@@ -4,12 +4,13 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup collect scan validate digest weekly test clean
+.PHONY: help setup alerts collect scan validate digest weekly test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
 	@echo ""
 	@echo "  make setup     install the one dependency and report outstanding TODOs"
+	@echo "  make alerts    print search strings for Google Alerts and manual sweeps"
 	@echo "  make collect   pull the permitted feeds into data/mentions.csv"
 	@echo "  make scan      suggest rows that may be red flags (a human decides)"
 	@echo "  make validate  check config and data for the week"
@@ -22,6 +23,9 @@ help:
 setup:
 	$(PY) -m pip install -r requirements.txt
 	-$(PY) scripts/validate_data.py
+
+alerts:
+	$(PY) scripts/alert_queries.py
 
 collect:
 	$(PY) scripts/collect_feeds.py

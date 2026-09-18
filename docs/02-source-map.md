@@ -74,11 +74,60 @@ most are customer reviews and are out of scope.
 ### News / web — weekly, feed
 Google Alerts RSS per entity. Catches layoffs, labour disputes and hiring coverage.
 
+## The alerts layer — what it does and does not cover
+
+Set expectations before spending an afternoon on this. **Alerts do not cover the platforms
+that matter most.** Glassdoor, AmbitionBox and LinkedIn reviews are largely invisible to
+Google Alerts — the pages are dynamic, often noindexed, and a new review rarely surfaces as a
+crawlable "news" item. Alerts are good at the tail: news coverage, blogs, forums, Quora, the
+occasional Reddit thread.
+
+So the alerts layer is worth an hour because it is the only thing watching **between** sweeps.
+It is not a substitute for the manual sweep, and a quiet alert inbox means nothing.
+
+| Layer | Covers | Latency |
+|---|---|---|
+| Google Alerts (RSS) | News, blogs, forums, Quora, some Reddit | Hours to a day |
+| Reddit search RSS | Reddit only | Near real-time |
+| Employer-account notifications | New reviews on a claimed profile | Same day, where offered |
+| Manual sweep | Everything, properly | Weekly |
+
+### Generating the queries
+
+Do not hand-write the search strings — generate them from the alias register so they cannot
+drift from what the collector filters on:
+
+```bash
+python3 scripts/alert_queries.py --format google   # alert queries, ready to paste
+python3 scripts/alert_queries.py --format manual   # per-platform sweep strings
+```
+
+Each entity gets a **broad** query (aliases OR-ed) and a **narrow** fallback (aliases AND an
+employment term, minus the known collisions). Start broad. Switch to narrow the first time an
+alert delivers a batch about a hotel chain in Dubai.
+
+### Platform-native alerts
+
+Worth setting up alongside Google Alerts, and often better:
+
+| Platform | What is available | Notes |
+|---|---|---|
+| **Glassdoor** | A free Employer Account on a **claimed** company profile gives email notification of new reviews | The most direct review alert available to us. Requires someone to claim and verify the profile — a decision for the group, not the desk |
+| **AmbitionBox** | Employer/business profile claiming exists; check whether the claimed account offers new-review notification | Verify before relying on it — do not assume parity with Glassdoor |
+| **LinkedIn** | Page admins are notified when the page is **@mentioned** | Plain-text mentions that do not tag the page produce no notification. The public post search in the weekly sweep is what actually catches those |
+| **X** | No free keyword alerting. Saved-search columns need X Pro (paid); the API needs a plan | Manual logged-out search each week is the V1 answer |
+| **Reddit** | No native keyword alert, but the public search RSS already runs in `scripts/collect_feeds.py` | Third-party keyword-to-email services exist and are free; they send our brand names to an outside party, so treat as an optional convenience, not part of the standard setup |
+| **Google Reviews** | Notification on new reviews via the Google Business Profile, if the group holds it | Mostly customer reviews — employment ones are a small minority |
+
+Claiming an employer profile is a **group decision, not a desk decision**: it is a public,
+attributable action and it changes the relationship with the platform. Raise it with the four
+rather than doing it to make the sweep easier.
+
 ## Setting up Google Alerts (Phase 1, once)
 
 1. Go to <https://www.google.com/alerts>.
-2. Create one alert per entity. Use quoted aliases OR-ed together, e.g.
-   `"Robust Kommerce" OR "Robust Commerce" OR "Robust Komerce"`.
+2. Create one alert per entity. Paste the query from
+   `python3 scripts/alert_queries.py --format google` — do not retype it.
 3. Set **How often: as-it-happens**, **Sources: automatic**, **Deliver to: RSS feed**.
 4. Copy the feed URL into the matching entry under `feeds:` in `config/sources.yaml` and set
    `enabled: true`.

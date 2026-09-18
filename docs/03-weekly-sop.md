@@ -30,6 +30,8 @@ Work the platform list in `docs/02-source-map.md`, priority 1 first. For each en
 - [ ] Reddit — check the subs the feed tends to miss
 - [ ] Indeed / Quora / YouTube / Google Reviews — on their fortnightly rotation
 
+Search strings for each platform: `python3 scripts/alert_queries.py --format manual`.
+
 For every new item, add a row to `data/mentions.csv` (schema: `docs/06-tracking-sheet-spec.md`).
 For every priority-1 page, add a row to `data/ratings.csv` **even when nothing changed** — the
 rating series needs the zero weeks as much as the movement.
@@ -114,7 +116,9 @@ Before weekly execution starts, run a deeper sweep to establish the baseline:
    `config/recipients.yaml`. Run `python3 scripts/validate_data.py` until the errors clear.
 2. Confirm the alias list with HR — especially former names
    (`needs_confirmation` in `config/entities.yaml`).
-3. Create the Google Alerts and paste the RSS URLs in.
+3. Create the Google Alerts: `python3 scripts/alert_queries.py --format google` prints the
+   queries; paste each RSS URL back into `config/sources.yaml` and set `enabled: true`.
+   See the alerts layer in `docs/02-source-map.md` for what alerts can and cannot cover.
 4. Capture the **current** rating and review count for every entity on Glassdoor and
    AmbitionBox into `data/ratings.csv`. This is week zero; every later movement is measured
    from here.
