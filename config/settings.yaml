@@ -1,0 +1,35 @@
+# Programme settings used by the scripts.
+
+programme:
+  name: HR Intelligence Digest
+  trial_start: "TODO: YYYY-MM-DD"   # week 1 Monday; drives the Phase 3 review date
+  owner: "TODO: name of the desk owner"
+  reply_to: "TODO: hr-intel@example.com"
+
+digest:
+  # Week runs Monday 00:00 to Sunday 23:59, local time. week_of is the Monday.
+  week_start: monday
+  send_day: monday
+  send_time: "10:00"
+  subject_template: "HR Intelligence Digest — week of {week_of} ({mention_count} mentions)"
+  # The shared spreadsheet the digest links to in section 6.
+  data_link: "TODO: paste the shared tracking-sheet URL"
+  # Show at most this many themes in section 4.
+  max_themes: 4
+  # Truncate one-line summaries in the What's New table to this many characters.
+  summary_max_chars: 160
+
+red_flags:
+  # Same-day escalation. See docs/04-red-flag-protocol.md.
+  sla_hours: 8
+  # A mention with engagement at or above this is treated as public-escalation risk.
+  virality_engagement_threshold: 100
+
+collector:
+  user_agent: "HR-Intelligence-Digest/1.0 (internal awareness monitoring; contact: TODO)"
+  timeout_seconds: 20
+  # Politeness gap between feed fetches.
+  delay_seconds: 2
+  # Require an employment-context term as well as an entity alias for these
+  # platforms. Review sites are exempt: every review is employment-related.
+  context_required_for: [news, reddit, x, quora, youtube, google_reviews]

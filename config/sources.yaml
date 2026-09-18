@@ -1,0 +1,170 @@
+# Platform source map — machine-readable half.
+# Narrative, search strings and compliance notes: docs/02-source-map.md
+#
+# collection:
+#   manual     - a person opens the page on the sweep schedule and records what is new
+#   feed       - a publisher-provided RSS/Atom feed the collector may fetch
+#   alert      - a standing Google Alert / platform alert that emails or feeds into us
+#
+# Nothing in this file may point a script at a page the platform's terms reserve for
+# human browsing. Glassdoor, AmbitionBox and LinkedIn are manual for that reason.
+
+platforms:
+  - id: ambitionbox
+    name: AmbitionBox
+    collection: manual
+    cadence: weekly
+    priority: 1
+    captures: [reviews, ratings, interviews, salaries]
+    notes: >-
+      Highest expected volume for India. Record the overall rating and review count
+      into data/ratings.csv on every sweep, even when no new review appeared.
+    urls:
+      rk_group: "TODO: paste AmbitionBox company URL"
+      rk_world: "TODO: paste AmbitionBox company URL"
+      robust_kommerce: "TODO: paste AmbitionBox company URL"
+      westbury_kommerce: "TODO: paste AmbitionBox company URL"
+
+  - id: glassdoor
+    name: Glassdoor
+    collection: manual
+    cadence: weekly
+    priority: 1
+    captures: [reviews, ratings, interviews, salaries]
+    notes: Record rating + review count weekly into data/ratings.csv.
+    urls:
+      rk_group: "TODO: paste Glassdoor company URL"
+      rk_world: "TODO: paste Glassdoor company URL"
+      robust_kommerce: "TODO: paste Glassdoor company URL"
+      westbury_kommerce: "TODO: paste Glassdoor company URL"
+
+  - id: linkedin
+    name: LinkedIn
+    collection: manual
+    cadence: weekly
+    priority: 1
+    captures: [company_page_activity, employee_posts, comments, exit_updates]
+    notes: >-
+      Company page activity and public post search only. Do not browse or compile
+      individual personal profiles — see the boundary in docs/00-brief.md section 4.
+    urls:
+      rk_group: "TODO: paste LinkedIn company page URL"
+      rk_world: "TODO: paste LinkedIn company page URL"
+      robust_kommerce: "TODO: paste LinkedIn company page URL"
+      westbury_kommerce: "TODO: paste LinkedIn company page URL"
+
+  - id: indeed
+    name: Indeed
+    collection: manual
+    cadence: fortnightly
+    priority: 2
+    captures: [reviews, interviews]
+    urls: {}
+
+  - id: x
+    name: X
+    collection: manual
+    cadence: weekly
+    priority: 2
+    captures: [mentions, complaints, threads]
+    notes: >-
+      Logged-out search on the alias list. If the group holds an X API plan, the
+      recent-search endpoint may be used instead — put the bearer token in the
+      environment, never in this repo.
+    urls: {}
+
+  - id: quora
+    name: Quora
+    collection: alert
+    cadence: weekly
+    priority: 3
+    captures: [answers]
+    urls: {}
+
+  - id: reddit
+    name: Reddit
+    collection: feed
+    cadence: weekly
+    priority: 2
+    captures: [threads, comments]
+    urls: {}
+
+  - id: youtube
+    name: YouTube
+    collection: manual
+    cadence: fortnightly
+    priority: 3
+    captures: [comments]
+    notes: Comments on videos about the group. Employment-related comments only.
+    urls: {}
+
+  - id: google_reviews
+    name: Google Reviews
+    collection: manual
+    cadence: fortnightly
+    priority: 3
+    captures: [reviews]
+    notes: Employment-related reviews only — skip customer and product reviews.
+    urls: {}
+
+  - id: news
+    name: News / web
+    collection: feed
+    cadence: weekly
+    priority: 3
+    captures: [articles]
+    urls: {}
+
+# Feeds the collector may fetch (scripts/collect_feeds.py).
+# Each one is a feed the publisher offers openly for machine reading.
+#
+# Google Alerts: create the alert at https://www.google.com/alerts, set
+# "Deliver to: RSS feed", then paste the feed URL here.
+feeds:
+  - id: google_alerts_rk_group
+    platform: news
+    entity: rk_group
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for RK Group"
+
+  - id: google_alerts_rk_world
+    platform: news
+    entity: rk_world
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for RK World"
+
+  - id: google_alerts_robust_kommerce
+    platform: news
+    entity: robust_kommerce
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for Robust Kommerce"
+
+  - id: google_alerts_westbury_kommerce
+    platform: news
+    entity: westbury_kommerce
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for Westbury Kommerce"
+
+  - id: reddit_search_rk_world
+    platform: reddit
+    entity: rk_world
+    enabled: true
+    url: "https://www.reddit.com/search.rss?q=%22RK%20World%22&sort=new&t=week"
+
+  - id: reddit_search_robust_kommerce
+    platform: reddit
+    entity: robust_kommerce
+    enabled: true
+    url: "https://www.reddit.com/search.rss?q=%22Robust%20Kommerce%22&sort=new&t=week"
+
+  - id: reddit_search_westbury_kommerce
+    platform: reddit
+    entity: westbury_kommerce
+    enabled: true
+    url: "https://www.reddit.com/search.rss?q=%22Westbury%20Kommerce%22&sort=new&t=week"
+
+  - id: reddit_search_rk_group
+    platform: reddit
+    entity: rk_group
+    enabled: true
+    url: "https://www.reddit.com/search.rss?q=%22RK%20Group%22&sort=new&t=week"

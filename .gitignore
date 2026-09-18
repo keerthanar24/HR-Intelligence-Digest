@@ -1,0 +1,17 @@
+# Generated digest output
+out/*
+!out/.gitkeep
+
+# Local secrets / API keys (never commit)
+.env
+config/secrets.yaml
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS / editor noise
+.DS_Store
+*.swp

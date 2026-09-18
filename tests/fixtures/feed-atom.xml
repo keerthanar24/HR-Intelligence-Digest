@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Reddit search</title>
+  <entry>
+    <title>Interview experience at Westburry Kommerce (misspelling on purpose)</title>
+    <link href="https://reddit.example.invalid/r/developersIndia/comments/aaa/"/>
+    <summary>&lt;div&gt;Had three rounds, recruiter ghosted after the offer discussion.&lt;/div&gt;</summary>
+    <published>2026-09-12T14:02:00Z</published>
+    <author><name>u/throwaway</name></author>
+  </entry>
+  <entry>
+    <title>Anyone worked at Robust Kommerce? Asking about appraisal cycle</title>
+    <link href="https://reddit.example.invalid/r/india/comments/bbb/"/>
+    <summary>Considering an offer, curious about the increment process.</summary>
+    <published>2026-09-13T06:30:00Z</published>
+  </entry>
+</feed>

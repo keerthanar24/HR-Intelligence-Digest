@@ -1,0 +1,2 @@
+# Only one third-party dependency, so the kit runs on a plain laptop.
+PyYAML>=6.0

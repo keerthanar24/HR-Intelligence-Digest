@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel>
+  <title>Google Alert - RK World</title>
+  <item>
+    <title>Ex-employee says RK World salary was delayed again</title>
+    <link>https://news.example.invalid/story/1?utm_source=alert</link>
+    <description>&lt;p&gt;A former warehouse worker at &lt;b&gt;RK World&lt;/b&gt; says his salary was delayed and his full and final settlement is pending.&lt;/p&gt;</description>
+    <pubDate>Fri, 11 Sep 2026 09:15:00 +0530</pubDate>
+  </item>
+  <item>
+    <title>RK World opens new distribution centre in Surat</title>
+    <link>https://news.example.invalid/story/2</link>
+    <description>The company inaugurated a facility on Thursday.</description>
+    <pubDate>Thu, 10 Sep 2026 11:00:00 +0530</pubDate>
+  </item>
+  <item>
+    <title>RK World Tours refuses to refund my booking</title>
+    <link>https://news.example.invalid/story/3</link>
+    <description>Customer complaint about a travel agency of a similar name.</description>
+    <pubDate>Wed, 09 Sep 2026 08:00:00 +0530</pubDate>
+  </item>
+  <item>
+    <title>Quarterly retail sector roundup</title>
+    <link>https://news.example.invalid/story/4</link>
+    <description>No mention of any of our entities.</description>
+    <pubDate>Tue, 08 Sep 2026 08:00:00 +0530</pubDate>
+  </item>
+</channel></rss>

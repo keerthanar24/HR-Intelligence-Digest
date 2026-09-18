@@ -1,0 +1,155 @@
+# Entity and keyword register for the HR Intelligence Digest.
+#
+# Every search, alert and automated feed filter is driven from this file.
+# Edit here, not in the scripts.
+#
+# aliases        : spellings people actually use (including misspellings and
+#                  previous names). Matching is case-insensitive and ignores
+#                  punctuation, so "R.K. Group" matches "rk group".
+# exclude_terms  : if one of these appears near the match, the hit is most
+#                  likely a different company or a customer/product topic.
+# needs_confirmation: previous/registered names that HR must confirm before we
+#                  rely on them. Left in the list but flagged.
+
+entities:
+  - id: rk_group
+    name: RK Group
+    role: Parent / corporate brand
+    aliases:
+      - RK Group
+      - R K Group
+      - R.K. Group
+      - RKGroup
+      - RK Grp
+      - RK group of companies
+      - RK Groups
+    needs_confirmation:
+      - RK Enterprises        # TODO(HR): confirm whether this was a previous name
+    exclude_terms:
+      - RK Group of Hotels
+      - RK Group Dubai
+
+  - id: rk_world
+    name: RK World
+    role: Operating entity
+    aliases:
+      - RK World
+      - R K World
+      - R.K. World
+      - RKWorld
+      - RK Worlds
+      - RK World Pvt
+      - RK World Private Limited
+    needs_confirmation: []
+    exclude_terms:
+      - RK World Tours
+
+  - id: robust_kommerce
+    name: Robust Kommerce
+    role: Operating entity
+    aliases:
+      - Robust Kommerce
+      - Robust Commerce
+      - Robust Komerce
+      - Robust Kommers
+      - RobustKommerce
+      - Robust E-Commerce
+      - Robust Ecommerce
+    needs_confirmation: []
+    exclude_terms: []
+
+  - id: westbury_kommerce
+    name: Westbury Kommerce
+    role: Operating entity
+    aliases:
+      - Westbury Kommerce
+      - Westbury Commerce
+      - Westbury Komerce
+      - Westburry Kommerce
+      - Westbery Kommerce
+      - West Bury Kommerce
+      - WestburyKommerce
+    needs_confirmation: []
+    exclude_terms:
+      - Westbury New York
+      - Westbury Hotel
+
+# Employment-context terms. A raw entity match plus one of these is what makes a
+# hit relevant. Used to filter noisy feeds (news, X, Reddit) — not applied to
+# review sites, where every review is employment-related by definition.
+context_terms:
+  - salary
+  - salaries
+  - ctc
+  - appraisal
+  - increment
+  - hike
+  - bonus
+  - incentive
+  - manager
+  - management
+  - hr
+  - human resources
+  - interview
+  - interviewed
+  - hiring
+  - recruiter
+  - offer letter
+  - joining
+  - onboarding
+  - notice period
+  - resign
+  - resigned
+  - resignation
+  - quit
+  - exit
+  - relieving letter
+  - experience letter
+  - full and final
+  - fnf
+  - f&f
+  - settlement
+  - pf
+  - provident fund
+  - esic
+  - gratuity
+  - layoff
+  - laid off
+  - fired
+  - terminated
+  - work culture
+  - toxic
+  - work life balance
+  - working hours
+  - overtime
+  - night shift
+  - harassment
+  - bullying
+  - abusive
+  - unsafe
+  - employee
+  - employees
+  - ex-employee
+  - working at
+  - work at
+  - job
+  - intern
+  - internship
+  - probation
+  - appraisal cycle
+  - unpaid
+
+# Terms that mark a hit as almost certainly out of scope (customer/product side).
+# Used as a demotion signal, not an automatic delete — a human confirms.
+out_of_scope_terms:
+  - refund
+  - delivery
+  - order id
+  - courier
+  - defective
+  - warranty
+  - return policy
+  - seller account
+  - product quality
+  - customer care
+  - shipment

@@ -1,0 +1,360 @@
+"""Shared helpers for the HR Intelligence Digest kit.
+
+Standard library only, apart from PyYAML for the config files. Everything the
+scripts agree on — the week definition, the sentiment scale, the theme
+taxonomy, the CSV schemas — lives here so the four scripts cannot drift.
+"""
+
+from __future__ import annotations
+
+import csv
+import datetime as dt
+import os
+import re
+import unicodedata
+from dataclasses import dataclass
+from typing import Any, Iterable
+
+try:
+    import yaml
+except ImportError:  # pragma: no cover - surfaced as a clear message, not a traceback
+    raise SystemExit(
+        "PyYAML is not installed. Run:  python3 -m pip install -r requirements.txt"
+    )
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_DIR = os.path.join(ROOT, "config")
+DATA_DIR = os.path.join(ROOT, "data")
+OUT_DIR = os.path.join(ROOT, "out")
+
+MENTIONS_CSV = os.path.join(DATA_DIR, "mentions.csv")
+RATINGS_CSV = os.path.join(DATA_DIR, "ratings.csv")
+ESCALATIONS_CSV = os.path.join(DATA_DIR, "escalations.csv")
+
+MENTION_FIELDS = [
+    "mention_id", "week_of", "captured_at", "captured_by", "entity", "platform",
+    "source_name", "url", "post_date", "author_type", "role_or_dept",
+    "title_or_snippet", "one_line_summary", "sentiment", "themes",
+    "rating_given", "engagement", "names_individual", "red_flag",
+    "red_flag_reason", "status", "notes",
+]
+
+RATING_FIELDS = [
+    "week_of", "captured_at", "captured_by", "entity", "platform",
+    "overall_rating", "review_count", "recommend_pct", "ceo_approval_pct",
+    "work_life_balance", "salary_benefits", "job_security", "career_growth",
+    "culture", "url", "notes",
+]
+
+ESCALATION_FIELDS = [
+    "escalation_id", "raised_at", "week_of", "mention_id", "entity", "platform",
+    "url", "severity", "reason", "notified", "notified_at", "owner",
+    "action_taken", "status", "closed_at",
+]
+
+# --- Controlled vocabularies -------------------------------------------------
+# Kept deliberately short. A tag nobody can apply consistently is worse than no
+# tag at all — see docs/05-sentiment-and-themes.md.
+
+SENTIMENT_SCORES = {
+    "very_negative": -2,
+    "negative": -1,
+    "neutral": 0,
+    "mixed": 0,
+    "positive": 1,
+    "very_positive": 2,
+}
+
+SENTIMENT_LABELS = {
+    "very_negative": "Very negative",
+    "negative": "Negative",
+    "neutral": "Neutral",
+    "mixed": "Mixed",
+    "positive": "Positive",
+    "very_positive": "Very positive",
+}
+
+THEMES = [
+    "compensation",
+    "appraisal",
+    "payroll_delay",
+    "management",
+    "culture",
+    "work_hours",
+    "workload",
+    "growth_learning",
+    "exits",
+    "layoffs",
+    "interview",
+    "onboarding",
+    "harassment_safety",
+    "facilities",
+    "transparency",
+    "job_security",
+]
+
+AUTHOR_TYPES = [
+    "current_employee", "ex_employee", "candidate", "intern",
+    "contractor", "anonymous", "unknown",
+]
+
+STATUSES = ["needs_review", "reviewed", "escalated", "closed", "out_of_scope"]
+
+RED_FLAG_REASONS = [
+    "names_individual",
+    "harassment_or_safety",
+    "non_payment",
+    "legal_or_regulatory",
+    "public_escalation_risk",
+]
+
+# --- Config ------------------------------------------------------------------
+
+
+def load_yaml(name: str) -> dict:
+    """Load a file from config/ by bare name, e.g. load_yaml('entities')."""
+    path = os.path.join(CONFIG_DIR, name if name.endswith(".yaml") else name + ".yaml")
+    with open(path, "r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def entity_names() -> dict[str, str]:
+    """entity id -> display name, in the order declared in config."""
+    cfg = load_yaml("entities")
+    return {e["id"]: e["name"] for e in cfg.get("entities", [])}
+
+
+def platform_names() -> dict[str, str]:
+    cfg = load_yaml("sources")
+    return {p["id"]: p["name"] for p in cfg.get("platforms", [])}
+
+
+def is_todo(value: Any) -> bool:
+    """True for a placeholder left in config, so scripts can warn rather than
+    silently ship 'TODO: paste the URL' into an email to four executives."""
+    return isinstance(value, str) and value.strip().upper().startswith("TODO")
+
+
+# --- Dates and weeks ---------------------------------------------------------
+
+
+def parse_date(value: str) -> dt.date | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
+        try:
+            return dt.datetime.strptime(value, fmt).date()
+        except ValueError:
+            continue
+    return None
+
+
+def monday_of(day: dt.date) -> dt.date:
+    """The Monday that starts the week containing `day`."""
+    return day - dt.timedelta(days=day.weekday())
+
+
+def last_complete_week(today: dt.date | None = None) -> dt.date:
+    """Monday of the most recently finished week.
+
+    The digest goes out on Monday morning covering the week that just closed,
+    so 'this week so far' is never reported as a full week.
+    """
+    today = today or dt.date.today()
+    return monday_of(today) - dt.timedelta(days=7)
+
+
+def week_range(week_of: dt.date) -> tuple[dt.date, dt.date]:
+    return week_of, week_of + dt.timedelta(days=6)
+
+
+def fmt_week(week_of: dt.date) -> str:
+    start, end = week_range(week_of)
+    if start.month == end.month:
+        return f"{start.strftime('%-d')}–{end.strftime('%-d %b %Y')}"
+    return f"{start.strftime('%-d %b')} – {end.strftime('%-d %b %Y')}"
+
+
+# --- Text matching -----------------------------------------------------------
+
+_PUNCT = re.compile(r"[^\w\s]", re.UNICODE)
+_SPACE = re.compile(r"\s+")
+
+
+def normalise(text: str) -> str:
+    """Lowercase, strip accents and punctuation, collapse whitespace.
+
+    Makes 'R.K. Group', 'r k group' and 'RK  Group' all compare equal, which is
+    the whole point of the misspelling list.
+    """
+    text = unicodedata.normalize("NFKD", text or "")
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = _PUNCT.sub(" ", text.lower())
+    return _SPACE.sub(" ", text).strip()
+
+
+@dataclass
+class Match:
+    entity_id: str
+    alias: str
+    has_context: bool
+    out_of_scope_hint: bool
+
+
+class EntityMatcher:
+    """Matches free text against the alias register in config/entities.yaml."""
+
+    def __init__(self, cfg: dict | None = None):
+        cfg = cfg or load_yaml("entities")
+        self.entities = cfg.get("entities", [])
+        self.context_terms = [normalise(t) for t in cfg.get("context_terms", [])]
+        self.out_terms = [normalise(t) for t in cfg.get("out_of_scope_terms", [])]
+        self._aliases: list[tuple[str, str, str]] = []  # (entity_id, alias, normalised)
+        self._excludes: dict[str, list[str]] = {}
+        for ent in self.entities:
+            names = list(ent.get("aliases") or []) + list(ent.get("needs_confirmation") or [])
+            for alias in names:
+                self._aliases.append((ent["id"], alias, normalise(alias)))
+            self._excludes[ent["id"]] = [normalise(x) for x in (ent.get("exclude_terms") or [])]
+        # Longest alias first so "RK World Private Limited" wins over "RK World".
+        self._aliases.sort(key=lambda a: len(a[2]), reverse=True)
+
+    @staticmethod
+    def _contains(haystack: str, needle: str) -> bool:
+        """Word-boundary containment on already-normalised strings."""
+        if not needle:
+            return False
+        return re.search(r"(?<!\w)" + re.escape(needle) + r"(?!\w)", haystack) is not None
+
+    def match(self, text: str) -> list[Match]:
+        norm = normalise(text)
+        if not norm:
+            return []
+        has_context = any(self._contains(norm, t) for t in self.context_terms)
+        out_hint = any(self._contains(norm, t) for t in self.out_terms)
+        seen: set[str] = set()
+        results: list[Match] = []
+        for entity_id, alias, alias_norm in self._aliases:
+            if entity_id in seen or not self._contains(norm, alias_norm):
+                continue
+            if any(self._contains(norm, x) for x in self._excludes.get(entity_id, [])):
+                continue
+            seen.add(entity_id)
+            results.append(Match(entity_id, alias, has_context, out_hint))
+        return results
+
+
+# --- URLs --------------------------------------------------------------------
+
+_TRACKING_PARAMS = re.compile(
+    r"(^|&)(utm_[^=]*|fbclid|gclid|igshid|ref|ref_src|si)=[^&]*", re.IGNORECASE
+)
+
+
+def canonical_url(url: str) -> str:
+    """Normalise a URL enough to dedupe the same post arriving twice."""
+    url = (url or "").strip()
+    if not url:
+        return ""
+    url = url.split("#", 1)[0]
+    if "?" in url:
+        base, query = url.split("?", 1)
+        query = _TRACKING_PARAMS.sub("", query).strip("&")
+        url = f"{base}?{query}" if query else base
+    url = re.sub(r"^https?://", "", url, flags=re.IGNORECASE)
+    url = re.sub(r"^www\.", "", url, flags=re.IGNORECASE)
+    return url.rstrip("/").lower()
+
+
+# --- CSV ---------------------------------------------------------------------
+
+
+def read_csv(path: str) -> list[dict]:
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="", encoding="utf-8") as fh:
+        return list(csv.DictReader(fh))
+
+
+def ensure_csv(path: str, fields: list[str]) -> None:
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            csv.DictWriter(fh, fieldnames=fields).writeheader()
+
+
+def append_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
+    rows = list(rows)
+    if not rows:
+        return 0
+    ensure_csv(path, fields)
+    with open(path, "a", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fields})
+    return len(rows)
+
+
+def mentions_for_week(rows: list[dict], week_of: dt.date) -> list[dict]:
+    """Rows belonging to a week, by week_of when set, else by post_date."""
+    target = week_of.isoformat()
+    picked = []
+    for row in rows:
+        if (row.get("week_of") or "").strip() == target:
+            picked.append(row)
+            continue
+        if not (row.get("week_of") or "").strip():
+            posted = parse_date(row.get("post_date", ""))
+            if posted and monday_of(posted) == week_of:
+                picked.append(row)
+    return picked
+
+
+def split_themes(value: str) -> list[str]:
+    return [t.strip() for t in re.split(r"[|,;]", value or "") if t.strip()]
+
+
+def sentiment_score(row: dict) -> int | None:
+    return SENTIMENT_SCORES.get((row.get("sentiment") or "").strip().lower())
+
+
+def net_sentiment(rows: list[dict]) -> float | None:
+    """Mean sentiment score over the rows that carry a valid tag.
+
+    Untagged rows are excluded rather than counted as neutral — a neutral-looking
+    average built from untagged rows would be a lie.
+    """
+    scores = [s for s in (sentiment_score(r) for r in rows) if s is not None]
+    if not scores:
+        return None
+    return sum(scores) / len(scores)
+
+
+def is_yes(value: str) -> bool:
+    return (value or "").strip().lower() in {"yes", "y", "true", "1"}
+
+
+def to_int(value: str, default: int = 0) -> int:
+    try:
+        return int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return default
+
+
+def to_float(value: str) -> float | None:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def next_mention_id(existing: list[dict], week_of: dt.date) -> str:
+    """M-YYYYMMDD-NNN, sequential within the week."""
+    prefix = f"M-{week_of.strftime('%Y%m%d')}-"
+    used = [
+        to_int(r["mention_id"][len(prefix):], 0)
+        for r in existing
+        if (r.get("mention_id") or "").startswith(prefix)
+    ]
+    return f"{prefix}{(max(used) + 1) if used else 1:03d}"

@@ -1,0 +1,26 @@
+# Distribution list for the weekly digest and red-flag alerts.
+# Four recipients during the trial. Keep it narrow.
+
+digest:
+  - name: Mahendra
+    email: "TODO: mahendra@example.com"
+  - name: Sonal
+    email: "TODO: sonal@example.com"
+  - name: Ramesh
+    email: "TODO: ramesh@example.com"
+  - name: Akshay
+    email: "TODO: akshay@example.com"
+
+# Red-flag alerts go to the same four by default. Add anyone who must be woken
+# up for a critical item (e.g. POSH IC chair) under escalation_only.
+red_flag:
+  - name: Mahendra
+    email: "TODO: mahendra@example.com"
+  - name: Sonal
+    email: "TODO: sonal@example.com"
+  - name: Ramesh
+    email: "TODO: ramesh@example.com"
+  - name: Akshay
+    email: "TODO: akshay@example.com"
+
+escalation_only: []
