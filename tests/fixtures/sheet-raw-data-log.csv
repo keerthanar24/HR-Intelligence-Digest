@@ -1,0 +1,7 @@
+Date Logged,Date Posted,Entity       ,Platform ,Sentiment ,Topic Category,Summary Overview,Direct Link / URL,Red Flag Escalated
+2026-09-14,2026-09-09,Robust Kommerce,AmbitionBox,Negative,Salary & Appraisals,Says the appraisal cycle slipped by a quarter,https://example.invalid/ab/3,No
+2026-09-14,2026-09-10,RKWorld,AmbitionBox,Red Flag,Salary & Appraisals,Ex-employee reports full-and-final settlement pending for two months,https://example.invalid/ab/4,Yes
+2026-09-14,2026-09-11,RK Group,LinkedIn,Positive,Culture,"Long-service post, positive about growth opportunities",https://example.invalid/li/2,No
+2026-09-14,2026-09-12,Westbury Kommerce,X / Twitter,Negative,Interviews,Candidate describes a disorganised interview loop,https://example.invalid/x/1,No
+2026-09-14,2026-09-12,RKWorld,Glassdoor,Neutral,Work Hours,"Notes long hours in peak season, otherwise balanced",https://example.invalid/gd/1,No
+2026-09-14,,RK Group,Quora,Positive,Management,Answer praising a specific manager,https://example.invalid/q/1,No

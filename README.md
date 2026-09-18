@@ -42,11 +42,12 @@ Then the weekly loop:
 ```bash
 python3 scripts/sheet_setup.py                   # 0. (setup) sheet headers + dropdowns
 python3 scripts/alert_queries.py                 # 0. (setup) search strings for alerts + sweeps
-python3 scripts/collect_feeds.py                 # 1. pull the permitted feeds
+python3 scripts/import_sheet.py tracker.xlsx     # 1. pull the sheet into data/
+python3 scripts/collect_feeds.py                 # 2. pull the permitted feeds
 #    ... manual sweep + tagging, per docs/03-weekly-sop.md ...
-python3 scripts/red_flags.py --scan              # 2. surface possible same-day escalations
-python3 scripts/validate_data.py --week <monday> # 3. check before sending
-python3 scripts/build_digest.py --stdout         # 4. build the email body
+python3 scripts/red_flags.py --scan              # 3. surface possible same-day escalations
+python3 scripts/validate_data.py --week <monday> # 4. check before sending
+python3 scripts/build_digest.py --stdout         # 5. build the email body
 ```
 
 `make weekly` runs steps 2–4 in order.
@@ -64,6 +65,7 @@ python3 scripts/build_digest.py --stdout         # 4. build the email body
 | [`docs/06-tracking-sheet-spec.md`](docs/06-tracking-sheet-spec.md) | Column-by-column schema for the three data files |
 | [`docs/07-phase3-review.md`](docs/07-phase3-review.md) | Month-2 decision agenda and criteria, fixed in advance |
 | [`docs/08-google-sheet-setup.md`](docs/08-google-sheet-setup.md) | Standing up the tracking sheet and the weekly export step |
+| [`docs/09-workbook-review.md`](docs/09-workbook-review.md) | Review of the supplied tracker and how the importer consumes it |
 | `config/` | Entities and aliases, source map and feeds, recipients, settings |
 | `data/` | `mentions.csv`, `ratings.csv`, `escalations.csv` — the record |
 | `scripts/` | Collector, digest builder, red-flag tool, validator, sheet and alert-query helpers |

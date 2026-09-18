@@ -29,6 +29,7 @@ H.ESCALATIONS_CSV = os.path.join(FIXTURES, "escalations.csv")
 
 import build_digest  # noqa: E402
 import collect_feeds  # noqa: E402
+import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
 
 WEEK = dt.date(2026, 9, 7)
@@ -86,6 +87,75 @@ def test_urls() -> None:
     check("tracking params and host variants collapse", a == b, f"({a!r} vs {b!r})")
     check("distinct posts stay distinct",
           H.canonical_url("https://a.test/p/1") != H.canonical_url("https://a.test/p/2"))
+
+
+def test_sheet_import() -> None:
+    """The workbook's own headers and dropdown vocabulary map onto the schema."""
+    print("sheet import")
+    cfg = H.load_yaml("column_map")
+    notes = import_sheet.Notes()
+
+    rows = import_sheet.read_csv_file(os.path.join(FIXTURES, "sheet-raw-data-log.csv"))
+    mentions = import_sheet.import_mentions(rows, cfg, notes)
+    check("all data rows imported", len(mentions) == 6, f"(got {len(mentions)})")
+
+    # Headers in the workbook carry trailing spaces ('Entity       ').
+    check("trailing whitespace in headers tolerated",
+          all(m["entity"] for m in mentions))
+    check("'RKWorld' maps to the rk_world id",
+          any(m["entity"] == "rk_world" for m in mentions))
+    check("'X / Twitter' maps to the x platform",
+          any(m["platform"] == "x" for m in mentions))
+    check("'Salary & Appraisals' maps to a known theme",
+          any(m["themes"] == "compensation" for m in mentions))
+    check("every entity is a known id",
+          all(m["entity"] in H.entity_names() for m in mentions))
+    check("every platform is a known id",
+          all(m["platform"] in H.platform_names() for m in mentions))
+
+    # 'Red Flag' sits in the Sentiment dropdown but is not a point on the scale.
+    flagged = [m for m in mentions if H.is_yes(m["red_flag"])]
+    check("'Red Flag' sentiment sets the flag", len(flagged) == 1, f"(got {len(flagged)})")
+    check("'Red Flag' sentiment is not invented as a score",
+          flagged and flagged[0]["sentiment"] == "")
+    check("the substitution is reported, not silent",
+          any("Red Flag" in w and "re-tag" in w for w in notes.warnings))
+    check("missing red-flag reason is reported",
+          any("Red Flag Reason" in w for w in notes.warnings))
+
+    # week_of is derived from Date Posted, since the sheet has no week column.
+    dated = [m for m in mentions if m["post_date"] == "2026-09-09"]
+    check("week derived from Date Posted",
+          dated and dated[0]["week_of"] == WEEK.isoformat(),
+          f"(got {dated[0]['week_of'] if dated else None})")
+    check("row with no Date Posted is reported",
+          any("no Date Posted" in w for w in notes.warnings))
+    check("mention ids generated and unique",
+          len({m["mention_id"] for m in mentions}) == 6)
+    check("untagged rows marked needs_review",
+          all(m["status"] in H.STATUSES for m in mentions))
+
+    # Ratings: the wide tab un-pivots to one row per entity x platform.
+    rt = import_sheet.read_csv_file(os.path.join(FIXTURES, "sheet-rating-tracker.csv"))
+    ratings = import_sheet.import_ratings(rt, cfg, notes)
+    check("wide rating rows un-pivot to long form", len(ratings) == 3, f"(got {len(ratings)})")
+    check("a blank platform rating produces no row",
+          not any(r["entity"] == "robust_kommerce" and r["platform"] == "glassdoor"
+                  for r in ratings))
+    check("ambiguous Total Reviews Count not attributed",
+          all(r["review_count"] == "" for r in ratings))
+    check("the ambiguity is reported",
+          any("Total Reviews Count" in w for w in notes.warnings))
+    check("single-snapshot overwrite risk is reported",
+          any("APPEND" in w for w in notes.warnings))
+
+    # The imported rows must survive validation and produce a digest.
+    import validate_data
+    report = validate_data.Report()
+    validate_data.check_mentions(report, mentions, WEEK)
+    schema_errors = [e for e in report.errors if "unknown" in e or "duplicate" in e]
+    check("imported rows pass schema validation", not schema_errors,
+          f"({schema_errors[:1]})")
 
 
 def test_digest() -> None:
@@ -230,7 +300,7 @@ def test_red_flags() -> None:
 
 def main() -> int:
     for test in (test_matching, test_weeks, test_urls, test_collector,
-                 test_digest, test_red_flags):
+                 test_sheet_import, test_digest, test_red_flags):
         test()
     print()
     if failures:

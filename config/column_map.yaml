@@ -1,0 +1,154 @@
+# Maps the HR_Intelligence_Master_Tracker workbook onto the canonical schema.
+#
+# The sheet is the human working surface and keeps its own friendly column
+# names; scripts/import_sheet.py translates. Header matching ignores case,
+# spaces, punctuation and trailing whitespace, so 'Entity       ' still maps.
+#
+# Add a spelling to a list here rather than renaming a column in the sheet.
+
+tabs:
+  mentions:
+    sheet_names: [Raw_Data_Log, mentions, Raw Data Log]
+    columns:
+      captured_at:       [Date Logged, captured_at, Logged Date]
+      post_date:         [Date Posted, post_date, Posted Date]
+      entity:            [Entity, entity]
+      platform:          [Platform, platform]
+      sentiment:         [Sentiment, sentiment]
+      themes:            [Topic Category, Topic, themes, Theme]
+      one_line_summary:  [Summary Overview, Summary, one_line_summary]
+      url:               [Direct Link / URL, URL, Link, url]
+      red_flag:          [Red Flag Escalated, Red Flag, red_flag]
+      # Columns the workbook does not have yet. Listed so that adding one to
+      # the sheet makes it work with no code change.
+      mention_id:        [Mention ID, mention_id, ID]
+      week_of:           [Week Of, week_of]
+      captured_by:       [Logged By, Captured By, captured_by]
+      source_name:       [Source, source_name]
+      author_type:       [Author Type, author_type, Reviewer Type]
+      role_or_dept:      [Role, Department, role_or_dept]
+      title_or_snippet:  [Title, Snippet, title_or_snippet]
+      rating_given:      [Stars, Rating Given, rating_given]
+      engagement:        [Engagement, Likes, engagement]
+      names_individual:  [Names Individual, Names a Person, names_individual]
+      red_flag_reason:   [Red Flag Reason, Trigger, red_flag_reason]
+      status:            [Status, status]
+      notes:             [Notes, notes]
+
+  ratings:
+    sheet_names: [Rating_Tracker, ratings, Rating Tracker]
+    # This tab is WIDE (one row per entity, a column per platform) while the
+    # schema is LONG (one row per entity x platform x week). The importer
+    # un-pivots using the per_platform block below.
+    layout: wide
+    columns:
+      entity:          [Entity, Entity Name, entity]
+      captured_at:     [Last Checked Date, Date Checked, captured_at]
+      week_of:         [Week Of, week_of]
+      captured_by:     [Checked By, captured_by]
+      notes:           [Notes, notes]
+    per_platform:
+      ambitionbox:
+        overall_rating: [AmbitionBox Rating, Ambition Box Rating]
+        review_count:   [AmbitionBox Reviews Count, AmbitionBox Review Count]
+        url:            [AmbitionBox URL, AmbitionBox Link]
+      glassdoor:
+        overall_rating: [Glassdoor Rating]
+        review_count:   [Glassdoor Reviews Count, Glassdoor Review Count]
+        url:            [Glassdoor URL, Glassdoor Link]
+    # Columns deliberately not imported, with the reason.
+    ignore:
+      # Computed by build_digest.py from consecutive snapshots. A stored copy
+      # drifts from the data the moment anyone edits a rating.
+      - Week-on-Week Delta
+      # Ambiguous while one column serves two platforms that have separate
+      # ratings. Split into 'AmbitionBox Reviews Count' and 'Glassdoor Reviews
+      # Count' and it imports automatically.
+      - Total Reviews Count
+
+  escalations:
+    sheet_names: [Escalations, escalations, Red_Flag_Log]
+    columns:
+      escalation_id: [Escalation ID, escalation_id]
+      raised_at:     [Raised At, Date Raised, raised_at]
+      week_of:       [Week Of, week_of]
+      mention_id:    [Mention ID, mention_id]
+      entity:        [Entity, entity]
+      platform:      [Platform, platform]
+      url:           [Direct Link / URL, URL, Link, url]
+      severity:      [Severity, severity]
+      reason:        [Reason, Trigger, reason]
+      notified:      [Notified, Sent To, notified]
+      notified_at:   [Notified At, Date Sent, notified_at]
+      owner:         [Owner, owner]
+      action_taken:  [Action Taken, action_taken]
+      status:        [Status, status]
+      closed_at:     [Closed At, closed_at]
+
+# Sheet vocabulary -> canonical vocabulary. Unmapped values are reported by the
+# importer rather than silently dropped.
+values:
+  entity:
+    RK Group: rk_group
+    RKWorld: rk_world
+    RK World: rk_world
+    Robust Kommerce: robust_kommerce
+    Westbury Kommerce: westbury_kommerce
+
+  platform:
+    AmbitionBox: ambitionbox
+    Ambition Box: ambitionbox
+    Glassdoor: glassdoor
+    LinkedIn: linkedin
+    X / Twitter: x
+    X: x
+    Twitter: x
+    Reddit: reddit
+    Quora: quora
+    YouTube: youtube
+    Google Reviews: google_reviews
+    Indeed: indeed
+
+  sentiment:
+    Very Positive: very_positive
+    Positive: positive
+    Neutral: neutral
+    Mixed: mixed
+    Negative: negative
+    Very Negative: very_negative
+    # 'Red Flag' is in the workbook's Sentiment dropdown but is not a point on
+    # a sentiment scale. The importer sets red_flag=yes and leaves sentiment
+    # blank rather than inventing a score, then warns. See docs/09.
+    Red Flag: __red_flag__
+
+  themes:
+    Culture: culture
+    Management: management
+    # The workbook's single 'Salary & Appraisals' category covers three
+    # distinct problems. Imports as compensation; see the note in docs/09.
+    Salary & Appraisals: compensation
+    Salary and Appraisals: compensation
+    Compensation: compensation
+    Appraisals: appraisal
+    Payroll Delay: payroll_delay
+    Interviews: interview
+    Work Hours: work_hours
+    Workload: workload
+    Onboarding: onboarding
+    Exit / Layoff: exits
+    Exits: exits
+    Layoffs: layoffs
+    Safety / Legal: harassment_safety
+    Harassment / Safety: harassment_safety
+    Growth: growth_learning
+    Facilities: facilities
+    Transparency: transparency
+    Job Security: job_security
+
+  red_flag:
+    "Yes": "yes"
+    "No": "no"
+    "Y": "yes"
+    "N": "no"
+    "TRUE": "yes"
+    "FALSE": "no"

@@ -28,6 +28,21 @@ NARROW_TERMS = ["salary", "employee", "appraisal", "interview", "manager", "resi
 # Terms worth a standing alert of their own, across all entities at once.
 RED_FLAG_TERMS = ["unpaid", "harassment", "labour court", "layoff"]
 
+# Sites worth an X-ray (site:) search by hand. Deliberately review and
+# discussion pages only.
+#
+# NOTE: the classic recruiting "X-ray" targets linkedin.com/in/ to enumerate
+# people's profiles. That is the surveillance pattern the brief rules out
+# (docs/00-brief.md section 4), so it is not generated here and should not be
+# added. We search where the company is discussed, not where individuals live.
+XRAY_SITES = [
+    "ambitionbox.com",
+    "glassdoor.co.in",
+    "indeed.co.in",
+    "reddit.com",
+    "quora.com",
+]
+
 
 def quoted_aliases(entity: dict, include_unconfirmed: bool = True) -> list[str]:
     names = list(entity.get("aliases") or [])
@@ -56,10 +71,23 @@ def narrow_query(entity: dict) -> str:
     return f"{query} {excludes}".strip()
 
 
+def xray_query(entity: dict) -> str:
+    aliases = " OR ".join(quoted_aliases(entity)[:4])
+    sites = " OR ".join(f"site:{site}" for site in XRAY_SITES)
+    return f"({sites}) ({aliases})"
+
+
+def boolean_query(entity: dict) -> str:
+    aliases = " OR ".join(quoted_aliases(entity))
+    context = " OR ".join(NARROW_TERMS)
+    return f"({aliases}) AND ({context})"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--entity", help="limit to one entity id")
-    parser.add_argument("--format", choices=["all", "google", "manual"], default="all")
+    parser.add_argument("--format", choices=["all", "google", "manual", "matrix"],
+                        default="all")
     args = parser.parse_args()
 
     cfg = H.load_yaml("entities")
@@ -69,6 +97,20 @@ def main() -> int:
         if not entities:
             print(f"No entity with id {args.entity!r}", file=sys.stderr)
             return 2
+
+    if args.format == "matrix":
+        # Paste-ready rows for the workbook's Keyword_Matrix tab.
+        print("Entity Name\tName Variations & Aliases\t"
+              "Google X-Ray Search String\tLinkedIn / Social Boolean String")
+        for entity in entities:
+            aliases = ", ".join(a.strip('"') for a in quoted_aliases(entity))
+            print("\t".join([entity["name"], aliases,
+                             xray_query(entity), boolean_query(entity)]))
+        print()
+        print("Paste into Keyword_Matrix!A1. The X-ray strings target review and")
+        print("discussion sites only — profile X-ray (site:linkedin.com/in/) is")
+        print("excluded on purpose; see docs/00-brief.md section 4.")
+        return 0
 
     if args.format in ("all", "google"):
         print("=" * 72)

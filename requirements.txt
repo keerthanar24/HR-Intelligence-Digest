@@ -1,2 +1,6 @@
 # Only one third-party dependency, so the kit runs on a plain laptop.
 PyYAML>=6.0
+
+# Optional: only needed by scripts/import_sheet.py to read the .xlsx workbook
+# directly. Without it, export each tab as CSV and use --csv instead.
+openpyxl>=3.1
