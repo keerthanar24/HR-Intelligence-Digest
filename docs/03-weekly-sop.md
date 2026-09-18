@@ -73,13 +73,20 @@ that is a genuine trigger:
 
 Red flags do **not** wait for the Monday digest. Full protocol: `docs/04-red-flag-protocol.md`.
 
-## Step 4 — Validate (5 min)
+## Step 4 — Export and validate (10 min)
+
+Working in Google Sheets? Export first — the scripts read the CSVs, not the sheet
+(`docs/08-google-sheet-setup.md`):
+
+**File → Download → Comma-separated values**, one tab at a time, into `data/mentions.csv`,
+`data/ratings.csv`, `data/escalations.csv`. Then:
 
 ```bash
 python3 scripts/validate_data.py --week $(date -d 'last monday - 7 days' +%F)
 ```
 
-Fix every ERROR. WARNINGs are judgement calls — an empty week is a warning, and it is fine.
+Fix every ERROR **in the sheet**, then re-export — a fix made in the CSV is lost on the next
+export. WARNINGs are judgement calls; an empty week is a warning, and it is fine.
 
 ## Step 5 — Build and send (20 min)
 
@@ -114,18 +121,20 @@ Before weekly execution starts, run a deeper sweep to establish the baseline:
 
 1. Fill in every `TODO:` in `config/sources.yaml`, `config/settings.yaml` and
    `config/recipients.yaml`. Run `python3 scripts/validate_data.py` until the errors clear.
-2. Confirm the alias list with HR — especially former names
+2. Stand up the sheet: `python3 scripts/sheet_setup.py` prints the headers, dropdowns and
+   formatting rules. See `docs/08-google-sheet-setup.md`.
+3. Confirm the alias list with HR — especially former names
    (`needs_confirmation` in `config/entities.yaml`).
-3. Create the Google Alerts: `python3 scripts/alert_queries.py --format google` prints the
+4. Create the Google Alerts: `python3 scripts/alert_queries.py --format google` prints the
    queries; paste each RSS URL back into `config/sources.yaml` and set `enabled: true`.
    See the alerts layer in `docs/02-source-map.md` for what alerts can and cannot cover.
-4. Capture the **current** rating and review count for every entity on Glassdoor and
+5. Capture the **current** rating and review count for every entity on Glassdoor and
    AmbitionBox into `data/ratings.csv`. This is week zero; every later movement is measured
    from here.
-5. Read back the last ~90 days of reviews on the priority-1 platforms and log them. Do not
+6. Read back the last ~90 days of reviews on the priority-1 platforms and log them. Do not
    send them as a digest — they are context for judging what "normal" looks like, and the
    2–3 month site lag means they describe the quarter before last.
-6. Do a dry run: build a digest for a past week and circulate it to the four for format
+7. Do a dry run: build a digest for a past week and circulate it to the four for format
    feedback, clearly marked as a sample.
 
 ## Empty weeks

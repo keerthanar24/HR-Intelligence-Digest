@@ -40,6 +40,7 @@ python3 tests/smoke_test.py             # end-to-end check against the fixtures
 Then the weekly loop:
 
 ```bash
+python3 scripts/sheet_setup.py                   # 0. (setup) sheet headers + dropdowns
 python3 scripts/alert_queries.py                 # 0. (setup) search strings for alerts + sweeps
 python3 scripts/collect_feeds.py                 # 1. pull the permitted feeds
 #    ... manual sweep + tagging, per docs/03-weekly-sop.md ...
@@ -62,9 +63,10 @@ python3 scripts/build_digest.py --stdout         # 4. build the email body
 | [`docs/05-sentiment-and-themes.md`](docs/05-sentiment-and-themes.md) | Tagging rubric, scale anchors, theme taxonomy |
 | [`docs/06-tracking-sheet-spec.md`](docs/06-tracking-sheet-spec.md) | Column-by-column schema for the three data files |
 | [`docs/07-phase3-review.md`](docs/07-phase3-review.md) | Month-2 decision agenda and criteria, fixed in advance |
+| [`docs/08-google-sheet-setup.md`](docs/08-google-sheet-setup.md) | Standing up the tracking sheet and the weekly export step |
 | `config/` | Entities and aliases, source map and feeds, recipients, settings |
 | `data/` | `mentions.csv`, `ratings.csv`, `escalations.csv` — the record |
-| `scripts/` | Collector, digest builder, red-flag tool, validator, alert-query generator |
+| `scripts/` | Collector, digest builder, red-flag tool, validator, sheet and alert-query helpers |
 | `templates/` | Printable weekly sweep checklist |
 | `tests/` | Fixtures and an end-to-end smoke test |
 
