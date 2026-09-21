@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import html
+import json
 import re
 import sys
 import time
@@ -73,6 +74,92 @@ def build_feed_url(feed: dict, entities: dict) -> str:
         return ("https://www.reddit.com/search.rss?q="
                 + urllib.parse.quote(query) + "&sort=new&t=week")
     raise ValueError(f"unknown auto_query kind {kind!r} on feed {feed.get('id')}")
+
+
+X_SEARCH_URL = "https://api.x.com/2/tweets/search/recent"
+X_QUERY_LIMIT = 512          # X Basic tier; Pro allows 1024
+X_TOKEN_ENV = "X_BEARER_TOKEN"
+
+# Employment context for the X query. Deliberately a spread across the themes
+# rather than the head of the entities.yaml list, which is all pay terms: X is
+# where a harassment thread or a layoff claim goes public, and a
+# compensation-only filter would never see one.
+X_CONTEXT = [
+    "salary", "unpaid", "appraisal", "manager", "hr", "interview",
+    '"notice period"', "resign", "layoff", "fired", "harassment", "toxic",
+    '"work culture"', "employee",
+]
+
+
+def build_x_query(entity: dict, context_terms: list[str] | None = None) -> str:
+    """An X recent-search query for one entity.
+
+    Shaped by the 512-character limit on the Basic tier, so spacing and
+    punctuation variants are collapsed first - X tokenises them the same way,
+    and leaving them in would crowd out a real trading name.
+    """
+    names, seen = [], set()
+    for alias in list(entity.get("aliases") or []) + list(entity.get("needs_confirmation") or []):
+        shape = "".join(ch for ch in alias.lower() if ch.isalnum())
+        if shape not in seen:
+            seen.add(shape)
+            names.append(alias)
+
+    context = " OR ".join(context_terms or X_CONTEXT)
+    # -is:retweet keeps one row per post; a viral complaint would otherwise
+    # arrive hundreds of times and drown the week.
+    suffix = f") ({context}) -is:retweet"
+    query = "(" + " OR ".join(f'"{n}"' for n in names) + suffix
+    while len(query) > X_QUERY_LIMIT and len(names) > 1:
+        names.pop()
+        query = "(" + " OR ".join(f'"{n}"' for n in names) + suffix
+    return query
+
+
+def parse_x_payload(payload: dict) -> list[dict]:
+    """Normalise an X recent-search response to the shared feed item shape."""
+    usernames = {
+        user["id"]: user.get("username", "")
+        for user in payload.get("includes", {}).get("users", [])
+    }
+
+    items = []
+    for tweet in payload.get("data", []):
+        metrics = tweet.get("public_metrics", {}) or {}
+        handle = usernames.get(tweet.get("author_id", ""), "")
+        # Without the author handle X still resolves a post by id alone.
+        url = (f"https://x.com/{handle}/status/{tweet['id']}" if handle
+               else f"https://x.com/i/web/status/{tweet['id']}")
+        items.append({
+            "title": " ".join((tweet.get("text") or "").split())[:300],
+            "url": url,
+            "summary": tweet.get("text", ""),
+            "published": (tweet.get("created_at") or "")[:10],
+            "author": f"@{handle}" if handle else "",
+            "engagement": (metrics.get("like_count", 0) + metrics.get("retweet_count", 0)
+                           + metrics.get("reply_count", 0) + metrics.get("quote_count", 0)),
+        })
+    return items
+
+
+def fetch_x_search(query: str, token: str, timeout: int, max_results: int = 100) -> list[dict]:
+    """Query X's recent-search endpoint.
+
+    Recent search covers the last 7 days, which is exactly the digest's window.
+    """
+    params = urllib.parse.urlencode({
+        "query": query,
+        "max_results": max(10, min(int(max_results), 100)),
+        "tweet.fields": "created_at,public_metrics,lang",
+        "expansions": "author_id",
+        "user.fields": "username",
+    })
+    request = urllib.request.Request(
+        f"{X_SEARCH_URL}?{params}",
+        headers={"Authorization": f"Bearer {token}", "User-Agent": "HR-Intelligence-Digest/1.0"},
+    )
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return parse_x_payload(json.loads(response.read().decode("utf-8")))
 
 
 def fetch(url: str, user_agent: str, timeout: int) -> bytes:
@@ -200,7 +287,7 @@ def collect_from_items(items, feed, matcher, platforms, week_of, seen,
                 "sentiment": "",
                 "themes": "",
                 "rating_given": "",
-                "engagement": "",
+                "engagement": str(item.get("engagement", "") or ""),
                 "names_individual": "",
                 "red_flag": "",
                 "red_flag_reason": "",
@@ -255,17 +342,43 @@ def main() -> int:
     new_rows: list[dict] = []
     skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0, "out_of_scope_hint": 0}
 
+    x_token = os.environ.get(X_TOKEN_ENV, "").strip()
+    x_context = X_CONTEXT
+
     for index, feed in enumerate(feeds):
-        url = build_feed_url(feed, entities_by_id)
-        if H.is_todo(url) or not url:
-            print(f"  skip {feed['id']}: URL still a TODO placeholder")
-            continue
-        try:
-            payload = fetch(url, user_agent, timeout)
-            items = parse_feed(payload)
-        except (urllib.error.URLError, urllib.error.HTTPError, ET.ParseError, OSError) as exc:
-            print(f"  FAIL {feed['id']}: {exc}", file=sys.stderr)
-            continue
+        if feed.get("source") == "x_api":
+            entity = entities_by_id.get(feed.get("entity"))
+            if not entity:
+                print(f"  skip {feed['id']}: unknown entity {feed.get('entity')!r}")
+                continue
+            if not x_token:
+                print(f"  skip {feed['id']}: no ${X_TOKEN_ENV} set \u2014 X stays on the "
+                      "manual sweep (scripts/alert_queries.py --format manual)")
+                continue
+            query = build_x_query(entity, x_context)
+            try:
+                items = fetch_x_search(query, x_token, timeout,
+                                       int(collector.get("x_max_results", 100)))
+            except urllib.error.HTTPError as exc:
+                hint = {401: "token rejected", 403: "plan does not allow recent search",
+                        429: "rate limited \u2014 try again later"}.get(exc.code, "")
+                print(f"  FAIL {feed['id']}: HTTP {exc.code} {hint}", file=sys.stderr)
+                continue
+            except (urllib.error.URLError, json.JSONDecodeError, OSError) as exc:
+                print(f"  FAIL {feed['id']}: {exc}", file=sys.stderr)
+                continue
+        else:
+            url = build_feed_url(feed, entities_by_id)
+            if H.is_todo(url) or not url:
+                print(f"  skip {feed['id']}: URL still a TODO placeholder")
+                continue
+            try:
+                payload = fetch(url, user_agent, timeout)
+                items = parse_feed(payload)
+            except (urllib.error.URLError, urllib.error.HTTPError,
+                    ET.ParseError, OSError) as exc:
+                print(f"  FAIL {feed['id']}: {exc}", file=sys.stderr)
+                continue
 
         rows, counts = collect_from_items(
             items, feed, matcher, platforms, week_of, seen, context_required,

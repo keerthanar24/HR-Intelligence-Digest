@@ -30,6 +30,11 @@ collector:
   timeout_seconds: 20
   # Politeness gap between feed fetches.
   delay_seconds: 2
+  # Posts to request per X search call (10-100). Recent search covers 7 days.
+  x_max_results: 100
+  # The X bearer token is read from the X_BEARER_TOKEN environment variable and
+  # must never be written here - this file is committed.
+  #
   # Require an employment-context term as well as an entity alias for these
   # platforms. Review sites are exempt: every review is employment-related.
   context_required_for: [news, reddit, x, quora, youtube, google_reviews]

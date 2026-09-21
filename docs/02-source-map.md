@@ -44,16 +44,47 @@ for these entities, but the rating movement still matters.
 
 ## Priority 2
 
-### X — weekly, manual (logged-out search)
-Search each alias plus an employment term. Look for complaints and threads gaining traction.
-Record `engagement` (likes + reposts) — it drives the public-escalation-risk red flag.
-If the group holds an X API plan, the recent-search endpoint may be used instead; put the
-bearer token in the environment, never in this repo.
+### X — weekly, API where available
 
-### Reddit — weekly, feed-assisted
-`scripts/collect_feeds.py` reads Reddit's public search RSS for each alias. Manually check
-`r/india`, `r/developersIndia`, `r/jobs`, `r/IndianWorkplace` and the relevant city subs for
-threads the feed missed — Reddit search is unreliable for exact phrases.
+`scripts/collect_feeds.py` queries X's official **recent-search** endpoint (last 7 days, which
+is exactly the digest window) when a bearer token is present:
+
+```bash
+export X_BEARER_TOKEN="…"        # never commit this; .env and config/secrets.yaml are gitignored
+```
+
+Then set the four `x_search_*` feeds in `config/sources.yaml` to `enabled: true`.
+
+The query is built from the alias register at run time, so a newly confirmed trading name is
+searched without editing anything. It pairs the aliases with a spread of employment terms —
+pay, harassment, layoffs, interviews, notice period — rather than pay alone, because X is
+where a harassment thread or a layoff claim goes public. `-is:retweet` keeps a viral complaint
+to one row instead of hundreds.
+
+**Why the API matters here beyond convenience:** it returns like, repost, reply and quote
+counts. `public_escalation_risk` is the only red-flag trigger with a numeric threshold
+(`red_flags.virality_engagement_threshold` in `config/settings.yaml`), and without those counts
+it is a guess. With them, `python3 scripts/red_flags.py --scan` surfaces a post gaining
+traction automatically.
+
+**No token?** The collector says so and skips, and X falls back to a logged-out manual search:
+
+```bash
+python3 scripts/alert_queries.py --format manual
+```
+
+Record `engagement` by hand in that case — a rough count is still far better than a blank.
+
+### Reddit — weekly, feed
+
+`scripts/collect_feeds.py` reads Reddit's public search feed for each entity, with the query
+built from the alias register at run time. No token or account needed; this runs today.
+
+**Known limitation: Reddit's search covers posts, not comments.** A thread titled "Best
+e-commerce employers in Gujarat?" whose comments name our entities will not surface. That is
+why the manual check stays in the weekly SOP: look through `r/india`, `r/developersIndia`,
+`r/IndianWorkplace`, `r/jobs` and the relevant city subs for threads the feed cannot see.
+Do not treat a quiet Reddit feed as a quiet Reddit.
 
 ### Indeed — fortnightly, manual
 Company reviews and interview experiences.
@@ -115,7 +146,7 @@ Worth setting up alongside Google Alerts, and often better:
 | **Glassdoor** | A free Employer Account on a **claimed** company profile gives email notification of new reviews | The most direct review alert available to us. Requires someone to claim and verify the profile — a decision for the group, not the desk |
 | **AmbitionBox** | Employer/business profile claiming exists; check whether the claimed account offers new-review notification | Verify before relying on it — do not assume parity with Glassdoor |
 | **LinkedIn** | Page admins are notified when the page is **@mentioned** | Plain-text mentions that do not tag the page produce no notification. The public post search in the weekly sweep is what actually catches those |
-| **X** | No free keyword alerting. Saved-search columns need X Pro (paid); the API needs a plan | Manual logged-out search each week is the V1 answer |
+| **X** | No free keyword alerting. The recent-search API needs a paid plan, and `scripts/collect_feeds.py` uses it when `$X_BEARER_TOKEN` is set | Without a plan, the logged-out manual search is the V1 answer |
 | **Reddit** | No native keyword alert, but the public search RSS already runs in `scripts/collect_feeds.py` | Third-party keyword-to-email services exist and are free; they send our brand names to an outside party, so treat as an optional convenience, not part of the standard setup |
 | **Google Reviews** | Notification on new reviews via the Google Business Profile, if the group holds it | Mostly customer reviews — employment ones are a small minority |
 

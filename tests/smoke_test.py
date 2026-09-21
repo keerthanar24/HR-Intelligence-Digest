@@ -102,6 +102,61 @@ def test_urls() -> None:
           H.canonical_url("https://a.test/p/1") != H.canonical_url("https://a.test/p/2"))
 
 
+def test_x_collection() -> None:
+    """X recent-search parsing and filtering, without calling the API."""
+    print("x collection")
+    import json
+
+    entities = {e["id"]: e for e in H.load_yaml("entities").get("entities", [])}
+    query = collect_feeds.build_x_query(entities["rk_world"])
+    check("query fits the API tier limit",
+          len(query) <= collect_feeds.X_QUERY_LIMIT, f"({len(query)} chars)")
+    check("confirmed trading name is in the query", '"ValueCart"' in query)
+    check("retweets excluded so a viral post is one row", "-is:retweet" in query)
+    check("context spans more than pay",
+          all(term in query for term in ("harassment", "layoff", "interview")))
+    # An alias list long enough to blow the limit must be trimmed, not sent.
+    huge = {"aliases": [f"Company Name Number {i} Private Limited" for i in range(60)]}
+    check("an overlong alias list is trimmed to fit",
+          len(collect_feeds.build_x_query(huge)) <= collect_feeds.X_QUERY_LIMIT)
+
+    with open(os.path.join(FIXTURES, "x-search-response.json"), encoding="utf-8") as fh:
+        items = collect_feeds.parse_x_payload(json.load(fh))
+    check("all posts parsed", len(items) == 3, f"(got {len(items)})")
+    check("url built from the author handle",
+          items[0]["url"] == "https://x.com/exemployee_blr/status/1800000000000000001",
+          f"({items[0]['url']})")
+    check("a post with no handle still gets a resolvable url",
+          items[2]["url"].startswith("https://x.com/i/web/status/"))
+    check("date taken from created_at", items[0]["published"] == "2026-09-11")
+    # Engagement is the only red-flag trigger with a numeric threshold, and X is
+    # the one source that supplies it.
+    check("engagement sums all four metrics",
+          items[0]["engagement"] == 180 + 64 + 22 + 9, f"(got {items[0]['engagement']})")
+
+    matcher = H.EntityMatcher()
+    feed = {"id": "x_search_rk_world", "platform": "x", "entity": "rk_world"}
+    rows, skipped = collect_feeds.collect_from_items(
+        items, feed, matcher, H.platform_names(), WEEK, set(), {"x"})
+    check("similarly-named travel company excluded", len(rows) == 2, f"(got {len(rows)})")
+    check("the exclusion was the Tours post", skipped["no_entity"] == 1)
+
+    by_url = {r["url"]: r for r in rows}
+    hot = by_url["https://x.com/exemployee_blr/status/1800000000000000001"]
+    check("engagement reaches the mention row", hot["engagement"] == "275",
+          f"(got {hot['engagement']!r})")
+
+    threshold = int(H.load_yaml("settings")["red_flags"]["virality_engagement_threshold"])
+    check("a viral complaint trips the virality scan",
+          "public_escalation_risk" in red_flags.matches_pattern(red_flags.mention_text(hot))
+          or H.to_int(hot["engagement"]) >= threshold)
+    check("an ordinary post does not",
+          H.to_int(by_url["https://x.com/devjobs_in/status/1800000000000000002"]["engagement"])
+          < threshold)
+    check("rows still land untagged for a human",
+          all(r["sentiment"] == "" and r["status"] == "needs_review" for r in rows))
+
+
 def test_sheet_import() -> None:
     """The workbook's own headers and dropdown vocabulary map onto the schema."""
     print("sheet import")
@@ -367,7 +422,7 @@ def test_red_flags() -> None:
 
 
 def main() -> int:
-    for test in (test_matching, test_weeks, test_urls, test_collector,
+    for test in (test_matching, test_weeks, test_urls, test_collector, test_x_collection,
                  test_sheet_import, test_sheet_import_v2, test_digest,
                  test_red_flags):
         test()

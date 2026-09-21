@@ -84,14 +84,17 @@ platforms:
 
   - id: x
     name: X
-    collection: manual
+    collection: api
     cadence: weekly
     priority: 2
     captures: [mentions, complaints, threads]
     notes: >-
-      Logged-out search on the alias list. If the group holds an X API plan, the
-      recent-search endpoint may be used instead — put the bearer token in the
-      environment, never in this repo.
+      Collected through X's official recent-search API when $X_BEARER_TOKEN is
+      set in the environment (never in this repo). The API also returns like,
+      repost, reply and quote counts, which is what makes the
+      public_escalation_risk red-flag threshold measurable rather than a guess.
+      Without a token the collector says so and X falls back to the logged-out
+      manual search in docs/02-source-map.md.
     urls: {}
 
   - id: quora
@@ -189,6 +192,33 @@ feeds:
     # Search built from the entity aliases at run time, so a new
     # trading name is picked up without editing this file.
     auto_query: reddit
+
+  # X recent search. Needs a paid X API plan; set X_BEARER_TOKEN in the
+  # environment and flip enabled to true. Queries are built from the alias
+  # register at run time, like the Reddit ones.
+  - id: x_search_rk_group
+    platform: x
+    entity: rk_group
+    source: x_api
+    enabled: false
+
+  - id: x_search_rk_world
+    platform: x
+    entity: rk_world
+    source: x_api
+    enabled: false
+
+  - id: x_search_robust_kommerce
+    platform: x
+    entity: robust_kommerce
+    source: x_api
+    enabled: false
+
+  - id: x_search_westbury_kommerce
+    platform: x
+    entity: westbury_kommerce
+    source: x_api
+    enabled: false
 
   - id: reddit_search_rk_group
     platform: reddit
