@@ -147,7 +147,7 @@ Three changes close it:
    a cell there is a deliberate edit.
 
 3. **The tools stopped counting columns.** `build_tracker_workbook.py` and
-   `seed_rating_baseline.py` address columns by header name. The positional version put the
+   `tools/export_to_workbook.py` address columns by header name. The positional version put the
    numbers one column to the left the first time a column was inserted, quietly.
 
 Two bugs surfaced while proving the round trip:
@@ -165,3 +165,38 @@ byte-for-byte identical.
 
 `Rating` and `Reviews Count` — the two the three-minute Friday check reads. Recommend %, CEO
 approval and the sub-scores move slowly; type them when they change. The URLs are typed once.
+
+## Getting the raw data *into* the sheet
+
+Having a column for every field is half the job. Until 2026-09-21 nothing ever wrote mentions or
+escalations into the workbook — only the rating baseline had a tool — so opening the data link
+showed four rating rows, an empty `Raw_Data_Log` and an empty `Escalations` tab. That is the
+schema for the raw data, not the raw data.
+
+```bash
+python3 tools/export_to_workbook.py            # CSVs  ->  workbook
+python3 scripts/import_sheet.py <book.xlsx>    # workbook  ->  CSVs
+```
+
+The two are mirror images, both driven by `config/column_map.yaml`, so a column added there works
+in both directions with no code change. `scripts/weekly_run.py` runs the export as step 3, before
+the digest is built — section 6 tells four people the sheet holds the week's raw data, so it has
+to hold it by the time they click.
+
+Proving the round trip is what surfaced three quiet importer bugs:
+
+- **Escalation `entity` and `platform` were never mapped**, so `escalations.csv` held
+  `RK World Infocom` where `mentions.csv` held `rk_world`. Nothing could join the two.
+- **Escalation `week_of` skipped date normalisation** and kept the cell's time component — the
+  same bug that once filed rating snapshots in the wrong week.
+- **`names_individual` never went through the Yes/No vocabulary**, so the sheet's `No` landed
+  beside `red_flag`'s `no`.
+
+`tests/smoke_test.py::test_workbook_round_trip` exports all three tabs and imports them back,
+field by field, so none of this can return.
+
+### Section 6 now says what is in the sheet
+
+It used to promise "the full week's raw entries" whether or not any existed. It now reads, for
+example, *"for this week it holds 6 mentions, 3 rating snapshots and 1 escalation"* — or, when
+nothing has been logged, says exactly that instead of sending four people to a tab of headers.

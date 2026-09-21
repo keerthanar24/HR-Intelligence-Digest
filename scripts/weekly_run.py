@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run the automatable part of the weekly cycle, in order.
 
-    collect feeds  ->  validate  ->  build the digest
+    collect feeds  ->  validate  ->  refresh the sheet  ->  build the digest
 
 What this does NOT do, because it cannot: Glassdoor, AmbitionBox and LinkedIn
 block automated collection and offer no public API, and the brief commits to
@@ -38,6 +38,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--week", help="week_of start day; default = the reporting week")
     parser.add_argument("--no-collect", action="store_true", help="skip the feed fetch")
+    parser.add_argument("--no-export", action="store_true",
+                        help="skip refreshing the tracking workbook")
     parser.add_argument("--strict", action="store_true",
                         help="fail if the week still has untagged mentions")
     args = parser.parse_args()
@@ -63,10 +65,18 @@ def main() -> int:
         print("\nValidation found ERRORS. Fix them before sending; "
               "the digest below is built anyway so you can see the state.")
 
+    # Before the digest, not after: section 6 tells four people the sheet holds
+    # the week's raw data, so the sheet has to hold it by the time they click.
+    if not args.no_export:
+        if run("3. Refresh the tracking sheet behind the data link",
+               ["tools/export_to_workbook.py"]):
+            print("\nThe sheet was not refreshed. The digest's data link will show "
+                  "last week's rows - fix this before sending.")
+
     digest_args = ["scripts/build_digest.py", "--week", week.isoformat()]
     if args.strict:
         digest_args.append("--strict")
-    digest_code = run("3. Build the digest", digest_args)
+    digest_code = run("4. Build the digest", digest_args)
 
     mentions = H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), week)
     untagged = [m for m in mentions if not (m.get("sentiment") or "").strip()]
@@ -80,6 +90,8 @@ def main() -> int:
     if untagged:
         todo.append(f"Tag {len(untagged)} collected mention(s): summary, sentiment, themes")
     todo.append("Sweep LinkedIn, and the fortnightly channels if due (make sweep)")
+    todo.append("Upload the refreshed workbook to the Google Sheet behind the data link, "
+                "or re-run step 3 after logging anything by hand")
     todo.append("Confirm any red flags and send them same-day "
                 "(python3 scripts/red_flags.py --scan)")
     if not todo[:1]:

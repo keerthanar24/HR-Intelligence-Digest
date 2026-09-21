@@ -197,8 +197,11 @@ def import_mentions(rows, cfg, notes: Notes) -> list[dict]:
 
         if not row.get("status"):
             row["status"] = "reviewed" if row["sentiment"] else "needs_review"
-        if not row.get("names_individual"):
-            row["names_individual"] = ""
+        # Shares the Yes/No vocabulary with red_flag. Without the mapping the
+        # sheet's 'No' landed verbatim beside red_flag's 'no'.
+        row["names_individual"] = (
+            map_value(record["names_individual"], "red_flag", cfg["values"], notes, where)
+            if record.get("names_individual") else "")
         if not row.get("captured_by"):
             row["captured_by"] = "sheet"
         out.append(row)
@@ -316,9 +319,21 @@ def import_escalations(rows, cfg, notes: Notes) -> list[dict]:
             row["reason"] = map_value(record["reason"], "red_flag_reason", cfg["values"], notes, where)
         if record.get("status"):
             row["status"] = map_value(record["status"], "escalation_status", cfg["values"], notes, where)
+        # Entity and platform were being left in the sheet's own spelling, so
+        # escalations.csv held 'RK World Infocom' where mentions.csv held
+        # 'rk_world' and nothing could group the two together.
+        for field, kind in (("entity", "entity"), ("platform", "platform")):
+            if record.get(field):
+                row[field] = map_value(record[field], kind, cfg["values"], notes, where)
         row["raised_at"] = as_date(record.get("raised_at"))
         row["notified_at"] = as_date(record.get("notified_at"))
         row["closed_at"] = as_date(record.get("closed_at"))
+        # week_of skipped as_date entirely and kept the cell's time component,
+        # which is the bug that once filed rating snapshots in the wrong week.
+        recorded = H.parse_date(as_date(record.get("week_of")))
+        raised = H.parse_date(row["raised_at"])
+        row["week_of"] = H.week_start_of(recorded or raised).isoformat() if (
+            recorded or raised) else ""
         out.append(row)
     return out
 

@@ -151,9 +151,16 @@ export. WARNINGs are judgement calls; an empty week is a warning, and it is fine
 
 ## Step 5 — Build and send (20 min)
 
+Refresh the sheet first, then build. Section 6 tells four people the sheet holds this week's raw
+data, so it has to hold it by the time they click:
+
 ```bash
+python3 tools/export_to_workbook.py     # CSVs -> workbook
 python3 scripts/build_digest.py --stdout
 ```
+
+Then upload the refreshed workbook to the Google Sheet behind the data link. (`weekly_run.py`
+does the export for you as its step 3; the upload is still a person's job.)
 
 Writes `out/digest-<week>.html` and `out/digest-<week>.txt`.
 
@@ -164,7 +171,8 @@ Writes `out/digest-<week>.html` and `out/digest-<week>.txt`.
 4. Sanity-check before hitting send:
    - No individual is named anywhere in the body.
    - Every row in What's New has a working link.
-   - The data link in section 6 opens the tracking sheet.
+   - The data link in section 6 opens the tracking sheet, and `Raw_Data_Log` shows this
+     week's rows — not just headers. Section 6 states the counts; check they match section 3.
 
 ## Step 6 — Commit (5 min)
 

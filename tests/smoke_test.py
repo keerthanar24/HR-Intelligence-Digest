@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import shutil
 import sys
 import tempfile
 
@@ -706,6 +707,68 @@ def test_carry_forward() -> None:
         check("clearing a column the sheet has is respected", out2["review_count"] == "")
 
 
+def test_workbook_round_trip() -> None:
+    """CSV -> workbook -> CSV has to come back unchanged.
+
+    The digest calls the workbook "the raw data", so the two directions have to
+    agree. Proving it is also how three quiet importer bugs surfaced: escalation
+    rows kept the sheet's spelling of entity and platform instead of the ids
+    mentions.csv uses, escalation week_of skipped date normalisation and kept
+    the cell's time component, and names_individual never went through the
+    Yes/No vocabulary.
+    """
+    print("workbook round trip")
+    try:
+        import openpyxl
+        from openpyxl.styles import Font
+    except ImportError:
+        print("  skip  openpyxl not installed")
+        return
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import export_to_workbook as export
+
+    cfg = H.load_yaml("column_map")
+    source = {
+        "mentions": H.read_csv(os.path.join(ROOT, "data", "mentions.sample.csv")),
+        "ratings": H.read_csv(os.path.join(ROOT, "data", "ratings.csv")),
+        "escalations": H.read_csv(os.path.join(FIXTURES, "escalations.csv")),
+    }
+    fields = {"mentions": H.MENTION_FIELDS, "ratings": H.RATING_FIELDS,
+              "escalations": H.ESCALATION_FIELDS}
+    for tab, rows in source.items():
+        check(f"{tab}: there is something to round-trip", bool(rows))
+
+    with tempfile.TemporaryDirectory() as tmp:
+        book = os.path.join(tmp, "tracker.xlsx")
+        shutil.copy(os.path.join(ROOT, "templates",
+                                 "HR_Intelligence_Master_Tracker.xlsx"), book)
+        wb = openpyxl.load_workbook(book)
+        font = Font(name="Arial")
+        export.write_long(wb, "mentions", source["mentions"], cfg, font)
+        export.write_long(wb, "escalations", source["escalations"], cfg, font)
+        export.write_ratings(wb, source["ratings"], cfg, font)
+        wb.save(book)
+
+        sheets = import_sheet.read_xlsx(book)
+        notes = import_sheet.Notes()
+        back = {
+            "mentions": import_sheet.import_mentions(sheets["Raw_Data_Log"], cfg, notes),
+            "ratings": import_sheet.import_ratings(sheets["Rating_Tracker"], cfg, notes),
+            "escalations": import_sheet.import_escalations(sheets["Escalations"], cfg, notes),
+        }
+
+    for tab, rows in source.items():
+        check(f"{tab}: every row survives the trip", len(back[tab]) == len(rows),
+              f"({len(rows)} out, {len(back[tab])} back)")
+        drift = []
+        for before, after in zip(rows, back[tab]):
+            for field in fields[tab]:
+                if str(before.get(field, "")).strip() != str(after.get(field, "")).strip():
+                    drift.append(f"{field}: {before.get(field)!r} -> {after.get(field)!r}")
+        check(f"{tab}: no field changes on the way", not drift,
+              f"({'; '.join(drift[:3])})")
+
+
 def test_red_flag_sla() -> None:
     """Section 5 has to evidence the *same-day* promise, not just the flag.
 
@@ -763,7 +826,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

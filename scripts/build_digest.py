@@ -387,6 +387,26 @@ def truncate(text: str, limit: int) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def sheet_contents(mentions, ratings, escalations, week_of):
+    """What a recipient will actually find when they open the data link.
+
+    Section 6 used to promise "the full week's raw entries" whether or not the
+    sheet held any. Saying the counts turns the link into something checkable,
+    and an empty week reads as an empty week rather than as a broken link.
+    """
+    week = week_of.isoformat()
+    counts = [
+        (len(mentions), "mention"),
+        (sum(1 for r in ratings if r.get("week_of") == week), "rating snapshot"),
+        (len(escalations), "escalation"),
+    ]
+    listed = [f"{n} {word}{'' if n == 1 else 's'}" for n, word in counts if n]
+    if not listed:
+        return ("nothing has been logged for this week yet, so the sheet shows "
+                "the earlier weeks only")
+    return ", ".join(listed[:-1]) + (" and " if len(listed) > 1 else "") + listed[-1]
+
+
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
@@ -418,6 +438,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     net_prev = H.net_sentiment(prev)
     untagged = sum(1 for m in now if H.sentiment_score(m) is None)
     data_link = digest_cfg.get("data_link", "")
+    holdings = sheet_contents(now, all_ratings, flags, week_of)
     week_label = H.fmt_week(week_of)
 
     # A week built before it has ended covers fewer than seven days. Say so:
@@ -602,7 +623,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">6 · Data</h3>')
     if data_link and not H.is_todo(data_link):
         h.append(f'<p style="margin:0 0 8px;"><a href="{E(data_link)}" style="color:#2b6cb0;">'
-                 'Open the tracking sheet</a> for the full week\'s raw entries.</p>')
+                 f'Open the tracking sheet</a> — for this week it holds {E(holdings)}. '
+                 'Every earlier week is in the same tabs.</p>')
     else:
         h.append('<p style="margin:0 0 8px;color:#a12622;">Tracking sheet link not set — '
                  'add <code>digest.data_link</code> in config/settings.yaml.</p>')
@@ -714,8 +736,12 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         t.append("None this week.")
     t.append("")
     t.append("6. DATA")
-    t.append(data_link if data_link and not H.is_todo(data_link)
-             else "Tracking sheet link not set — add digest.data_link in config/settings.yaml.")
+    if data_link and not H.is_todo(data_link):
+        t.append(data_link)
+        t.append(f"For this week the sheet holds {holdings}. "
+                 "Every earlier week is in the same tabs.")
+    else:
+        t.append("Tracking sheet link not set — add digest.data_link in config/settings.yaml.")
     t.append("")
     t.append("-" * 72)
     t.append(BOUNDARY_NOTE)
