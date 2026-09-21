@@ -47,7 +47,23 @@ Work the platform list in `docs/02-source-map.md`, priority 1 first. For each en
 
 Search strings for each platform: `python3 scripts/alert_queries.py --format manual`.
 
-For every new item, add a row to `data/mentions.csv` (schema: `docs/06-tracking-sheet-spec.md`).
+For every new item, log a mention — either by typing a row into the sheet's `Raw_Data_Log`
+tab, or from the command line, which validates as it goes:
+
+```bash
+python3 scripts/log_mention.py -e rk_world -p ambitionbox -d 2026-09-20 \
+  -s "Ex-employee says FnF pending two months, HR not replying" \
+  --sentiment very_negative --themes payroll_delay,exits \
+  --author ex_employee --url https://... --flag non_payment
+```
+
+`--vocab` lists the allowed values; `--list` shows what is already logged for the week. A
+duplicate URL is refused, and a red flag prints the alert command rather than waiting for
+Friday.
+
+**This is the step that fills sections 1, 3 and 4.** A rating snapshot is one number for a
+whole company; a mention is one row per review, and the digest cannot summarise reviews it
+has never been given.
 For every priority-1 page, add a row to `data/ratings.csv` **even when nothing changed** — the
 rating series needs the zero weeks as much as the movement.
 

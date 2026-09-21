@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+"""Log one review or post as a mention, validated against the vocabularies.
+
+A rating snapshot is one number for a whole company. A mention is one row per
+review or post, and that is what sections 1, 3 and 4 of the digest are built
+from - so capturing ratings alone leaves those sections empty.
+
+    python3 scripts/log_mention.py \\
+        -e rk_world -p ambitionbox -d 2026-09-20 \\
+        -s "Ex-employee says FnF pending two months, HR not replying" \\
+        --sentiment very_negative --themes payroll_delay,exits \\
+        --author ex_employee --url https://... --flag non_payment
+
+    python3 scripts/log_mention.py --vocab      # list the allowed values
+    python3 scripts/log_mention.py --week 2026-09-19 --list
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import hrintel as H  # noqa: E402
+
+
+def show_vocab() -> int:
+    print("sentiment  :", ", ".join(H.SENTIMENT_SCORES))
+    print("themes     :", ", ".join(H.THEMES))
+    print("author     :", ", ".join(H.AUTHOR_TYPES))
+    print("status     :", ", ".join(H.STATUSES))
+    print("flag reason:", ", ".join(H.RED_FLAG_REASONS))
+    print("entities   :", ", ".join(H.entity_names()))
+    print("platforms  :", ", ".join(H.platform_names()))
+    return 0
+
+
+def show_week(week: dt.date) -> int:
+    rows = H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), week)
+    print(f"{len(rows)} mention(s) logged for {H.fmt_week(week)}\n")
+    for r in sorted(rows, key=lambda x: x.get("post_date", "")):
+        tag = r.get("sentiment") or "UNTAGGED"
+        flag = "  [RED FLAG]" if H.is_yes(r.get("red_flag")) else ""
+        print(f"  {r['mention_id']}  {r.get('post_date',''):<11} "
+              f"{r.get('entity',''):<18} {r.get('platform',''):<12} {tag}{flag}")
+        print(f"      {(r.get('one_line_summary') or '')[:92]}")
+    untagged = [r for r in rows if not (r.get("sentiment") or "").strip()]
+    if untagged:
+        print(f"\n{len(untagged)} still untagged - excluded from net sentiment until tagged.")
+    return 0
+
+
+def main() -> int:
+    p = argparse.ArgumentParser(description=__doc__,
+                                formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("-e", "--entity")
+    p.add_argument("-p", "--platform")
+    p.add_argument("-d", "--date", help="date the review or post was published (YYYY-MM-DD)")
+    p.add_argument("-s", "--summary", help="one factual sentence, no names, no interpretation")
+    p.add_argument("--sentiment", help="very_negative | negative | neutral | mixed | positive | very_positive")
+    p.add_argument("--themes", help="comma or pipe separated, from the fixed list")
+    p.add_argument("--author", default="unknown")
+    p.add_argument("--url", default="")
+    p.add_argument("--title", default="", help="review title or first line, as published")
+    p.add_argument("--role", default="")
+    p.add_argument("--rating", help="stars the reviewer gave, 1-5")
+    p.add_argument("--engagement", type=int, help="likes + reposts + comments")
+    p.add_argument("--names-individual", action="store_true",
+                   help="the post names a person (a red-flag trigger)")
+    p.add_argument("--flag", help=f"red-flag reason: {', '.join(H.RED_FLAG_REASONS)}")
+    p.add_argument("--notes", default="")
+    p.add_argument("--by", default="desk")
+    p.add_argument("--vocab", action="store_true", help="print the allowed values")
+    p.add_argument("--list", action="store_true", help="show what is logged for a week")
+    p.add_argument("--week", help="with --list, the week to show")
+    args = p.parse_args()
+
+    if args.vocab:
+        return show_vocab()
+    if args.list:
+        week = H.parse_date(args.week) if args.week else H.last_complete_week()
+        return show_week(H.week_start_of(week))
+
+    entities, platforms = H.entity_names(), H.platform_names()
+    problems = []
+    if args.entity not in entities:
+        problems.append(f"entity {args.entity!r}; one of: {', '.join(entities)}")
+    if args.platform not in platforms:
+        problems.append(f"platform {args.platform!r}; one of: {', '.join(platforms)}")
+    posted = H.parse_date(args.date or "")
+    if posted is None:
+        problems.append(f"date {args.date!r}; expected YYYY-MM-DD")
+    elif posted > dt.date.today():
+        problems.append(f"date {args.date} is in the future")
+    if not (args.summary or "").strip():
+        problems.append("a one-line summary is required - it is what the four actually read")
+
+    sentiment = (args.sentiment or "").strip().lower()
+    if sentiment and sentiment not in H.SENTIMENT_SCORES:
+        problems.append(f"sentiment {sentiment!r}; one of: {', '.join(H.SENTIMENT_SCORES)}")
+    themes = [t.strip() for t in (args.themes or "").replace(",", "|").split("|") if t.strip()]
+    for theme in themes:
+        if theme not in H.THEMES:
+            problems.append(f"theme {theme!r}; see --vocab")
+    if args.author not in H.AUTHOR_TYPES:
+        problems.append(f"author {args.author!r}; one of: {', '.join(H.AUTHOR_TYPES)}")
+    if args.flag and args.flag not in H.RED_FLAG_REASONS:
+        problems.append(f"flag {args.flag!r}; one of: {', '.join(H.RED_FLAG_REASONS)}")
+
+    if problems:
+        for problem in problems:
+            print(f"  invalid {problem}", file=sys.stderr)
+        return 2
+
+    existing = H.read_csv(H.MENTIONS_CSV)
+    canonical = H.canonical_url(args.url)
+    if canonical:
+        clash = [r for r in existing if H.canonical_url(r.get("url", "")) == canonical]
+        if clash:
+            print(f"Already logged as {clash[0]['mention_id']} - same URL.", file=sys.stderr)
+            return 1
+
+    week = H.week_start_of(posted)
+    row = {f: "" for f in H.MENTION_FIELDS}
+    row.update({
+        "mention_id": H.next_mention_id(existing, week),
+        "week_of": week.isoformat(),
+        "captured_at": dt.date.today().isoformat(),
+        "captured_by": args.by,
+        "entity": args.entity,
+        "platform": args.platform,
+        "source_name": platforms.get(args.platform, args.platform),
+        "url": args.url,
+        "post_date": posted.isoformat(),
+        "author_type": args.author,
+        "role_or_dept": args.role,
+        "title_or_snippet": args.title[:300],
+        "one_line_summary": args.summary.strip(),
+        "sentiment": sentiment,
+        "themes": "|".join(themes),
+        "rating_given": args.rating or "",
+        "engagement": "" if args.engagement is None else str(args.engagement),
+        "names_individual": "yes" if args.names_individual else "no",
+        "red_flag": "yes" if (args.flag or args.names_individual) else "no",
+        "red_flag_reason": args.flag or ("names_individual" if args.names_individual else ""),
+        "status": "escalated" if args.flag or args.names_individual else
+                  ("reviewed" if sentiment else "needs_review"),
+        "notes": args.notes,
+    })
+
+    H.append_csv(H.MENTIONS_CSV, H.MENTION_FIELDS, [row])
+    print(f"Logged {row['mention_id']}  {entities[args.entity]} / "
+          f"{platforms[args.platform]} / {row['post_date']} / {sentiment or 'UNTAGGED'}")
+    print(f"  week of {H.fmt_week(week)}")
+    if not sentiment:
+        print("  No sentiment given - it will be counted but excluded from the average, "
+              "and the digest will report it as untagged.")
+    if row["red_flag"] == "yes":
+        print(f"  RED FLAG ({row['red_flag_reason']}). This does not wait for Friday:")
+        print(f"    python3 scripts/red_flags.py --alert {row['mention_id']}")
+        print("    then log the escalation in data/escalations.csv")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

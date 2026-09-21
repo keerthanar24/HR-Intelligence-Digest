@@ -15,6 +15,7 @@ help:
 	@echo "  make sweep     print this week's sweep worksheet with every URL"
 	@echo "  make import BOOK=tracker.xlsx   pull the workbook into data/"
 	@echo "  make collect   pull the permitted feeds into data/mentions.csv"
+	@echo "  make log       show how to log a review as a mention"
 	@echo "  make scan      suggest rows that may be red flags (a human decides)"
 	@echo "  make validate  check config and data for the week"
 	@echo "  make digest    build out/digest-$(WEEK).html and .txt"
@@ -45,6 +46,11 @@ import:
 
 collect:
 	$(PY) scripts/collect_feeds.py
+
+log:
+	@$(PY) scripts/log_mention.py --help | head -20
+	@echo ""
+	@$(PY) scripts/log_mention.py --vocab
 
 scan:
 	$(PY) scripts/red_flags.py --scan
