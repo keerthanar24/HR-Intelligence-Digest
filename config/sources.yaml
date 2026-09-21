@@ -54,10 +54,12 @@ platforms:
       rk_group: "https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm"   # Bangalore filter dropped
       # supplied: /Overview/Working-at-Rk-Worldinfocom-EI_IE8268877.11,26.htm
       rk_world: "https://www.glassdoor.co.in/Reviews/Rk-Worldinfocom-Reviews-E8268877.htm"   # reviews, not overview
-      # supplied: /Overview/Working-at-Robust-EI_IE1882698.11,17.htm
-      # Listed on Glassdoor as plain "Robust"; confirmed as Robust Kommerce by
-      # the programme owner on 2026-09-21.
-      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"
+      # Glassdoor employer 1882698, listed as plain "Robust", was taken for this
+      # company and supplied as /Overview/Working-at-Robust-EI_IE1882698.11,17.htm.
+      # The programme owner checked the page on 2026-09-21: it is NOT Robust
+      # Kommerce, which has no Glassdoor presence at all. Recorded as 'none'
+      # rather than deleted, so nobody re-adds it from the same search result.
+      robust_kommerce: "none"
       westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
 
   - id: linkedin

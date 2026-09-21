@@ -890,6 +890,32 @@ def test_red_flag_wording_has_context() -> None:
           f"(got {customer})")
 
 
+def test_unrated_entity_is_named() -> None:
+    """An entity with no review-site page must be named, not just absent.
+
+    Robust Kommerce has neither a Glassdoor nor an AmbitionBox profile, so it
+    can never appear in section 2. Simply missing from the table, it reads as a
+    quiet week - when the truth is that the two platforms carrying almost all
+    the evidence cannot see it at all.
+    """
+    print("unrated entity is named")
+    entities = H.entity_names()
+    unrated = build_digest.unrated_entities(entities)
+    check("Robust Kommerce is known to have no review-site page",
+          "Robust Kommerce" in unrated, f"(got {unrated})")
+    check("the other three are not listed",
+          all(n not in unrated for n in
+              ("RK Group", "RK World Infocom", "Westbury Kommerce")), f"(got {unrated})")
+
+    settings = H.load_yaml("settings")
+    _, body_html, body_text, _ = build_digest.build(WEEK, settings)
+    for label, body in (("text", body_text), ("html", body_html)):
+        check(f"the {label} body names it",
+              "Robust Kommerce" in body and "no Glassdoor or AmbitionBox page" in body)
+        check(f"the {label} body says absence is not evidence",
+              "not evidence of a quiet week" in body)
+
+
 def test_coverage_gate() -> None:
     """An incomplete sweep must not be sendable.
 
@@ -1056,7 +1082,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

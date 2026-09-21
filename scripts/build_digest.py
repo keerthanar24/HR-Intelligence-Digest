@@ -454,6 +454,19 @@ def sheet_contents(mentions, ratings, escalations, week_of):
     return f"For this week it holds {held}. Every earlier week is in the same tabs."
 
 
+def unrated_entities(entities):
+    """Entities with no review-site page at all.
+
+    Robust Kommerce has neither a Glassdoor nor an AmbitionBox profile, so it
+    can never appear in section 2. An entity that is simply absent from the
+    table reads as a quiet week; the truth is that the two platforms carrying
+    almost all the evidence cannot see it, and only LinkedIn, Reddit, news and
+    X cover it at all. That has to be said, not inferred from a gap.
+    """
+    covered = {entity_id for entity_id, _ in H.rated_profiles()}
+    return [name for entity_id, name in entities.items() if entity_id not in covered]
+
+
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
@@ -475,6 +488,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     ratings = rating_rows(all_ratings, week_of, entities, platforms)
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
+    unrated = unrated_entities(entities)
     trial_start = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
     is_baseline = bool(trial_start) and H.week_start_of(trial_start) == week_of
     swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms,
@@ -568,6 +582,13 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     else:
         h.append('<p style="margin:0 0 8px;">No rating snapshot recorded for this week. '
                  'Glassdoor and AmbitionBox scores are captured on the manual sweep.</p>')
+    if unrated:
+        h.append('<p style="margin:0 0 8px;font-size:12px;color:#52606d;">'
+                 f'<strong>{E(", ".join(unrated))}</strong> '
+                 f'{"has" if len(unrated) == 1 else "have"} no Glassdoor or AmbitionBox page, '
+                 f'so {"it" if len(unrated) == 1 else "they"} cannot appear above. '
+                 f'{"It is" if len(unrated) == 1 else "They are"} covered by LinkedIn, Reddit, '
+                 'news and X only — absence here is not evidence of a quiet week.</p>')
 
     # 3. What's new
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">3 · What\'s New</h3>')
@@ -708,6 +729,13 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         [[r["entity"], r["platform"], r["rating"], r["rating_delta"], r["reviews"], r["reviews_delta"]]
          for r in ratings],
     ) if ratings else "No rating snapshot recorded for this week.")
+    if unrated:
+        t.append("")
+        t.append(f"{', '.join(unrated)} {'has' if len(unrated) == 1 else 'have'} no Glassdoor "
+                 f"or AmbitionBox page, so {'it' if len(unrated) == 1 else 'they'} cannot "
+                 f"appear above. {'It is' if len(unrated) == 1 else 'They are'} covered by "
+                 "LinkedIn, Reddit, news and X only - absence here is not evidence of a "
+                 "quiet week.")
     t.append("")
     t.append("3. WHAT'S NEW")
     if now:
