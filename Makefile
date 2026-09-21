@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -19,6 +19,7 @@ help:
 	@echo "  make validate  check config and data for the week"
 	@echo "  make digest    build out/digest-$(WEEK).html and .txt"
 	@echo "  make weekly    scan + validate + digest, in order"
+	@echo "  make auto      collect + validate + digest (what the scheduler runs)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
 	@echo "Override the week:  make digest WEEK=2026-09-07"
@@ -55,6 +56,9 @@ validate:
 # Fails if the week still has untagged mentions — tag them before sending.
 digest:
 	$(PY) scripts/build_digest.py --week $(WEEK) --strict
+
+auto:
+	$(PY) scripts/weekly_run.py
 
 weekly: scan validate digest
 	@echo ""

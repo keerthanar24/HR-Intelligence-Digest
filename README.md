@@ -66,6 +66,7 @@ python3 scripts/build_digest.py --stdout         # 5. build the email body
 | [`docs/07-phase3-review.md`](docs/07-phase3-review.md) | Month-2 decision agenda and criteria, fixed in advance |
 | [`docs/08-google-sheet-setup.md`](docs/08-google-sheet-setup.md) | Standing up the tracking sheet and the weekly export step |
 | [`docs/09-workbook-review.md`](docs/09-workbook-review.md) | Review of the supplied tracker and how the importer consumes it |
+| [`docs/10-automation.md`](docs/10-automation.md) | What runs weekly on its own, what cannot, and how to schedule it |
 | `config/` | Entities and aliases, source map and feeds, recipients, settings |
 | `data/` | `mentions.csv`, `ratings.csv`, `escalations.csv` — the record |
 | `scripts/` | Collector, digest builder, red-flag tool, validator, sheet and alert-query helpers |
