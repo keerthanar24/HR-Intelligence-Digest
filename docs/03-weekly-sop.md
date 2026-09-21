@@ -165,6 +165,23 @@ way to act on it. The sweep is finished when the logged rows account for every r
 say arrived, so that is the gate now, and the lines above are the worklist: open the URL, read
 the reviews you have not logged, log them, build again.
 
+Three things stop the build, and they are different failures:
+
+| | What it means |
+|---|---|
+| `N TO READ` | the count moved further than the logged rows explain — reviews are unread |
+| `NOT SWEPT` | no rating snapshot this week; nobody opened that profile at all |
+| `no previous snapshot` | only one snapshot exists, so there is nothing to subtract |
+
+The second one is the important one. Before, a profile nobody swept produced no rows and read
+exactly like a quiet week — the check could only fail on profiles someone had already looked at,
+which is the wrong way round. Every profile in `config/sources.yaml` that carries a review count
+is now enumerated up front and has to come back accounted for. A page that does not exist
+(Robust Kommerce on AmbitionBox, recorded as `none`) is not expected and never counts as a gap.
+
+Week 1 is exempt from the third: a baseline week has no previous snapshot by definition. It is
+**not** exempt from the second.
+
 `--allow-gaps` builds anyway, for a mid-sweep look. Use it knowing the email will **not** say the
 week is incomplete — the disclosure was removed along with the caption, because an incomplete
 digest is no longer supposed to reach anyone.

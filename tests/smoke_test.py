@@ -859,26 +859,70 @@ def test_coverage_gate() -> None:
     ]
     logged_one = [{"entity": "rk_world", "platform": "ambitionbox"}]
 
-    _, gaps = build_digest.coverage_rows(logged_one, ratings, week, entities, platforms)
+    expect = [("rk_world", "ambitionbox")]
+
+    def cover(mentions, rows=ratings, expected=expect):
+        return build_digest.coverage_rows(
+            mentions, rows, week, entities, platforms, expected=expected)[1]
+
+    gaps = cover(logged_one)
     check("three new reviews with one logged is a gap", len(gaps) == 1, f"(got {gaps})")
+    check("it is reported as unread, not as unswept", gaps[0]["kind"] == "unread")
     check("the worklist says how many are left", gaps[0]["missing"] == 2,
           f"(got {gaps[0]['missing']})")
     check("and where to read them", gaps[0]["url"] == "https://ab.invalid/rkw")
 
-    logged_all = logged_one * 3
-    _, none = build_digest.coverage_rows(logged_all, ratings, week, entities, platforms)
-    check("logging all three closes the gap", none == [], f"(got {none})")
+    check("logging all three closes the gap", cover(logged_one * 3) == [],
+          f"(got {cover(logged_one * 3)})")
 
     # Logging more than the count moved is not a gap either: a LinkedIn post
     # and a review can both be real in a week the count only moved once.
-    _, over = build_digest.coverage_rows(logged_one * 5, ratings, week, entities, platforms)
-    check("logging more than the count moved is not a gap", over == [])
+    check("logging more than the count moved is not a gap", cover(logged_one * 5) == [])
+
+    # The hole the first version had: with nothing to subtract, the pair was
+    # skipped and the week passed as complete. "Could not check" is not
+    # "checked and complete".
+    baseline_only = [r for r in ratings if r["week_of"] == "2026-09-12"]
+    only = cover(logged_one, rows=baseline_only)
+    check("a single snapshot is not silently treated as verified", len(only) == 1,
+          f"(got {only})")
+    check("it says there is nothing to compare against",
+          only and only[0]["kind"] == "no_baseline", f"(got {only})")
+
+    # And a profile nobody swept at all must not read as a quiet week.
+    nothing = cover([], rows=[])
+    check("a profile nobody swept is reported", len(nothing) == 1, f"(got {nothing})")
+    check("it is named as never checked",
+          nothing and nothing[0]["kind"] == "not_swept", f"(got {nothing})")
+    check("and it names which profile", nothing and nothing[0]["entity"] == "RK World Infocom")
+
+    # A profile that does not exist is not a gap: Robust Kommerce has no
+    # AmbitionBox page, and config records that as 'none'.
+    check("a profile that does not exist is not expected",
+          ("robust_kommerce", "ambitionbox") not in H.rated_profiles())
+
+    # Week 1 has no previous snapshot by definition, so blocking on that would
+    # mean the very first digest could only go out through the override.
+    base = build_digest.coverage_rows(
+        logged_one, baseline_only, week, entities, platforms,
+        expected=expect, baseline=True)[1]
+    check("the baseline week does not block on having no baseline", base == [],
+          f"(got {base})")
+    check("but an unswept profile still blocks in the baseline week",
+          [g["kind"] for g in build_digest.coverage_rows(
+              [], [], week, entities, platforms, expected=expect, baseline=True)[1]]
+          == ["not_swept"])
 
     # The send must refuse on it, the way it refuses a missing address.
     refusals = send_digest.coverage_refusal({"coverage_gaps": 1, "coverage_detail": gaps})
     check("the send refuses while reviews are unread", bool(refusals))
     check("and the refusal names the outstanding count", "2 review(s)" in refusals[0],
           f"(got {refusals[0]!r})")
+    unswept = send_digest.coverage_refusal(
+        {"coverage_gaps": 1, "coverage_detail": nothing})
+    check("the send also refuses a profile nobody swept", bool(unswept))
+    check("and says so in those words", "not swept" in unswept[0].lower(),
+          f"(got {unswept[0]!r})")
     check("no gap, no refusal",
           send_digest.coverage_refusal({"coverage_gaps": 0, "coverage_detail": []}) == [])
 

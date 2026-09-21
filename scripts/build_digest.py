@@ -152,15 +152,30 @@ def rating_rows(ratings, week_of, entities, platforms):
     return rows
 
 
-def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms):
-    """What the sweep actually covered, and where reviews were probably missed.
+def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms,
+                  expected=None, baseline=False):
+    """What the sweep covered, and every reason the week is not yet verified.
 
-    "Every new review" cannot be guaranteed while three platforms are swept by
+    "Every new review" cannot be guaranteed while three platforms are read by
     hand. But the rating snapshot carries the review COUNT, so the change in
-    that count is the number of reviews a platform genuinely gained. Comparing
-    it with how many were logged turns an unverifiable claim into an arithmetic
-    check: if AmbitionBox gained three reviews and one was logged, two were
-    missed, and the digest says so rather than implying completeness.
+    that count is the number of reviews a platform genuinely gained, and
+    comparing it with how many were logged turns an unverifiable claim into
+    arithmetic.
+
+    The arithmetic only works with two snapshots to subtract, and the first
+    version simply skipped a pair that did not have them - so a platform nobody
+    swept produced no rows and read exactly like a quiet week. "Could not
+    check" is not "checked and complete", so every profile the sweep is
+    expected to cover is enumerated up front and each one has to come back
+    accounted for:
+
+      not_swept   - no snapshot this week; nobody looked
+      no_baseline - snapshot this week but none last week; nothing to subtract
+      unread      - the count moved further than the logged rows explain
+
+    Week 1 is the exception: a baseline week has no previous snapshot by
+    definition, so no_baseline is not raised there. not_swept still is - a
+    profile nobody opened is a failure in any week.
     """
     prev_week = (week_of - dt.timedelta(days=7)).isoformat()
     this_week = week_of.isoformat()
@@ -176,23 +191,43 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms):
     logged = collections.Counter(
         (m.get("entity"), m.get("platform")) for m in mentions_now)
 
+    if expected is None:
+        expected = H.rated_profiles()
+
     gaps, swept = [], set()
-    for (entity_id, platform), seen in sorted(counts.items()):
-        if "now" in seen:
-            swept.add(platform)
+
+    def note(kind, entity_id, platform, **extra):
+        gaps.append({
+            "kind": kind,
+            "entity": entities.get(entity_id, entity_id),
+            "platform": platforms.get(platform, platform),
+            "url": counts.get((entity_id, platform), {}).get("url", ""),
+            "new": 0, "logged": logged.get((entity_id, platform), 0), "missing": 0,
+            **extra,
+        })
+
+    for key in sorted(set(expected) | set(counts)):
+        entity_id, platform = key
+        seen = counts.get(key, {})
         now, before = seen.get("now", -1), seen.get("prev", -1)
-        if now < 0 or before < 0:
-            continue                      # no pair of snapshots, nothing to compare
+
+        if now < 0:
+            if key in expected:
+                note("not_swept", entity_id, platform)
+            continue
+
+        swept.add(platform)
+        if before < 0:
+            if not baseline:
+                note("no_baseline", entity_id, platform)
+            continue
+
         new_reviews = now - before
-        if new_reviews > 0 and new_reviews > logged.get((entity_id, platform), 0):
-            gaps.append({
-                "entity": entities.get(entity_id, entity_id),
-                "platform": platforms.get(platform, platform),
-                "new": new_reviews,
-                "logged": logged.get((entity_id, platform), 0),
-                "missing": new_reviews - logged.get((entity_id, platform), 0),
-                "url": seen.get("url", ""),
-            })
+        already = logged.get(key, 0)
+        if new_reviews > already:
+            note("unread", entity_id, platform,
+                 new=new_reviews, missing=new_reviews - already)
+
     swept |= {m.get("platform") for m in mentions_now if m.get("platform")}
     return sorted(platforms.get(p, p) for p in swept if p), gaps
 
@@ -431,7 +466,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     ratings = rating_rows(all_ratings, week_of, entities, platforms)
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
-    swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms)
+    trial_start = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
+    is_baseline = bool(trial_start) and H.week_start_of(trial_start) == week_of
+    swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms,
+                                baseline=is_baseline)
     rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
     rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
 
@@ -813,15 +851,23 @@ def main() -> int:
     # every review the counts say arrived, so that is now a gate, and the
     # worklist below says exactly what is left to read.
     if stats["coverage_gaps"] and not args.allow_gaps:
-        outstanding = sum(g["missing"] for g in stats["coverage_detail"])
-        print(f"\nNOT SENDABLE — {outstanding} review(s) still to read. "
-              "The counts moved further than the logged rows account for.", file=sys.stderr)
+        print(f"\nNOT SENDABLE — {stats['coverage_gaps']} profile(s) are not accounted for.",
+              file=sys.stderr)
+        labels = {
+            "unread": "reviews still to read",
+            "not_swept": "NOT SWEPT — no snapshot this week",
+            "no_baseline": "no previous snapshot to compare against",
+        }
         for g in stats["coverage_detail"]:
-            print(f"  {g['entity']} / {g['platform']}: {g['new']} new, {g['logged']} logged, "
-                  f"{g['missing']} TO READ", file=sys.stderr)
+            kind = g.get("kind", "unread")
+            if kind == "unread":
+                detail = (f"{g['new']} new, {g['logged']} logged, {g['missing']} TO READ")
+            else:
+                detail = labels[kind]
+            print(f"  {g['entity']} / {g['platform']}: {detail}", file=sys.stderr)
             if g["url"]:
                 print(f"    {g['url']}", file=sys.stderr)
-        print("\nLog them (scripts/log_mention.py) and build again. To look at the digest "
+        print("\nLog the ratings and the reviews, then build again. To look at the digest "
               "before the sweep is finished, add --allow-gaps.", file=sys.stderr)
         return 1
 

@@ -23,6 +23,7 @@ four executives cannot be unsent.
 from __future__ import annotations
 
 import argparse
+import collections
 import os
 import smtplib
 import sys
@@ -65,11 +66,30 @@ def coverage_refusal(stats: dict) -> list[str]:
     if not stats.get("coverage_gaps"):
         return []
     gaps = stats.get("coverage_detail", [])
-    outstanding = sum(g["missing"] for g in gaps)
-    detail = "; ".join(f"{g['entity']}/{g['platform']} {g['missing']}" for g in gaps)
-    return [f"{outstanding} review(s) still unread ({detail}) - the digest would "
-            "under-report the week and would not say so. Log them first, or "
-            "--allow-gaps if that is genuinely intended"]
+    by_kind = collections.defaultdict(list)
+    for gap in gaps:
+        by_kind[gap.get("kind", "unread")].append(gap)
+
+    out = []
+    unread = by_kind.get("unread", [])
+    if unread:
+        outstanding = sum(g["missing"] for g in unread)
+        detail = "; ".join(f"{g['entity']}/{g['platform']} {g['missing']}" for g in unread)
+        out.append(f"{outstanding} review(s) still unread ({detail}) - the digest would "
+                   "under-report the week and would not say so")
+    if by_kind.get("not_swept"):
+        detail = "; ".join(f"{g['entity']}/{g['platform']}"
+                           for g in by_kind["not_swept"])
+        out.append(f"{len(by_kind['not_swept'])} profile(s) not swept at all ({detail}) - "
+                   "no snapshot this week, so nothing about them has been checked")
+    if by_kind.get("no_baseline"):
+        detail = "; ".join(f"{g['entity']}/{g['platform']}"
+                           for g in by_kind["no_baseline"])
+        out.append(f"{len(by_kind['no_baseline'])} profile(s) have no previous snapshot to "
+                   f"compare against ({detail}) - completeness cannot be verified for them")
+    if out:
+        out[-1] += ". Fix them first, or --allow-gaps if that is genuinely intended"
+    return out
 
 
 def main() -> int:

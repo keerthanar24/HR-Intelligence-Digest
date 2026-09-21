@@ -124,6 +124,29 @@ def entity_names() -> dict[str, str]:
     return {e["id"]: e["name"] for e in cfg.get("entities", [])}
 
 
+def rated_profiles() -> list[tuple[str, str]]:
+    """(entity_id, platform_id) for every profile that carries a review count.
+
+    These are the pairs a weekly sweep is expected to snapshot. Enumerating
+    them is what lets the digest tell "checked and complete" apart from "never
+    checked" - without the list, a platform nobody swept simply produces no
+    rows and looks exactly like a quiet week.
+
+    A URL of 'none' means the page does not exist (Robust Kommerce has no
+    AmbitionBox profile), which is not the same as one nobody looked at.
+    """
+    pairs = []
+    for platform in load_yaml("sources").get("platforms", []):
+        if "ratings" not in (platform.get("captures") or []):
+            continue
+        for entity_id, url in (platform.get("urls") or {}).items():
+            text = str(url or "").strip()
+            if not text or text.lower() == "none" or is_todo(text):
+                continue
+            pairs.append((entity_id, platform["id"]))
+    return sorted(pairs)
+
+
 def platform_names() -> dict[str, str]:
     cfg = load_yaml("sources")
     return {p["id"]: p["name"] for p in cfg.get("platforms", [])}
