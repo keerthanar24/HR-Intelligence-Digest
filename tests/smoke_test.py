@@ -71,6 +71,19 @@ def test_matching() -> None:
 
 def test_weeks() -> None:
     print("week arithmetic")
+    # A date cell read out of .xlsx stringifies with a time part. Unparsed, the
+    # importer fell back to the date a rating was CHECKED instead of the week it
+    # belonged to, silently filing two weeks' snapshots under one week and
+    # wiping out the week-on-week movement in section 2.
+    check("spreadsheet datetime string parses",
+          H.parse_date("2026-08-31 00:00:00") == dt.date(2026, 8, 31))
+    check("iso datetime string parses",
+          H.parse_date("2026-08-31T00:00:00") == dt.date(2026, 8, 31))
+    check("datetime with a real time parses",
+          H.parse_date("2026-08-31 14:30:00") == dt.date(2026, 8, 31))
+    check("plain date still parses", H.parse_date("2026-08-31") == dt.date(2026, 8, 31))
+    check("day-first date still parses", H.parse_date("31/08/2026") == dt.date(2026, 8, 31))
+    check("nonsense is still rejected", H.parse_date("not a date") is None)
     check("last_complete_week on a Friday", H.last_complete_week(dt.date(2026, 9, 18)) == WEEK)
     check("last_complete_week on a Monday", H.last_complete_week(dt.date(2026, 9, 14)) == WEEK)
     check("monday_of a Sunday", H.monday_of(dt.date(2026, 9, 13)) == WEEK)
@@ -156,6 +169,61 @@ def test_sheet_import() -> None:
     schema_errors = [e for e in report.errors if "unknown" in e or "duplicate" in e]
     check("imported rows pass schema validation", not schema_errors,
           f"({schema_errors[:1]})")
+
+
+def test_sheet_import_v2() -> None:
+    """The corrected workbook layout maps with no warnings at all."""
+    print("sheet import (corrected workbook)")
+    cfg = H.load_yaml("column_map")
+    notes = import_sheet.Notes()
+
+    rows = import_sheet.import_mentions(
+        import_sheet.read_csv_file(os.path.join(FIXTURES, "sheet-v2-raw-data-log.csv")),
+        cfg, notes)
+    ratings = import_sheet.import_ratings(
+        import_sheet.read_csv_file(os.path.join(FIXTURES, "sheet-v2-rating-tracker.csv")),
+        cfg, notes)
+    escalations = import_sheet.import_escalations(
+        import_sheet.read_csv_file(os.path.join(FIXTURES, "sheet-v2-escalations.csv")),
+        cfg, notes)
+
+    check("no warnings on the corrected layout", notes.warnings == [],
+          f"({notes.warnings[:1]})")
+    check("mentions imported", len(rows) == 4, f"(got {len(rows)})")
+
+    by_id = {r["mention_id"]: r for r in rows}
+    check("sheet-supplied mention ids are kept, not regenerated",
+          "M-20260907-002" in by_id)
+    check("'Mixed' sentiment survives the round trip",
+          any(r["sentiment"] == "mixed" for r in rows))
+    check("'Payroll Delay' maps to its own theme, not compensation",
+          by_id["M-20260907-002"]["themes"] == "payroll_delay")
+    check("author type vocabulary maps",
+          by_id["M-20260907-002"]["author_type"] == "ex_employee")
+    check("red flag reason maps to a canonical trigger",
+          by_id["M-20260907-002"]["red_flag_reason"] in H.RED_FLAG_REASONS)
+    check("status vocabulary maps",
+          all(r["status"] in H.STATUSES for r in rows))
+
+    # The split review-count columns are the point of the Rating_Tracker fix.
+    check("two weeks x two platforms un-pivot", len(ratings) == 4, f"(got {len(ratings)})")
+    ab = [r for r in ratings if r["platform"] == "ambitionbox"]
+    check("review counts now attributed per platform",
+          sorted(r["review_count"] for r in ab) == ["118", "121"],
+          f"(got {[r['review_count'] for r in ab]})")
+    check("in-sheet delta columns are ignored, not imported",
+          all("delta" not in k for r in ratings for k in r))
+
+    check("escalation severity maps", escalations[0]["severity"] == "high")
+    check("escalation reason maps", escalations[0]["reason"] == "non_payment")
+    check("escalation status maps", escalations[0]["status"] == "acknowledged")
+
+    import validate_data
+    report = validate_data.Report()
+    validate_data.check_mentions(report, rows, WEEK)
+    validate_data.check_escalations(report, rows, escalations)
+    check("corrected layout passes validation clean", not report.errors,
+          f"({report.errors[:1]})")
 
 
 def test_digest() -> None:
@@ -300,7 +368,8 @@ def test_red_flags() -> None:
 
 def main() -> int:
     for test in (test_matching, test_weeks, test_urls, test_collector,
-                 test_sheet_import, test_digest, test_red_flags):
+                 test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_red_flags):
         test()
     print()
     if failures:

@@ -1,0 +1,2 @@
+Escalation ID,Raised At,Week Of,Mention ID,Entity,Platform,Direct Link / URL,Severity,Reason,Notified,Notified At,Owner,Action Taken,Status,Closed At
+E-2026-001,2026-09-14,2026-09-07,M-20260907-002,RK World,AmbitionBox,https://example.invalid/ab/4,High,Non-payment,"Mahendra, Sonal, Ramesh, Akshay",2026-09-14,desk,Same-day alert sent,Acknowledged,

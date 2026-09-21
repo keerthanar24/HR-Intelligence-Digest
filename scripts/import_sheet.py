@@ -151,7 +151,7 @@ def import_mentions(rows, cfg, notes: Notes) -> list[dict]:
         row["post_date"] = as_date(record.get("post_date"))
 
         posted = H.parse_date(row["post_date"])
-        recorded = H.parse_date(row.get("week_of", ""))
+        recorded = H.parse_date(as_date(record.get("week_of")))
         if recorded:
             row["week_of"] = H.monday_of(recorded).isoformat()
         elif posted:
@@ -165,6 +165,9 @@ def import_mentions(rows, cfg, notes: Notes) -> list[dict]:
         row["entity"] = map_value(record.get("entity"), "entity", cfg["values"], notes, where)
         row["platform"] = map_value(record.get("platform"), "platform", cfg["values"], notes, where)
         row["red_flag"] = map_value(record.get("red_flag"), "red_flag", cfg["values"], notes, where)
+        for field in ("author_type", "red_flag_reason", "status"):
+            if record.get(field):
+                row[field] = map_value(record.get(field), field, cfg["values"], notes, where)
 
         sentiment = map_value(record.get("sentiment"), "sentiment", cfg["values"], notes, where)
         if sentiment == RED_FLAG_SENTINEL:
@@ -241,7 +244,7 @@ def import_ratings(rows, cfg, notes: Notes) -> list[dict]:
         where = f"Rating_Tracker row {number}"
         entity = map_value(record.get("entity"), "entity", cfg["values"], notes, where)
         captured = as_date(record.get("captured_at")) or dt.date.today().isoformat()
-        recorded = H.parse_date(str(record.get("week_of") or ""))
+        recorded = H.parse_date(as_date(record.get("week_of")))
         week = H.monday_of(recorded or H.parse_date(captured) or dt.date.today())
 
         for platform in per_platform:
@@ -288,6 +291,13 @@ def import_escalations(rows, cfg, notes: Notes) -> list[dict]:
     for record in records:
         row = {field: "" for field in H.ESCALATION_FIELDS}
         row.update({k: ("" if v is None else str(v).strip()) for k, v in record.items()})
+        where = f"Escalations row {record.get('escalation_id') or '?'}"
+        if record.get("severity"):
+            row["severity"] = map_value(record["severity"], "severity", cfg["values"], notes, where)
+        if record.get("reason"):
+            row["reason"] = map_value(record["reason"], "red_flag_reason", cfg["values"], notes, where)
+        if record.get("status"):
+            row["status"] = map_value(record["status"], "escalation_status", cfg["values"], notes, where)
         row["raised_at"] = as_date(record.get("raised_at"))
         row["notified_at"] = as_date(record.get("notified_at"))
         row["closed_at"] = as_date(record.get("closed_at"))

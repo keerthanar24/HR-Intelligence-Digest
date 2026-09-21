@@ -139,9 +139,20 @@ def is_todo(value: Any) -> bool:
 
 
 def parse_date(value: str) -> dt.date | None:
+    """Parse the date spellings a spreadsheet actually produces.
+
+    A date cell read out of .xlsx stringifies as '2026-08-31 00:00:00'. Left
+    unhandled that returns None, and a caller with a fallback then files the row
+    under the wrong date without any error - so the time part is stripped here
+    rather than at each call site.
+    """
     value = (value or "").strip()
     if not value:
         return None
+    if " " in value and ":" in value.split(" ", 1)[1]:
+        value = value.split(" ", 1)[0]
+    if value.endswith("T00:00:00"):
+        value = value[:-9]
     for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%Y/%m/%d"):
         try:
             return dt.datetime.strptime(value, fmt).date()

@@ -1,5 +1,10 @@
 # Workbook Review — HR_Intelligence_Master_Tracker
 
+**Status: applied.** Every fix below is in
+`templates/HR_Intelligence_Master_Tracker.xlsx`, rebuilt from the supplied file by
+`tools/build_tracker_workbook.py` and `tools/populate_tracker_workbook.py`. This page stays as
+the record of what changed and why.
+
 Review of the tracker as supplied, and how the scripts consume it.
 
 **The sheet keeps its own column names.** `scripts/import_sheet.py` translates via

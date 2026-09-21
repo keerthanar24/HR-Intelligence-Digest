@@ -58,9 +58,11 @@ tabs:
         url:            [Glassdoor URL, Glassdoor Link]
     # Columns deliberately not imported, with the reason.
     ignore:
-      # Computed by build_digest.py from consecutive snapshots. A stored copy
-      # drifts from the data the moment anyone edits a rating.
+      # Computed by build_digest.py from consecutive snapshots. The in-sheet
+      # copies are there for eyeballing; the digest derives its own.
       - Week-on-Week Delta
+      - AmbitionBox Delta
+      - Glassdoor Delta
       # Ambiguous while one column serves two platforms that have separate
       # ratings. Split into 'AmbitionBox Reviews Count' and 'Glassdoor Reviews
       # Count' and it imports automatically.
@@ -144,6 +146,42 @@ values:
     Facilities: facilities
     Transparency: transparency
     Job Security: job_security
+
+  author_type:
+    Current Employee: current_employee
+    Ex-Employee: ex_employee
+    Ex Employee: ex_employee
+    Former Employee: ex_employee
+    Candidate: candidate
+    Intern: intern
+    Contractor: contractor
+    Anonymous: anonymous
+    Unknown: unknown
+
+  red_flag_reason:
+    Names Individual: names_individual
+    Harassment / Safety: harassment_or_safety
+    Harassment: harassment_or_safety
+    Non-payment: non_payment
+    Non Payment: non_payment
+    Legal / Regulatory: legal_or_regulatory
+    Public Escalation Risk: public_escalation_risk
+
+  status:
+    Needs Review: needs_review
+    Reviewed: reviewed
+    Escalated: escalated
+    Closed: closed
+    Out of Scope: out_of_scope
+
+  severity:
+    High: high
+    Critical: critical
+
+  escalation_status:
+    Open: open
+    Acknowledged: acknowledged
+    Closed: closed
 
   red_flag:
     "Yes": "yes"
