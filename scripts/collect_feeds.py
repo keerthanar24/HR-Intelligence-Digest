@@ -24,6 +24,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 import os
 import xml.etree.ElementTree as ET
@@ -36,6 +37,42 @@ NS = {
     "atom": "http://www.w3.org/2005/Atom",
     "dc": "http://purl.org/dc/elements/1.1/",
 }
+
+
+def build_feed_url(feed: dict, entities: dict) -> str:
+    """Resolve a feed's URL, generating it from the alias register where asked.
+
+    A feed with `auto_query: reddit` has its search built from the entity's
+    current aliases, so adding a trading name to config/entities.yaml updates
+    the feed too. Hand-written search URLs silently go stale the moment a new
+    name is discovered, which is exactly the failure this programme exists to
+    avoid.
+    """
+    kind = feed.get("auto_query")
+    if not kind:
+        return feed.get("url", "")
+
+    entity = entities.get(feed.get("entity"))
+    if not entity:
+        return feed.get("url", "")
+
+    # Reddit's search rejects very long queries, so spend the slots on
+    # genuinely different names. Spacing and punctuation variants ("RK World",
+    # "R K World", "R.K. World") are one term to a search engine, so collapse
+    # them first - otherwise they crowd out a real trading name like ValueCart.
+    names = list(entity.get("aliases") or []) + list(entity.get("needs_confirmation") or [])
+    distinct, seen = [], set()
+    for alias in names:
+        shape = "".join(ch for ch in alias.lower() if ch.isalnum())
+        if shape not in seen:
+            seen.add(shape)
+            distinct.append(alias)
+    query = " OR ".join(f'"{alias}"' for alias in distinct[:8])
+
+    if kind == "reddit":
+        return ("https://www.reddit.com/search.rss?q="
+                + urllib.parse.quote(query) + "&sort=new&t=week")
+    raise ValueError(f"unknown auto_query kind {kind!r} on feed {feed.get('id')}")
 
 
 def fetch(url: str, user_agent: str, timeout: int) -> bytes:
@@ -202,6 +239,7 @@ def main() -> int:
     seen = {H.canonical_url(r.get("url", "")) for r in existing if r.get("url")}
     platforms = H.platform_names()
 
+    entities_by_id = {e["id"]: e for e in H.load_yaml("entities").get("entities", [])}
     feeds = [f for f in sources.get("feeds", []) if f.get("enabled")]
     if args.feed:
         feeds = [f for f in sources.get("feeds", []) if f.get("id") == args.feed]
@@ -218,7 +256,7 @@ def main() -> int:
     skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0, "out_of_scope_hint": 0}
 
     for index, feed in enumerate(feeds):
-        url = feed.get("url", "")
+        url = build_feed_url(feed, entities_by_id)
         if H.is_todo(url) or not url:
             print(f"  skip {feed['id']}: URL still a TODO placeholder")
             continue
