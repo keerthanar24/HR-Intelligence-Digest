@@ -34,11 +34,9 @@ entities:
       - RK Grp
       - RK group of companies
       - RK Groups
-    needs_confirmation:
-      # Placeholder invented during setup, with no evidence behind it. No
-      # platform listing has corroborated it. Confirm with HR or delete it -
-      # do not treat it as a known former name.
-      - RK Enterprises
+    # Confirmed 2026-09-21: there is no "RK Enterprises". It was a placeholder
+    # invented at setup and is removed rather than carried as a maybe.
+    needs_confirmation: []
     exclude_terms:
       - RK Group of Hotels
       - RK Group Dubai
