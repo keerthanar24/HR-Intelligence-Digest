@@ -413,8 +413,13 @@ def test_digest() -> None:
           f"({total_row['count']})")
     check("every entity still has its own row",
           len([r for r in heads if not r["is_total"]]) == len(H.entity_names()))
-    check("theme cap respected",
-          body_html.count("</li>") <= int(settings["digest"].get("max_themes", 4)))
+    # Counting list items across the page no longer works: section 4 carries a
+    # second list for the rolling window. Assert the cap where it is applied.
+    cap = int(settings["digest"].get("max_themes", 4))
+    week_rows = H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), WEEK)
+    check("weekly theme cap respected", len(build_digest.theme_rows(week_rows, cap)) <= cap)
+    check("rolling theme cap respected", stats["rolling_themes"] <= cap,
+          f"(got {stats['rolling_themes']})")
 
     # Net sentiment: the six rows tag as mixed(0), very_negative(-2),
     # positive(+1), negative(-1), negative(-1) and one untagged -> -3/5 = -0.60.
