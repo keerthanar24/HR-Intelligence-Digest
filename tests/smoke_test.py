@@ -635,9 +635,64 @@ def test_red_flags() -> None:
           red_flags.matches_pattern("Nice canteen, average pay") == [])
 
 
+def test_red_flag_sla() -> None:
+    """Section 5 has to evidence the *same-day* promise, not just the flag.
+
+    Without the two dates a flag alerted three days late renders exactly like
+    one alerted within the hour, which is the only thing deliverable 5 claims.
+    """
+    print("red flag SLA")
+    entities = {"rk_world": "RK World Infocom"}
+    platforms = {"ambitionbox": "AmbitionBox"}
+
+    def mention(mid):
+        return {"mention_id": mid, "entity": "rk_world", "platform": "ambitionbox",
+                "post_date": "2026-09-14", "captured_at": "2026-09-16",
+                "one_line_summary": "F&F pending two months", "red_flag": "yes",
+                "red_flag_reason": "non_payment", "url": "https://example.invalid/1",
+                "names_individual": "no", "status": "escalated"}
+
+    same_day = [{"mention_id": "M-1", "raised_at": "2026-09-16",
+                 "notified_at": "2026-09-16", "notified": "Mahendra, Sonal",
+                 "severity": "high", "status": "acknowledged"}]
+    late = [dict(same_day[0], notified_at="2026-09-19")]
+    unsent = [dict(same_day[0], notified_at="", notified="")]
+
+    on = build_digest.red_flag_rows([mention("M-1")], same_day, entities, platforms)[0]
+    check("same-day escalation is marked on time", on["on_time"] and on["timing"] == "same day",
+          f"(got {on['timing']})")
+    check("the trigger reads as a label, not a field name", on["reason"] == "Non-payment",
+          f"(got {on['reason']})")
+    check("the row carries who was told", "Mahendra" in on["notified_to"])
+
+    lt = build_digest.red_flag_rows([mention("M-1")], late, entities, platforms)[0]
+    check("a late escalation is not marked on time", not lt["on_time"])
+    check("the delay is stated in days", lt["timing"] == "3 day(s) late", f"(got {lt['timing']})")
+
+    ns = build_digest.red_flag_rows([mention("M-1")], unsent, entities, platforms)[0]
+    check("an unsent escalation says so loudly",
+          ns["timing"] == "NOT YET SENT" and not ns["on_time"])
+
+    # A flagged mention with no escalation row at all must not read as fine.
+    none_logged = build_digest.red_flag_rows([mention("M-1")], [], entities, platforms)[0]
+    check("a flag with no escalation logged is not silently on time",
+          not none_logged["on_time"] and none_logged["raised"] == "2026-09-16",
+          f"(got {none_logged['raised']}/{none_logged['on_time']})")
+
+    # And the rendering has to surface it, not just the data.
+    for rows, expected in ((same_day, "same day"), (late, "3 day(s) late"), (unsent, "NOT YET SENT")):
+        flags = build_digest.red_flag_rows([mention("M-1")], rows, entities, platforms)
+        cell = build_digest.alert_cell(flags[0])
+        check(f"the alert cell shows {expected!r}", expected in cell, f"(got {cell})")
+    check("a missed window is red", "#a12622" in build_digest.alert_cell(
+        build_digest.red_flag_rows([mention("M-1")], late, entities, platforms)[0]))
+    check("a kept window is green", "#1e7a3c" in build_digest.alert_cell(
+        build_digest.red_flag_rows([mention("M-1")], same_day, entities, platforms)[0]))
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

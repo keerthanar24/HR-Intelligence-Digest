@@ -30,6 +30,15 @@ BOUNDARY_NOTE = (
     "not monitor any individual's personal social media accounts."
 )
 
+# The five triggers, as the brief names them, in the form the digest prints.
+TRIGGER_LABELS = {
+    "names_individual": "Names an individual",
+    "harassment_or_safety": "Harassment / safety",
+    "non_payment": "Non-payment",
+    "legal_or_regulatory": "Legal / regulatory",
+    "public_escalation_risk": "Public escalation risk",
+}
+
 TRIAL_NOTE = (
     "This is a 60-day awareness trial. No action items or HR process changes follow "
     "from this digest; only Red Flags are escalated. Review sites lag by 2–3 months, "
@@ -251,25 +260,50 @@ def theme_rows(mentions, limit):
 
 
 def red_flag_rows(mentions, escalations, entities, platforms):
+    """Red flags raised this week, with the evidence that they went out on time.
+
+    The deliverable promises *same-day* escalation, so the section has to show
+    when each was found and when the four were told. Without those two dates a
+    flag alerted three days late reads exactly like one alerted within the
+    hour, and the one number that matters is invisible.
+    """
     by_mention = {e.get("mention_id"): e for e in escalations if e.get("mention_id")}
     rows = []
     for m in mentions:
         if not H.is_yes(m.get("red_flag")):
             continue
         esc = by_mention.get(m.get("mention_id"), {})
+        trigger = m.get("red_flag_reason") or esc.get("reason") or ""
+        raised = H.parse_date(esc.get("raised_at", "")) or H.parse_date(m.get("captured_at", ""))
+        notified = H.parse_date(esc.get("notified_at", ""))
+
+        if notified is None:
+            timing, on_time = "NOT YET SENT", False
+        elif raised is None:
+            timing, on_time = notified.isoformat(), True
+        else:
+            delay = (notified - raised).days
+            on_time = delay <= 0
+            timing = "same day" if on_time else f"{delay} day(s) late"
+
         rows.append(
             {
                 "mention_id": m.get("mention_id", ""),
                 "entity": entities.get(m.get("entity"), m.get("entity", "")),
                 "platform": platforms.get(m.get("platform"), m.get("platform", "")),
                 "date": m.get("post_date") or m.get("captured_at", ""),
-                "reason": (m.get("red_flag_reason") or esc.get("reason") or "unspecified").replace("_", " "),
+                "reason": TRIGGER_LABELS.get(trigger, trigger.replace("_", " ") or "unspecified"),
+                "severity": (esc.get("severity") or "high").title(),
+                "raised": raised.isoformat() if raised else "?",
+                "notified": notified.isoformat() if notified else "",
+                "timing": timing,
+                "on_time": on_time,
                 # The digest never carries a named individual; the restricted
                 # escalation log does. See docs/00-brief.md section 10.
                 "summary": m.get("one_line_summary", ""),
                 "url": m.get("url", ""),
                 "status": esc.get("status") or m.get("status") or "open",
-                "notified": esc.get("notified", ""),
+                "notified_to": esc.get("notified", ""),
                 "names_individual": H.is_yes(m.get("names_individual")),
             }
         )
@@ -280,6 +314,24 @@ def red_flag_rows(mentions, escalations, entities, platforms):
 # --- rendering ---------------------------------------------------------------
 
 E = html.escape
+
+
+def alert_cell(r):
+    """The escalation timing, coloured so a miss cannot be skimmed past.
+
+    Deliverable 5 promises *same-day* escalation. A date on its own does not
+    show whether that promise was kept, so the cell carries the verdict too.
+    """
+    if not r["notified"]:
+        return ('<strong style="color:#a12622;">NOT YET SENT</strong><br>'
+                '<span style="font-size:11px;color:#a12622;">escalate now</span>')
+    colour = "#1e7a3c" if r["on_time"] else "#a12622"
+    who = ""
+    if r["notified_to"]:
+        who = ('<br><span style="font-size:11px;color:#52606d;">to '
+               f'{E(truncate(r["notified_to"], 44))}</span>')
+    return (f'{E(r["notified"])}<br><strong style="color:{colour};font-size:11px;">'
+            f'{E(r["timing"])}</strong>{who}')
 
 
 def h_table(headers, rows, aligns=None, widths=None):
@@ -513,19 +565,35 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     # 5. Red flags
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">5 · Red Flags</h3>')
     if flags:
+        late = [r for r in flags if not r["on_time"]]
+        if late:
+            banner = "background:#fdecea;border-left:4px solid #a12622;"
+            verdict = (f'<strong style="color:#a12622;">{plural(len(late), "item")} did not go '
+                       'out the same day it was found.</strong>')
+        else:
+            banner = "background:#eaf5ec;border-left:4px solid #1e7a3c;"
+            verdict = ('<strong style="color:#1e7a3c;">All escalated the same day they were '
+                       'found.</strong>')
         h.append(
-            '<p style="margin:0 0 8px;color:#a12622;"><strong>'
-            f'{plural(len(flags), "item")} escalated this week.</strong> Names of individuals are '
-            'held in the restricted escalation log, not in this email.</p>'
+            f'<div style="{banner}padding:8px 10px;margin:0 0 8px;font-size:13px;">'
+            f'<strong>{plural(len(flags), "item")} escalated this week.</strong> {verdict}<br>'
+            '<span style="font-size:12px;color:#52606d;">Escalation is immediate and does not '
+            'wait for this digest; the rows below are the record of what was already sent. '
+            'Names of individuals are held in the restricted escalation log, not in this '
+            'email.</span></div>'
         )
         h.append(h_table(
-            ["ID", "Entity", "Platform", "Date", "Trigger", "Status", "Detail"],
-            [[E(r["mention_id"]), E(r["entity"]), E(r["platform"]), E(r["date"]),
-              E(r["reason"]), E(r["status"]),
-              (E(truncate(r["summary"], 120)) +
+            ["ID", "Entity", "Platform", "Found", "Trigger", "Alerted", "Detail"],
+            [[E(r["mention_id"]), E(r["entity"]), E(r["platform"]),
+              (f'{E(r["raised"])}<br><span style="font-size:11px;color:#52606d;">'
+               f'posted {E(r["date"])}</span>'),
+              (f'{E(r["reason"])}<br><span style="font-size:11px;color:#52606d;">'
+               f'{E(r["severity"])} · {E(r["status"])}</span>'),
+              alert_cell(r),
+              (E(truncate(r["summary"], 110)) +
                (f' <a href="{E(r["url"])}" style="color:#2b6cb0;">link</a>' if r["url"] else ""))]
              for r in flags],
-            widths=["14%", "14%", "11%", "10%", "14%", "11%", "26%"],
+            widths=["12%", "13%", "10%", "10%", "14%", "16%", "25%"],
         ))
     else:
         h.append('<p style="margin:0 0 8px;">None this week.</p>')
@@ -621,11 +689,24 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     t.append("")
     t.append("5. RED FLAGS")
     if flags:
-        t.append(f"{plural(len(flags), 'item')} escalated this week. "
-                 "Names of individuals are held in the restricted escalation log, not here.")
+        late = [r for r in flags if not r["on_time"]]
+        verdict = (f"{plural(len(late), 'item')} did not go out the same day it was found."
+                   if late else "All escalated the same day they were found.")
+        t.append(f"{plural(len(flags), 'item')} escalated this week. {verdict}")
+        t.append("Escalation is immediate and does not wait for this digest; the rows below are "
+                 "the record of what was already sent. Names of individuals are held in the "
+                 "restricted escalation log, not here.")
         for r in flags:
-            t.append(f"- {r['mention_id']} [{r['entity']} / {r['platform']} / {r['date']}] "
-                     f"{r['reason']} · status {r['status']}")
+            t.append(f"- {r['mention_id']} [{r['entity']} / {r['platform']} / "
+                     f"posted {r['date']}]")
+            t.append(f"  {r['reason']} · {r['severity']} · status {r['status']}")
+            if r["notified"]:
+                line = f"  Found {r['raised']} → alerted {r['notified']} ({r['timing']})"
+                if r["notified_to"]:
+                    line += f" to {truncate(r['notified_to'], 60)}"
+            else:
+                line = f"  Found {r['raised']} → NOT YET SENT - escalate now"
+            t.append(line)
             t.append(f"  {truncate(r['summary'], 120)}")
             if r["url"]:
                 t.append(f"  {r['url']}")
