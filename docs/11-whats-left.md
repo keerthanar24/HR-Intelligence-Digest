@@ -1,6 +1,6 @@
 # What is left to do
 
-State as of 2026-09-21. Everything here is an **input only a person can supply** — none of it is
+State as of 2026-09-21 (Google Alerts now connected — see section 4). Everything here is an **input only a person can supply** — none of it is
 blocked on code. Ordered by what unblocks the most.
 
 Re-check this list any time with:
@@ -81,25 +81,36 @@ before the 4.00 / 7 reviews baseline is relied on.
 
 ## 4. Missing source URLs
 
-**RK World Infocom's LinkedIn page** — the only platform URL still a placeholder:
+~~**Four Google Alerts RSS feeds.**~~ **Done.** All five alerts are connected and verified on a
+live run — each feed reports its own query as its title, which confirms every URL is bound to the
+entity it belongs to. They return 0 items today because a Google Alert only carries items indexed
+after it was created; they fill from here.
+
+**RK World Infocom's LinkedIn page** — now the only platform URL still a placeholder:
 
 ```
 linkedin  rk_world  TODO: paste the LinkedIn page for RK World Infocom Pvt Ltd
 ```
 
-**Four Google Alerts RSS feeds** in `config/sources.yaml`. The RSS option only appears if the
-alert's *Deliver to* field is set to "RSS feed" rather than an email address — that is why they
-could not be found before.
-
 **X bearer token** (optional) — set `X_BEARER_TOKEN` as a repository secret and the four X
 searches start running. Without it they are skipped and X stays manual.
 
+**Reddit API credentials** (optional) — two of four Reddit queries still hit HTTP 429 from a
+shared CI address, even after four retries. More waiting will not fix it; an API client id
+would.
+
 ---
 
-## 5. The four recipient addresses
+## 5. Who the digest is from and to
 
-All four entries in `config/recipients.yaml` are placeholders, so the send refuses. Mahendra,
-Sonal, Ramesh, Akshay. Not blocking the build or the sweep — only the send.
+Three separate things, all needed before anything can be sent:
+
+- **The four recipient addresses** in `config/recipients.yaml` — Mahendra, Sonal, Ramesh, Akshay.
+- **`programme.owner`** in `config/settings.yaml` — the name of whoever runs the desk.
+- **`programme.reply_to`** in `config/settings.yaml` — the address the digest comes from and
+  replies go to. Without it the send has no From address and refuses.
+
+None of these block the build or the sweep; they block only the send.
 
 ---
 
