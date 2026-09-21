@@ -68,7 +68,15 @@ def main() -> int:
     parser.add_argument("-e", "--entity")
     parser.add_argument("-p", "--platform")
     parser.add_argument("-r", "--rating", type=float)
-    parser.add_argument("-c", "--reviews", type=int, help="total review count on the page")
+    parser.add_argument("-c", "--reviews", type=int,
+                        help="total review count on the page; omit only if the page "
+                             "does not show one, and it will be flagged")
+    parser.add_argument("--culture", type=float, help="sub-score: culture and values")
+    parser.add_argument("--work-life", type=float, help="sub-score: work/life balance")
+    parser.add_argument("--career", type=float, help="sub-score: career opportunities")
+    parser.add_argument("--pay", type=float, help="sub-score: compensation and benefits")
+    parser.add_argument("--job-security", type=float, help="sub-score: job security")
+    parser.add_argument("--recommend", type=int, help="percent who recommend")
     parser.add_argument("--week", help="week_of Monday; defaults to the current week")
     parser.add_argument("--by", default="desk")
     parser.add_argument("--notes", default="")
@@ -94,9 +102,8 @@ def main() -> int:
         print(f"Unknown platform {args.platform!r}. One of: {', '.join(REVIEW_PLATFORMS)}",
               file=sys.stderr)
         return 2
-    if args.rating is None or args.reviews is None:
-        print("Both --rating and --reviews are needed: a rating move means nothing "
-              "without the count behind it.", file=sys.stderr)
+    if args.rating is None:
+        print("--rating is required.", file=sys.stderr)
         return 2
     if not 1.0 <= args.rating <= 5.0:
         print(f"Rating {args.rating} is outside 1.0-5.0 - misread?", file=sys.stderr)
@@ -121,7 +128,13 @@ def main() -> int:
         "entity": args.entity,
         "platform": args.platform,
         "overall_rating": f"{args.rating:.2f}",
-        "review_count": str(args.reviews),
+        "review_count": "" if args.reviews is None else str(args.reviews),
+        "recommend_pct": "" if args.recommend is None else str(args.recommend),
+        "work_life_balance": "" if args.work_life is None else f"{args.work_life:.1f}",
+        "salary_benefits": "" if args.pay is None else f"{args.pay:.1f}",
+        "job_security": "" if args.job_security is None else f"{args.job_security:.1f}",
+        "career_growth": "" if args.career is None else f"{args.career:.1f}",
+        "culture": "" if args.culture is None else f"{args.culture:.1f}",
         "url": platform_url(args.platform, args.entity),
         "notes": args.notes,
     })
@@ -134,8 +147,15 @@ def main() -> int:
         for row in rows:
             writer.writerow({f: row.get(f, "") for f in H.RATING_FIELDS})
 
+    count_text = f"{args.reviews} reviews" if args.reviews is not None else "review count MISSING"
     print(f"Recorded {entities[args.entity]} / {args.platform}: "
-          f"{args.rating:.2f} ({args.reviews} reviews), week of {week}.")
+          f"{args.rating:.2f} ({count_text}), week of {week}.")
+    if args.reviews is None:
+        print("  WARNING: no review count. A rating move is unreadable without it - "
+              "0.1 on 40 reviews is one review. Add it with --replace when you have it.")
+    elif args.reviews < 10:
+        print(f"  NOTE: only {args.reviews} review(s). At this base a single new review "
+              "swings the score by a lot; treat week-on-week movement as noise.")
 
     # Show the movement immediately - it is the whole point of the series.
     prior_week = (week - dt.timedelta(days=7)).isoformat()
