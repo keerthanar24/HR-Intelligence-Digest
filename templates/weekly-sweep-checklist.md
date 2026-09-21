@@ -1,58 +1,95 @@
-# Weekly Sweep Checklist — week of ______________
+# Friday Sweep Checklist — week of ______________
 
-Print or copy per week. Full instructions: `docs/03-weekly-sop.md`.
+Reporting week: **Saturday → Friday**. Sweep 09:00–11:00, send 15:00–17:00.
+Full instructions: `docs/03-weekly-sop.md`
 
 Swept by: ______________   Started: ______  Finished: ______  (budget 3–4 h)
 
-## 0 · Setup
+---
+
+## 09:00 · Start (5 min)
+
 - [ ] `git pull`
-- [ ] `python3 scripts/collect_feeds.py`
+- [ ] `make sweep` — prints every URL and what to capture
+- [ ] `make auto` — runs the feed collection (Reddit, news, X if configured)
 
-## 1 · Manual sweep — priority 1, weekly
+## 09:05 · Review sites — the part only a person can do (60–75 min)
 
-| Platform | RK Group | RK World | Robust Kommerce | Westbury Kommerce |
-|---|---|---|---|---|
-| AmbitionBox — new reviews | ☐ | ☐ | ☐ | ☐ |
-| AmbitionBox — rating + count logged | ☐ | ☐ | ☐ | ☐ |
-| Glassdoor — new reviews | ☐ | ☐ | ☐ | ☐ |
-| Glassdoor — rating + count logged | ☐ | ☐ | ☐ | ☐ |
-| LinkedIn — page posts + comments | ☐ | ☐ | ☐ | ☐ |
-| LinkedIn — public post search | ☐ | ☐ | ☐ | ☐ |
-| X — alias search | ☐ | ☐ | ☐ | ☐ |
-| Reddit — manual sub check | ☐ | ☐ | ☐ | ☐ |
+For each page: record the **rating and review count**, then copy **any review newer than
+last Friday**. Sort by newest, not relevance.
 
-## 1b · Fortnightly rotation — due this week? ☐ yes ☐ no
-- [ ] Indeed
-- [ ] Quora
-- [ ] YouTube comments
-- [ ] Google Reviews (employment-related only)
+**AmbitionBox** — highest volume, rates ~1 point harsher than Glassdoor
 
-## 2 · Tag
-- [ ] Every `needs_review` row has a one-line summary
-- [ ] Every row has sentiment + themes
-- [ ] `author_type`, `names_individual`, `red_flag` set
+| | Rating + count | New reviews copied |
+|---|---|---|
+| RK Group | ☐ | ☐ |
+| RK World Infocom | ☐ | ☐ |
+| Robust Kommerce | — *no page on this platform* | — |
+| Westbury Kommerce | ☐ | ☐ |
+
+**Glassdoor**
+
+| | Rating + count | New reviews copied |
+|---|---|---|
+| RK Group | ☐ | ☐ |
+| RK World Infocom | ☐ | ☐ |
+| Robust Kommerce | ☐ | ☐ |
+| Westbury Kommerce | ☐ | ☐ |
+
+> RK Group is currently recorded from the **Bengaluru-filtered** view on both platforms.
+> Use the all-locations page and tell the desk, so the series switches scope once, knowingly.
+
+**LinkedIn** — company page posts and their comments, plus a public post search
+
+- [ ] RK Group · [ ] RK World Infocom *(page URL still needed)* · [ ] Robust Kommerce · [ ] Westbury Kommerce
+
+**Fortnightly rotation — due this week?** ☐ yes ☐ no
+- [ ] Indeed · [ ] Quora · [ ] YouTube comments · [ ] Google Reviews *(employment only)*
+- [ ] Reddit — check the subs by hand; the feed sees posts, not comments
+
+## 10:15 · Log what you found (30 min)
+
+Either paste it all to Claude and let it tag and log, or do it yourself:
+
+```bash
+python3 scripts/log_rating.py -e <entity> -p <platform> -r <rating> -c <count>
+python3 scripts/log_mention.py --vocab        # allowed values
+python3 scripts/log_mention.py -e … -p … -d … -s "…" --sentiment … --themes …
+```
+
+- [ ] Every rating recorded — `python3 scripts/log_rating.py --status` shows 7/7
+- [ ] Every new review logged as a mention, with a one-line summary
 - [ ] Customer/product items marked `out_of_scope` (kept, not deleted)
 
-## 3 · Red flags — same day, no waiting
-- [ ] `python3 scripts/red_flags.py --scan` run
-- [ ] Each suggestion confirmed or dismissed by a human
+## 10:45 · Red flags — same day, not Friday afternoon (15 min)
+
+```bash
+python3 scripts/red_flags.py --scan
+```
+
+- [ ] Each suggestion confirmed or dismissed **by a person**
 - [ ] For each confirmed flag: row updated, escalation logged, alert sent **today**
 
-## 4 · Validate
-- [ ] `python3 scripts/validate_data.py --week <monday>` — no ERRORs
+## 11:00 · Build and check (15 min)
 
-## 5 · Send
-- [ ] `python3 scripts/build_digest.py --stdout`
-- [ ] Plain-text read top to bottom; headline matches what was seen
+```bash
+python3 scripts/validate_data.py --week <saturday>
+python3 scripts/build_digest.py --stdout
+```
+
+- [ ] No ERRORs
+- [ ] Not marked **PARTIAL WEEK**
+- [ ] Read the plain-text version top to bottom — does the headline match what you saw?
 - [ ] No individual named anywhere in the body
 - [ ] Every What's New row links correctly
-- [ ] Section 6 data link opens the sheet
-- [ ] Pasted into the email **body** — no attachments
-- [ ] Sent to all four
+- [ ] Section 6 link opens the sheet
 
-## 6 · Close
+## 15:00–17:00 · Send
+
+- [ ] Paste the HTML body into the email — **body only, no attachments**
+- [ ] To: Mahendra, Sonal, Ramesh, Akshay
 - [ ] `git add data/ && git commit && git push`
-- [ ] Hours logged above (over budget two weeks running → raise it for Phase 3)
+- [ ] Hours logged above — over budget two weeks running is a Phase 3 finding
 
 Notes / anything odd this week:
 
