@@ -1,0 +1,65 @@
+# Same-day cover between weekly sweeps, for the channels that can be polled.
+#
+# It cannot watch Glassdoor, AmbitionBox or LinkedIn - those block automated
+# access - so it does not make "immediate, same-day escalation" complete. It
+# closes the gap for Reddit, news alerts and X, which is where a complaint goes
+# public fastest anyway. The rest still depends on the weekly sweep, or on
+# claiming the employer profiles so those platforms email you directly.
+name: Daily red-flag scan
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 09:00 IST, every day
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --quiet -r requirements.txt
+
+      - name: Collect the pollable feeds
+        env:
+          X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
+        run: python scripts/collect_feeds.py || true
+
+      - name: Commit anything new
+        run: |
+          git config user.name  "hr-intel-bot"
+          git config user.email "hr-intel-bot@users.noreply.github.com"
+          if ! git diff --quiet -- data/; then
+            git add data/ && git commit -m "Daily collection: new mentions from feeds" && git push
+          fi
+
+      - name: Scan for red-flag candidates
+        id: scan
+        run: |
+          python scripts/red_flags.py --scan --exit-code | tee scan.log
+        continue-on-error: true
+
+      - name: Report
+        run: |
+          {
+            echo "## Daily red-flag scan"
+            echo ""
+            if [ "${{ steps.scan.outcome }}" = "failure" ]; then
+              echo "**Candidates found — a person must confirm or dismiss each one today.**"
+            else
+              echo "Nothing found in the pollable channels."
+              echo ""
+              echo "_This does not cover Glassdoor, AmbitionBox or LinkedIn._"
+            fi
+            echo ""
+            echo '```'
+            cat scan.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # Fail the job when there is something to look at, so GitHub notifies.
+          [ "${{ steps.scan.outcome }}" != "failure" ]

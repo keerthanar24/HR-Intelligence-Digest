@@ -143,6 +143,75 @@ def rating_rows(ratings, week_of, entities, platforms):
     return rows
 
 
+def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms):
+    """What the sweep actually covered, and where reviews were probably missed.
+
+    "Every new review" cannot be guaranteed while three platforms are swept by
+    hand. But the rating snapshot carries the review COUNT, so the change in
+    that count is the number of reviews a platform genuinely gained. Comparing
+    it with how many were logged turns an unverifiable claim into an arithmetic
+    check: if AmbitionBox gained three reviews and one was logged, two were
+    missed, and the digest says so rather than implying completeness.
+    """
+    prev_week = (week_of - dt.timedelta(days=7)).isoformat()
+    this_week = week_of.isoformat()
+    counts = {}
+    for row in all_ratings:
+        key = (row.get("entity"), row.get("platform"))
+        if row.get("week_of") == this_week:
+            counts.setdefault(key, {})["now"] = H.to_int(row.get("review_count"), -1)
+        elif row.get("week_of") == prev_week:
+            counts.setdefault(key, {})["prev"] = H.to_int(row.get("review_count"), -1)
+
+    logged = collections.Counter(
+        (m.get("entity"), m.get("platform")) for m in mentions_now)
+
+    gaps, swept = [], set()
+    for (entity_id, platform), seen in sorted(counts.items()):
+        if "now" in seen:
+            swept.add(platform)
+        now, before = seen.get("now", -1), seen.get("prev", -1)
+        if now < 0 or before < 0:
+            continue                      # no pair of snapshots, nothing to compare
+        new_reviews = now - before
+        if new_reviews > 0 and new_reviews > logged.get((entity_id, platform), 0):
+            gaps.append({
+                "entity": entities.get(entity_id, entity_id),
+                "platform": platforms.get(platform, platform),
+                "new": new_reviews,
+                "logged": logged.get((entity_id, platform), 0),
+            })
+    swept |= {m.get("platform") for m in mentions_now if m.get("platform")}
+    return sorted(platforms.get(p, p) for p in swept if p), gaps
+
+
+def rolling_theme_rows(all_mentions, week_of, weeks, limit):
+    """Themes recurring across several weeks, not just within one.
+
+    A complaint appearing once a week for four weeks is a pattern, and a
+    seven-day window cannot see it - each week reports a lone mention and calls
+    it "not yet a pattern". This looks back over `weeks` to catch it.
+    """
+    start = week_of - dt.timedelta(days=7 * (weeks - 1))
+    window = []
+    for offset in range(weeks):
+        window += H.mentions_for_week(all_mentions, start + dt.timedelta(days=7 * offset))
+    window = [m for m in window if (m.get("status") or "") != "out_of_scope"]
+
+    weeks_seen = collections.defaultdict(set)
+    for m in window:
+        for theme in H.split_themes(m.get("themes", "")):
+            weeks_seen[theme].add(m.get("week_of"))
+
+    rows = []
+    for row in theme_rows(window, limit):
+        theme_key = row["theme"].lower().replace(" ", "_")
+        row["weeks"] = len(weeks_seen.get(theme_key, ()))
+        rows.append(row)
+    # A theme is only "recurring" if it appeared in more than one week.
+    return [r for r in rows if r["weeks"] > 1], len(window)
+
+
 def theme_rows(mentions, limit):
     counter = collections.Counter()
     scores = collections.defaultdict(list)
@@ -273,6 +342,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     ratings = rating_rows(all_ratings, week_of, entities, platforms)
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
+    swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms)
+    rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
+    rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
 
     total = len(now)
     total_prev = len(prev)
@@ -298,6 +370,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         "untagged": untagged,
         "red_flags": len(flags),
         "week_label": week_label,
+        "coverage_gaps": len(gaps),
+        "rolling_themes": len(rolling),
     }
 
     # ---------- HTML ----------
@@ -376,6 +450,18 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     else:
         h.append('<p style="margin:0 0 8px;">No new reviews or posts this week.</p>')
 
+    if swept:
+        h.append(f'<p style="margin:0 0 4px;font-size:12px;color:#52606d;">Swept this week: '
+                 f'{E(", ".join(swept))}.</p>')
+    if gaps:
+        detail = "; ".join(f"{g['entity']} on {g['platform']} gained {g['new']} review(s), "
+                           f"{g['logged']} logged" for g in gaps)
+        h.append(
+            '<p style="margin:0 0 8px;padding:8px 10px;background:#FBF0D9;border-radius:4px;'
+            'font-size:12px;color:#8a6d3b;"><strong>Not everything was captured.</strong> '
+            f'{E(detail)}. The review counts moved further than the rows above account for, '
+            'so this table is incomplete.</p>')
+
     # 4. Themes
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">4 · Themes</h3>')
     if themes:
@@ -390,7 +476,21 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             )
         h.append("</ul>")
     else:
-        h.append('<p style="margin:0 0 8px;">Not enough tagged mentions to identify recurring themes.</p>')
+        h.append('<p style="margin:0 0 8px;">Not enough tagged mentions this week to identify '
+                 'recurring themes.</p>')
+
+    if rolling:
+        h.append(f'<p style="margin:10px 0 4px;font-size:13px;"><strong>Recurring across the '
+                 f'last {rolling_weeks} weeks</strong> ({rolling_total} mentions):</p>')
+        h.append("<ul style='margin:0 0 8px;padding-left:20px;font-size:13px;'>")
+        for r in rolling:
+            h.append(f'<li style="margin:0 0 4px;">{E(r["theme"])} \u2014 '
+                     f'{E(plural(r["count"], "mention"))} across {r["weeks"]} weeks, '
+                     f'{E(r["lean"])}, net {E(r["net"])}</li>')
+        h.append("</ul>")
+    elif rolling_total:
+        h.append(f'<p style="margin:0 0 8px;font-size:12px;color:#52606d;">No theme has '
+                 f'appeared in more than one of the last {rolling_weeks} weeks yet.</p>')
 
     # 5. Red flags
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">5 · Red Flags</h3>')
@@ -472,6 +572,13 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 t.append(f"  {m['url']}")
     else:
         t.append("No new reviews or posts this week.")
+    if swept:
+        t.append("")
+        t.append(f"Swept this week: {', '.join(swept)}.")
+    if gaps:
+        t.append("NOT EVERYTHING WAS CAPTURED - " + "; ".join(
+            f"{g['entity']} on {g['platform']} gained {g['new']} review(s), {g['logged']} logged"
+            for g in gaps) + ". This table is incomplete.")
     t.append("")
     t.append("4. THEMES")
     if themes:
@@ -483,7 +590,15 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 line += f" — {truncate(r['example'], 120)}"
             t.append(line)
     else:
-        t.append("Not enough tagged mentions to identify recurring themes.")
+        t.append("Not enough tagged mentions this week to identify recurring themes.")
+    if rolling:
+        t.append("")
+        t.append(f"Recurring across the last {rolling_weeks} weeks ({rolling_total} mentions):")
+        for r in rolling:
+            t.append(f"- {r['theme']} \u2014 {plural(r['count'], 'mention')} across "
+                     f"{r['weeks']} weeks, {r['lean']}, net {r['net']}")
+    elif rolling_total:
+        t.append(f"No theme has appeared in more than one of the last {rolling_weeks} weeks yet.")
     t.append("")
     t.append("5. RED FLAGS")
     if flags:

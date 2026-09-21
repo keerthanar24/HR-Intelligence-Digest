@@ -134,6 +134,9 @@ def main() -> int:
                         help="suggest rows whose wording looks like a trigger")
     parser.add_argument("--alert", metavar="MENTION_ID", help="draft the alert email for one mention")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
+    parser.add_argument("--exit-code", action="store_true",
+                        help="exit 1 if the scan finds candidates, so a scheduled run "
+                             "can raise them instead of passing quietly")
     args = parser.parse_args()
 
     settings = H.load_yaml("settings")
@@ -187,7 +190,7 @@ def main() -> int:
             print(f"      {m.get('url','')}")
         print("\nIf a suggestion is right, set red_flag=yes and red_flag_reason, then run:")
         print("  python3 scripts/red_flags.py --alert <MENTION_ID>")
-        return 0
+        return 1 if args.exit_code else 0
 
     flags = open_flags(mentions, escalations)
     if not flags:

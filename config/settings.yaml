@@ -26,6 +26,10 @@ digest:
   data_link: "https://docs.google.com/spreadsheets/d/155xO1Ui6aIL7KLh9qMEhbxAtnTe6b6eAnl3kO36pRGg/edit"
   # Show at most this many themes in section 4.
   max_themes: 4
+  # Section 4 also reports themes recurring across this many weeks. A complaint
+  # appearing once a week for a month is a pattern a seven-day window cannot
+  # see - each week alone would call it a single mention.
+  rolling_theme_weeks: 4
   # Truncate one-line summaries in the What's New table to this many characters.
   summary_max_chars: 160
 

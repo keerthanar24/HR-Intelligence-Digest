@@ -384,6 +384,23 @@ def test_digest() -> None:
 
     # RK Group is the parent and the other four are its subsidiaries, so the
     # headline carries a group total as well as the per-entity split.
+    # Deliverable 3: "every new review" cannot be guaranteed, so the digest
+    # states its coverage and checks the rating count against what was logged.
+    check("coverage gap detected from the review count",
+          stats["coverage_gaps"] >= 1, f"(got {stats['coverage_gaps']})")
+    check("the shortfall is stated in both bodies",
+          "NOT EVERYTHING WAS CAPTURED" in body_text
+          and "Not everything was captured" in body_html)
+    check("what was swept is named", "Swept this week" in body_text)
+
+    # Deliverable 4: a theme recurring across weeks is invisible to a 7-day
+    # window; the rolling view is what makes "recurring" achievable.
+    check("rolling themes surfaced", stats["rolling_themes"] >= 1,
+          f"(got {stats['rolling_themes']})")
+    check("the rolling window is labelled",
+          "Recurring across the last" in body_text and "Recurring across the last" in body_html)
+    check("rolling themes span more than one week", "across 2 weeks" in body_text)
+
     check("group total row present", "Group total" in body_html and "Group total" in body_text)
     heads = build_digest.headline_rows(
         H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), WEEK),

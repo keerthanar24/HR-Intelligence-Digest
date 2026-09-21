@@ -88,6 +88,17 @@ To send from the scheduled workflow, add the SMTP values as repository secrets a
 send step. Do that only once a few digests have been reviewed by hand — an unattended send to
 four executives is not where to discover a tagging mistake.
 
+## Daily red-flag scan
+
+`.github/workflows/daily-red-flag-scan.yml` runs every morning: it collects the pollable
+feeds and scans for red-flag wording and virality. If it finds candidates the job fails, so
+GitHub notifies, and a person confirms or dismisses each one that day.
+
+This narrows the gap in deliverable 5 without closing it. It covers Reddit, news alerts and X
+— where a complaint goes public fastest — but **not** Glassdoor, AmbitionBox or LinkedIn. For
+those, the only same-day route is claiming the employer profiles so the platform emails you
+directly.
+
 ## What automation cannot rescue
 
 - **A missed rating snapshot.** Ratings are read from a page by a person. Miss a Friday and
