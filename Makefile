@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts import collect scan validate digest weekly test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -12,6 +12,7 @@ help:
 	@echo "  make setup     install the one dependency and report outstanding TODOs"
 	@echo "  make sheet     print tab headers, dropdowns and formatting for the sheet"
 	@echo "  make alerts    print search strings for Google Alerts and manual sweeps"
+	@echo "  make sweep     print this week's sweep worksheet with every URL"
 	@echo "  make import BOOK=tracker.xlsx   pull the workbook into data/"
 	@echo "  make collect   pull the permitted feeds into data/mentions.csv"
 	@echo "  make scan      suggest rows that may be red flags (a human decides)"
@@ -31,6 +32,10 @@ sheet:
 
 alerts:
 	$(PY) scripts/alert_queries.py
+
+sweep:
+	$(PY) scripts/alert_queries.py --format sweep
+	@$(PY) scripts/log_rating.py --status
 
 BOOK ?= HR_Intelligence_Master_Tracker.xlsx
 

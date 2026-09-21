@@ -86,7 +86,8 @@ def boolean_query(entity: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--entity", help="limit to one entity id")
-    parser.add_argument("--format", choices=["all", "google", "manual", "matrix"],
+    parser.add_argument("--format",
+                        choices=["all", "google", "manual", "matrix", "sweep"],
                         default="all")
     args = parser.parse_args()
 
@@ -97,6 +98,45 @@ def main() -> int:
         if not entities:
             print(f"No entity with id {args.entity!r}", file=sys.stderr)
             return 2
+
+    if args.format == "sweep":
+        sources = H.load_yaml("sources")
+        by_id = {p["id"]: p for p in sources.get("platforms", [])}
+        names = {e["id"]: e["name"] for e in cfg.get("entities", [])}
+        order = [p["id"] for p in sorted(
+            (p for p in sources.get("platforms", []) if p.get("urls")),
+            key=lambda p: p.get("priority", 9))]
+
+        print("=" * 72)
+        print("WEEKLY SWEEP WORKSHEET")
+        print("=" * 72)
+        print("Work top to bottom. Sort each page by NEWEST, not relevance.")
+        print()
+        for platform_id in order:
+            platform = by_id[platform_id]
+            print(f"--- {platform['name']} ---")
+            if platform_id in ("ambitionbox", "glassdoor"):
+                print("    Record the rating AND the review count, even if nothing is new:")
+                print("      python3 scripts/log_rating.py -e <entity> -p %s -r <rating> -c <count>"
+                      % platform_id)
+            for entity_id, url in (platform.get("urls") or {}).items():
+                if entity_id not in names:
+                    continue
+                print(f"  [ ] {names[entity_id]}")
+                print(f"      {'(no page - write none in config)' if H.is_todo(url) else url}")
+            print()
+
+        print("--- Feed-collected, no page to open ---")
+        print("  [ ] python3 scripts/collect_feeds.py      (Reddit, news; X if a token is set)")
+        print()
+        print("--- Search by hand, no fixed page ---")
+        for label in ("X (if no API plan)", "Reddit comments - the feed only sees posts",
+                      "Quora", "YouTube comments", "Google Reviews (employment only)"):
+            print(f"  [ ] {label}")
+        print()
+        print("Search strings: python3 scripts/alert_queries.py --format manual")
+        print("Progress:       python3 scripts/log_rating.py --status")
+        return 0
 
     if args.format == "matrix":
         # Paste-ready rows for the workbook's Keyword_Matrix tab.
