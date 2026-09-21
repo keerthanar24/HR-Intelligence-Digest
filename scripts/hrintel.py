@@ -304,6 +304,56 @@ def canonical_url(url: str) -> str:
     return url.rstrip("/").lower()
 
 
+# --- Scope guardrail ---------------------------------------------------------
+# The brief's out-of-scope list is a boundary, not a preference: customer or
+# seller complaints, product reviews, and surveillance of individuals' personal
+# social media. The first two are judgement calls a person confirms. The third
+# is not - it is mechanically checkable from the URL, and it is the one whose
+# breach would be hardest to explain, so it is refused rather than warned about.
+
+# A person's own profile page. A COMPANY page, or a specific public POST, is a
+# different thing and stays in scope.
+PERSONAL_PROFILE_PATTERNS = [
+    (re.compile(r"(^|\.)linkedin\.com/in/", re.I), "a LinkedIn personal profile"),
+    (re.compile(r"(^|\.)linkedin\.com/pub/", re.I), "a LinkedIn personal profile"),
+    (re.compile(r"(^|\.)instagram\.com/(?!p/|reel/|explore/|tv/)[^/]+/?$", re.I),
+     "an Instagram profile"),
+    (re.compile(r"(^|\.)facebook\.com/(?!.*(posts|permalink|story|groups|watch))[^/]+/?$", re.I),
+     "a Facebook profile"),
+    (re.compile(r"(^|\.)(x|twitter)\.com/(?!i/|search|hashtag)[^/]+/?$", re.I),
+     "an X profile rather than a specific post"),
+    (re.compile(r"(^|\.)threads\.net/@", re.I), "a Threads profile"),
+]
+
+
+def personal_profile_reason(url: str) -> str | None:
+    """Why this URL is a person's profile, or None if it is not one.
+
+    Surveillance of individuals' personal accounts is out of scope. A link to
+    someone's profile is that, whatever the intent behind logging it; a link to
+    one public post they wrote about their employer is not.
+    """
+    cleaned = canonical_url(url)
+    if not cleaned:
+        return None
+    for pattern, description in PERSONAL_PROFILE_PATTERNS:
+        if pattern.search(cleaned):
+            return description
+    return None
+
+
+def customer_side_terms(text: str, cfg: dict | None = None) -> list[str]:
+    """Out-of-scope wording found in the text: refunds, deliveries, product faults.
+
+    A prompt, not a verdict - an ex-employee can complain about a refund and
+    unpaid salary in one post, and the employment half is in scope.
+    """
+    cfg = cfg or load_yaml("entities")
+    haystack = normalise(text)
+    return [term for term in (cfg.get("out_of_scope_terms") or [])
+            if re.search(r"(?<!\w)" + re.escape(normalise(term)) + r"(?!\w)", haystack)]
+
+
 # --- CSV ---------------------------------------------------------------------
 
 

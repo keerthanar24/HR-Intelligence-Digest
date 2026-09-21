@@ -29,6 +29,7 @@ H.ESCALATIONS_CSV = os.path.join(FIXTURES, "escalations.csv")
 
 import build_digest  # noqa: E402
 import collect_feeds  # noqa: E402
+import validate_data  # noqa: E402
 import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
 
@@ -69,6 +70,61 @@ def test_matching() -> None:
     hits = matcher.match("Robust Kommerce employee refused my refund, terrible manager")
     check("customer wording sets out_of_scope_hint",
           bool(hits) and hits[0].out_of_scope_hint is True)
+
+
+def test_scope_guardrail() -> None:
+    """The out-of-scope boundary is enforced, not just printed in the footer."""
+    print("scope guardrail")
+    blocked = {
+        "https://www.linkedin.com/in/some-person": "LinkedIn personal profile",
+        "https://linkedin.com/pub/some-person": "LinkedIn personal profile",
+        "https://instagram.com/someone": "Instagram profile",
+        "https://www.facebook.com/someperson": "Facebook profile",
+        "https://x.com/someperson": "X profile",
+        "https://twitter.com/someperson/": "X profile",
+        "https://www.threads.net/@someone": "Threads profile",
+    }
+    for url in blocked:
+        check(f"blocked: {url.split('//')[1][:38]}", H.personal_profile_reason(url) is not None)
+
+    # A company page or one specific post is a different thing entirely.
+    allowed = [
+        "https://www.linkedin.com/company/robust-kommerce-india/",
+        "https://www.linkedin.com/company/rk-groupp/posts/123",
+        "https://x.com/someperson/status/1800000000000000001",
+        "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews",
+        "https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm",
+        "https://www.reddit.com/r/developersIndia/comments/abc/",
+        "https://www.instagram.com/p/Cxyz123/",
+    ]
+    for url in allowed:
+        check(f"allowed: {url.split('//')[1][:38]}", H.personal_profile_reason(url) is None,
+              f"({H.personal_profile_reason(url)})")
+
+    check("customer wording detected",
+          set(H.customer_side_terms("refund never came and the delivery was late"))
+          >= {"refund", "delivery"})
+    check("employment wording is not flagged as customer-side",
+          H.customer_side_terms("appraisal delayed, manager unresponsive, FnF pending") == [])
+
+    # A feed item pointing at a personal profile must never reach the sheet.
+    matcher = H.EntityMatcher()
+    items = [{"title": "RK World Infocom salary complaint", "summary": "unpaid salary",
+              "url": "https://www.linkedin.com/in/someone", "published": "2026-09-16"}]
+    rows, skipped = collect_feeds.collect_from_items(
+        items, {"id": "f", "platform": "linkedin", "entity": "rk_world"},
+        matcher, H.platform_names(), WEEK, set(), set())
+    check("collector drops a personal-profile link", rows == [], f"(got {len(rows)})")
+    check("and counts why", skipped.get("personal_profile") == 1)
+
+    report = validate_data.Report()
+    validate_data.check_mentions(report, [{
+        "mention_id": "M-1", "week_of": WEEK.isoformat(), "entity": "rk_world",
+        "platform": "linkedin", "url": "https://www.linkedin.com/in/someone",
+        "sentiment": "negative", "status": "reviewed", "one_line_summary": "x",
+    }], None)
+    check("validator errors on a personal-profile URL",
+          any("personal social media" in e for e in report.errors), f"({report.errors})")
 
 
 def test_weeks() -> None:
@@ -568,7 +624,7 @@ def test_red_flags() -> None:
 
 
 def main() -> int:
-    for test in (test_matching, test_weeks, test_urls, test_collector, test_x_collection,
+    for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
                  test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()

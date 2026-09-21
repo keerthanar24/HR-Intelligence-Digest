@@ -89,6 +89,19 @@ note it in the digest so the series break is visible.
 - A theme with one mention this week is reported as **"single mention — not yet a pattern"**.
   Three or four recurring themes is what section 4 is for; one-offs are visible in section 3.
 
+## The scope guardrail
+
+Before tagging anything, the row has to be in scope. Two of the three boundaries are
+enforced mechanically, so a slip is refused rather than discovered later:
+
+- **A personal profile URL is refused outright.** LinkedIn `/in/`, Instagram, Facebook, X or
+  Threads profiles. Link to the company page or the specific post instead.
+- **Customer-side wording is refused** unless the row is flagged `--mixed-post`, for the
+  genuine case where one post carries both a refund complaint and an employment one.
+
+If a check fires on something you believe is in scope, do not work around it — the summary
+probably needs rewriting to describe the employment half.
+
 ## The one-line summary
 
 One sentence, factual, no interpretation, no names.

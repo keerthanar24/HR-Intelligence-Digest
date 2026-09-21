@@ -86,6 +86,17 @@ Per-platform search strings, cadence and compliance notes: `docs/02-source-map.m
 - Product, service or delivery reviews
 - Surveillance of individual employees' personal social media accounts
 
+**This boundary is enforced in the tooling, not only written here.**
+
+| Boundary | How it is held |
+|---|---|
+| No surveillance of personal accounts | A URL that is someone's personal profile — LinkedIn `/in/`, Instagram, Facebook, X, Threads — is **refused** by `log_mention.py`, dropped by the collector, and errors in the validator. A company page or one specific public post is a different thing and stays in scope |
+| No customer or seller complaints | Customer-side wording (refund, delivery, warranty…) is **refused** at logging unless flagged as a mixed post, and warned about in validation |
+| No product reviews | Same check |
+
+A mixed post — an ex-employee complaining about both a refund and unpaid salary — is logged
+with the employment half only, via `--mixed-post`, and the note records why.
+
 The out-of-scope line is not a soft preference. We log **public, employment-related** commentary.
 We do not follow, friend, monitor or compile a picture of any named individual's personal
 accounts, and we do not open private or restricted content. If a post is only reachable by

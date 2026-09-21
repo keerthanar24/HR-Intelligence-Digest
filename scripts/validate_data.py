@@ -162,6 +162,19 @@ def check_mentions(report: Report, rows: list[dict], week_of: dt.date | None) ->
         if row.get("platform") not in platform_ids:
             report.error(f"{where}: unknown platform {row.get('platform')!r}.")
 
+        profile = H.personal_profile_reason(row.get("url", ""))
+        if profile:
+            report.error(f"{where}: the URL is {profile}. Surveillance of individuals' "
+                         "personal social media is out of scope - link to the company page "
+                         "or the specific post instead.")
+        if (row.get("status") or "") != "out_of_scope":
+            customer_words = H.customer_side_terms(
+                f"{row.get('one_line_summary','')} {row.get('title_or_snippet','')}")
+            if customer_words and "mixed post" not in (row.get("notes") or "").lower():
+                report.warn(f"{where}: reads as customer-side ({', '.join(customer_words)}). "
+                            "Customer complaints and product reviews are out of scope - mark "
+                            "it out_of_scope, or note it as a mixed post.")
+
         canonical = H.canonical_url(row.get("url", ""))
         if canonical:
             if canonical in seen_urls:

@@ -240,7 +240,8 @@ def collect_from_items(items, feed, matcher, platforms, week_of, seen,
     out from main() so the smoke test can exercise it without a network call.
     """
     rows: list[dict] = []
-    skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0, "out_of_scope_hint": 0}
+    skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0,
+               "out_of_scope_hint": 0, "personal_profile": 0}
     platform = feed.get("platform", "news")
 
     for item in items:
@@ -254,6 +255,11 @@ def collect_from_items(items, feed, matcher, platforms, week_of, seen,
 
         if platform in context_required and not match.has_context and not ignore_context:
             skipped["no_context"] += 1
+            continue
+
+        # Never log a link to someone's personal profile, whatever matched.
+        if H.personal_profile_reason(item["url"]):
+            skipped["personal_profile"] = skipped.get("personal_profile", 0) + 1
             continue
 
         canonical = H.canonical_url(item["url"])
@@ -340,7 +346,8 @@ def main() -> int:
         return 0
 
     new_rows: list[dict] = []
-    skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0, "out_of_scope_hint": 0}
+    skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0,
+               "out_of_scope_hint": 0, "personal_profile": 0}
 
     x_token = os.environ.get(X_TOKEN_ENV, "").strip()
     x_context = X_CONTEXT
@@ -401,6 +408,9 @@ def main() -> int:
         "\nSkipped — no entity match: {no_entity}, no employment context: {no_context}, "
         "already logged: {duplicate}".format(**skipped)
     )
+    if skipped.get("personal_profile"):
+        print(f"{skipped['personal_profile']} item(s) dropped for linking to a personal "
+              "profile - out of scope.")
     if skipped["out_of_scope_hint"]:
         print(f"{skipped['out_of_scope_hint']} row(s) flagged as possibly customer-side; check before tagging.")
 

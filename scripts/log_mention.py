@@ -72,6 +72,9 @@ def main() -> int:
                    help="the post names a person (a red-flag trigger)")
     p.add_argument("--flag", help=f"red-flag reason: {', '.join(H.RED_FLAG_REASONS)}")
     p.add_argument("--notes", default="")
+    p.add_argument("--mixed-post", action="store_true",
+                   help="the post mixes a customer complaint with an employment one; "
+                        "log only the employment half")
     p.add_argument("--by", default="desk")
     p.add_argument("--vocab", action="store_true", help="print the allowed values")
     p.add_argument("--list", action="store_true", help="show what is logged for a week")
@@ -110,10 +113,31 @@ def main() -> int:
     if args.flag and args.flag not in H.RED_FLAG_REASONS:
         problems.append(f"flag {args.flag!r}; one of: {', '.join(H.RED_FLAG_REASONS)}")
 
+    # The out-of-scope list in the brief is a guardrail, enforced here rather
+    # than left to whoever is logging at 5pm on a Friday.
+    profile = H.personal_profile_reason(args.url)
+    if profile:
+        print(f"REFUSED: that URL is {profile}.", file=sys.stderr)
+        print("Surveillance of individuals' personal social media accounts is out of scope "
+              "(docs/00-brief.md section 4).", file=sys.stderr)
+        print("A company page, or one specific public post about the employer, is in scope - "
+              "link to that instead.", file=sys.stderr)
+        return 3
+
     if problems:
         for problem in problems:
             print(f"  invalid {problem}", file=sys.stderr)
         return 2
+
+    customer_words = H.customer_side_terms(f"{args.summary} {args.title} {args.notes}")
+    if customer_words and not args.mixed_post:
+        print(f"REFUSED: this reads as customer-side - found {', '.join(customer_words)}.",
+              file=sys.stderr)
+        print("Customer or seller complaints and product reviews are out of scope.",
+              file=sys.stderr)
+        print("If the post mixes a customer complaint with an employment one, summarise only "
+              "the employment half and re-run with --mixed-post.", file=sys.stderr)
+        return 3
 
     existing = H.read_csv(H.MENTIONS_CSV)
     canonical = H.canonical_url(args.url)
@@ -148,7 +172,8 @@ def main() -> int:
         "red_flag_reason": args.flag or ("names_individual" if args.names_individual else ""),
         "status": "escalated" if args.flag or args.names_individual else
                   ("reviewed" if sentiment else "needs_review"),
-        "notes": args.notes,
+        "notes": (args.notes + ("; mixed post - only the employment half logged"
+                                if args.mixed_post else "")).strip("; "),
     })
 
     H.append_csv(H.MENTIONS_CSV, H.MENTION_FIELDS, [row])
