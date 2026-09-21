@@ -323,6 +323,21 @@ def test_digest() -> None:
 
     # Appraisal appears twice this week and must surface as a recurring theme.
     check("recurring theme surfaced", "Appraisal" in body_html)
+
+    # RK Group is the parent and the other four are its subsidiaries, so the
+    # headline carries a group total as well as the per-entity split.
+    check("group total row present", "Group total" in body_html and "Group total" in body_text)
+    heads = build_digest.headline_rows(
+        H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), WEEK),
+        H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), WEEK - dt.timedelta(days=7)),
+        H.entity_names())
+    total_row = heads[-1]
+    check("total is the last row and marked as such", total_row["is_total"])
+    check("total equals the sum of the entity rows",
+          total_row["count"] == sum(r["count"] for r in heads if not r["is_total"]),
+          f"({total_row['count']})")
+    check("every entity still has its own row",
+          len([r for r in heads if not r["is_total"]]) == len(H.entity_names()))
     check("theme cap respected",
           body_html.count("</li>") <= int(settings["digest"].get("max_themes", 4)))
 

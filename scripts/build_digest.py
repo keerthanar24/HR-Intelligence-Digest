@@ -66,6 +66,13 @@ def plural(count: int, word: str) -> str:
 
 
 def headline_rows(mentions_now, mentions_prev, entities):
+    """Per-entity counts and sentiment, with a group total row at the end.
+
+    RK Group is the parent and the other four are its subsidiaries, so the four
+    executives read this as one group first and a breakdown second. The parent
+    keeps its own row - it is an employer in its own right - and the total
+    spans every entity including it.
+    """
     rows = []
     for entity_id, name in entities.items():
         now = [m for m in mentions_now if m.get("entity") == entity_id]
@@ -82,8 +89,24 @@ def headline_rows(mentions_now, mentions_prev, entities):
                 "net_prev": sentiment_text(net_prev),
                 "net_delta": delta_text(net_now, net_prev, digits=2),
                 "untagged": sum(1 for m in now if H.sentiment_score(m) is None),
+                "is_total": False,
             }
         )
+
+    net_now, net_prev = H.net_sentiment(mentions_now), H.net_sentiment(mentions_prev)
+    rows.append(
+        {
+            "entity": "Group total",
+            "count": len(mentions_now),
+            "count_prev": len(mentions_prev),
+            "count_delta": delta_text(len(mentions_now), len(mentions_prev)),
+            "net": sentiment_text(net_now),
+            "net_prev": sentiment_text(net_prev),
+            "net_delta": delta_text(net_now, net_prev, digits=2),
+            "untagged": sum(1 for m in mentions_now if H.sentiment_score(m) is None),
+            "is_total": True,
+        }
+    )
     return rows
 
 
@@ -289,7 +312,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  'Low volume is expected for the smaller entities.</p>')
     h.append(h_table(
         ["Entity", "Mentions", "vs last week", "Net sentiment", "vs last week"],
-        [[E(r["entity"]), r["count"], E(r["count_delta"]), E(r["net"]), E(r["net_delta"])]
+        [[(f"<strong>{E(r['entity'])}</strong>" if r["is_total"] else E(r["entity"])),
+          (f"<strong>{r['count']}</strong>" if r["is_total"] else r["count"]),
+          E(r["count_delta"]), E(r["net"]), E(r["net_delta"])]
          for r in heads],
         ["left", "right", "right", "right", "right"],
     ))
@@ -393,10 +418,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     )
     t.append("")
     t.append("1. HEADLINE")
-    t.append(t_table(
-        ["Entity", "Mentions", "vs last wk", "Net sentiment", "vs last wk"],
-        [[r["entity"], r["count"], r["count_delta"], r["net"], r["net_delta"]] for r in heads],
-    ))
+    head_rows = [[r["entity"], r["count"], r["count_delta"], r["net"], r["net_delta"]]
+                 for r in heads]
+    table = t_table(
+        ["Entity", "Mentions", "vs last wk", "Net sentiment", "vs last wk"], head_rows
+    ).splitlines()
+    # Separator before the total line.
+    table.insert(len(table) - 1, table[1])
+    t.append("\n".join(table))
     if untagged:
         t.append(f"Note: {plural(untagged, 'mention')} untagged; excluded from net sentiment.")
     t.append("")
