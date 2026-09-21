@@ -80,14 +80,21 @@ def check_config(report: Report) -> None:
         report.warn("config/settings.yaml: programme.trial_start not set — "
                     "the Phase 3 review date cannot be derived.")
 
+    # Missing addresses are a warning, not an error: every part of Phase 1 -
+    # the baseline sweep, tagging, and building a digest to review - works
+    # without them. Only the send needs them, and build_digest.py says so on
+    # every run. Blocking setup on an address nobody has yet would just train
+    # people to ignore the validator.
     for group in ("digest", "red_flag"):
         people = recipients.get(group, [])
         if len(people) != 4 and group == "digest":
             report.warn(f"config/recipients.yaml: {group} has {len(people)} recipients; "
                         "the brief specifies four.")
-        for person in people:
-            if H.is_todo(person.get("email", "")):
-                report.error(f"config/recipients.yaml: no email for {person.get('name','?')} in {group}.")
+        unset = [p.get("name", "?") for p in people if H.is_todo(p.get("email", ""))
+                 or not str(p.get("email", "")).strip()]
+        if unset:
+            report.warn(f"config/recipients.yaml: no email yet for {', '.join(unset)} in "
+                        f"{group} - the digest can be built and reviewed, but not sent.")
 
     entity_ids = {e["id"] for e in entities.get("entities", [])}
     for ent in entities.get("entities", []):

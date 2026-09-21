@@ -29,7 +29,8 @@ platforms:
       rk_group: "https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews"   # (derived) drop the Bengaluru filter
       # supplied: .../overview/r-k-world-infocom-overview/locations/bengaluru-offices
       rk_world: "https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews"   # (derived) reviews page, all locations
-      robust_kommerce: "TODO: paste AmbitionBox reviews URL (not yet supplied)"
+      # supplied: .../overview/robust-results-overview  -- listed as "Robust Results"
+      robust_kommerce: "https://www.ambitionbox.com/reviews/robust-results-reviews"   # (derived) reviews page
       westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
 
   - id: glassdoor
@@ -40,10 +41,20 @@ platforms:
     captures: [reviews, ratings, interviews, salaries]
     notes: Record rating + review count weekly into data/ratings.csv.
     urls:
-      rk_group: "TODO: paste Glassdoor company URL (the 4 supplied were AmbitionBox)"
-      rk_world: "TODO: paste Glassdoor company URL"
-      robust_kommerce: "TODO: paste Glassdoor company URL"
-      westbury_kommerce: "TODO: paste Glassdoor company URL"
+      # Canonical all-locations reviews form is /Reviews/<Name>-Reviews-E<id>.htm.
+      # URLs marked (derived) were rebuilt from the employer id in the supplied
+      # link and need one click to confirm before Week 1.
+      #
+      # supplied: /Reviews/RK-Group-Bangalore-Reviews-EI_IE653077.0,8_IL.9,18_IM1091.htm
+      rk_group: "https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm"   # (derived) drop the Bangalore filter
+      # supplied: /Overview/Working-at-Rk-Worldinfocom-EI_IE8268877.11,26.htm
+      rk_world: "https://www.glassdoor.co.in/Reviews/Rk-Worldinfocom-Reviews-E8268877.htm"   # (derived) reviews, not overview
+      # supplied: /Overview/Working-at-Robust-EI_IE1882698.11,17.htm
+      # CAUTION: this profile is named only "Robust". Confirm employer id
+      # 1882698 is Robust Kommerce and not an unrelated company before the
+      # baseline sweep - a wrong id pollutes the series for the whole trial.
+      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"   # (derived, UNCONFIRMED)
+      westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
 
   - id: linkedin
     name: LinkedIn

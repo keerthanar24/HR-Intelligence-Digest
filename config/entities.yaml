@@ -51,6 +51,9 @@ entities:
       # on the offer letter, and the one reviewers tend to copy.
       - RK World Infocom
       - R K World Infocom
+      # Glassdoor spells it as one word.
+      - RK Worldinfocom
+      - Worldinfocom
     exclude_terms:
       - RK World Tours
 
@@ -65,7 +68,11 @@ entities:
       - RobustKommerce
       - Robust E-Commerce
       - Robust Ecommerce
-    needs_confirmation: []
+    needs_confirmation:
+      # AmbitionBox lists this company under the slug 'robust-results', and
+      # Glassdoor under plain "Robust". If Robust Results is a trading name,
+      # reviewers will use it. Searched now, flagged until HR confirms.
+      - Robust Results
     exclude_terms: []
 
   - id: westbury_kommerce

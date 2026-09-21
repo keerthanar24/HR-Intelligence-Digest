@@ -504,6 +504,15 @@ def main() -> int:
     print(f"HTML body : {html_path}")
     print(f"Text body : {text_path}")
     print(f"Mentions {stats['total']} · red flags {stats['red_flags']} · untagged {stats['untagged']}")
+
+    recipients = H.load_yaml("recipients").get("digest", [])
+    ready = [r for r in recipients if str(r.get("email", "")).strip() and not H.is_todo(r.get("email", ""))]
+    if ready:
+        print(f"To: {', '.join(r['email'] for r in ready)}")
+    if len(ready) < len(recipients):
+        pending = [r.get("name", "?") for r in recipients if r not in ready]
+        print(f"NOT SENDABLE YET — no address for {', '.join(pending)} "
+              "(config/recipients.yaml). The body above is complete and reviewable.")
     print("Paste the HTML body into the email — the brief says body only, no attachments.")
 
     if args.strict and stats["untagged"]:
