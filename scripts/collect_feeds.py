@@ -166,7 +166,11 @@ def fetch_x_search(query: str, token: str, timeout: int, max_results: int = 100)
 # back-to-back got 429 on three of them, so three of the four entities were
 # never actually searched and the run still reported "an empty week" - the
 # worst kind of wrong, because it looks like a finding.
-MIN_SECONDS_BETWEEN_HITS = 2.0
+# 2.0s was not enough: a real run still lost two of four Reddit queries to 429
+# after retrying. Reddit throttles unauthenticated search hard, and a CI runner
+# shares its IP. This is a weekly job, so patience is nearly free and a skipped
+# entity is not.
+MIN_SECONDS_BETWEEN_HITS = 5.0
 _last_hit: dict[str, float] = {}
 
 
@@ -178,12 +182,12 @@ def _space_out(host: str) -> None:
     _last_hit[host] = time.monotonic()
 
 
-def fetch(url: str, user_agent: str, timeout: int, attempts: int = 3) -> bytes:
+def fetch(url: str, user_agent: str, timeout: int, attempts: int = 4) -> bytes:
     """Fetch a feed, backing off when the host throttles us.
 
     A 429 is not an answer, so retrying is the difference between searching an
     entity and silently skipping it. Honours Retry-After when the host sends
-    one, otherwise backs off 2s, 4s.
+    one, otherwise backs off 2s, 4s, 8s.
     """
     host = urllib.parse.urlsplit(url).netloc
     delay = 2

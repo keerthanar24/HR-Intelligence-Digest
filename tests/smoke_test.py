@@ -829,7 +829,7 @@ def test_rate_limit_backoff() -> None:
             check("a permanently throttled feed raises rather than returning empty", False)
         except urllib.error.HTTPError:
             check("a permanently throttled feed raises rather than returning empty", True)
-        check("and it gave up after the attempt limit", calls["n"] == 3, f"(got {calls['n']})")
+        check("and it gave up after the attempt limit", calls["n"] == 4, f"(got {calls['n']})")
     finally:
         collect_feeds.urllib.request.urlopen = real_open
         collect_feeds.time.sleep = real_sleep
