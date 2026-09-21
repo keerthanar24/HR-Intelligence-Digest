@@ -11,10 +11,21 @@
 # needs_confirmation: previous/registered names that HR must confirm before we
 #                  rely on them. Left in the list but flagged.
 
+# Group structure, confirmed by the programme owner 2026-09-21:
+#
+#   RK Group (parent)
+#    |- RK World Infocom Pvt Ltd   -- customer-facing brand: ValueCart
+#    |- Robust Kommerce            -- listed on AmbitionBox as Robust Results
+#    \- Westbury Kommerce
+#
+# ValueCart is a BRAND of RK World Infocom, not a separate company, so its
+# mentions roll up to that entity rather than getting a row of their own.
+
 entities:
   - id: rk_group
     name: RK Group
     role: Parent / corporate brand
+    parent: null
     aliases:
       - RK Group
       - R K Group
@@ -33,8 +44,13 @@ entities:
       - RK Group Dubai
 
   - id: rk_world
-    name: RK World
-    role: Operating entity
+    name: RK World Infocom
+    legal_name: RK World Infocom Pvt Ltd
+    role: Operating entity (subsidiary of RK Group)
+    parent: rk_group
+    # Customer-facing brand. Employees and candidates write this far more often
+    # than the registered name, so it carries most of the signal.
+    brands: [ValueCart]
     aliases:
       - RK World
       - R K World
@@ -61,7 +77,8 @@ entities:
 
   - id: robust_kommerce
     name: Robust Kommerce
-    role: Operating entity
+    role: Operating entity (subsidiary of RK Group)
+    parent: rk_group
     aliases:
       - Robust Kommerce
       - Robust Commerce
@@ -81,7 +98,8 @@ entities:
 
   - id: westbury_kommerce
     name: Westbury Kommerce
-    role: Operating entity
+    role: Operating entity (subsidiary of RK Group)
+    parent: rk_group
     aliases:
       - Westbury Kommerce
       - Westbury Commerce

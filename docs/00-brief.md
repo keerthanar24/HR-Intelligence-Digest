@@ -23,12 +23,23 @@ that escalate the same day. See `docs/04-red-flag-protocol.md`.
 
 ## 2. Entities in scope
 
-| # | Entity | Role |
-|---|--------|------|
-| 1 | RK Group | Parent / corporate brand |
-| 2 | RK World | Operating entity |
-| 3 | Robust Kommerce | Operating entity |
-| 4 | Westbury Kommerce | Operating entity |
+```
+RK Group  (parent / corporate brand)
+ |- RK World Infocom Pvt Ltd    - customer-facing brand: ValueCart
+ |- Robust Kommerce             - listed on AmbitionBox as Robust Results
+ \- Westbury Kommerce
+```
+
+| # | Entity | Role | Also appears as |
+|---|--------|------|-----------------|
+| 1 | RK Group | Parent / corporate brand | R.K. Group |
+| 2 | RK World Infocom | Subsidiary | **ValueCart**, Rk Worldinfocom |
+| 3 | Robust Kommerce | Subsidiary | Robust Results, Robust |
+| 4 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
+
+**ValueCart is a brand of RK World Infocom, not a separate company**, so its mentions roll up
+to that entity rather than getting a row of their own. It is also the name employees and
+candidates use most often, so it carries much of that entity's signal.
 
 We track **common misspellings and previous names** alongside the registered names — employees
 rarely write the registered entity name. The maintained list lives in `config/entities.yaml`
