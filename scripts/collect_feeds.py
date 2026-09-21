@@ -223,6 +223,25 @@ def _text(element, *paths) -> str:
     return ""
 
 
+def feed_title(payload: bytes) -> str:
+    """The feed's own title, which for Google Alerts is the alert query.
+
+    Four alert URLs pasted into four config entries is four chances to put one
+    in the wrong place, and a misrouted feed files real mentions under the
+    wrong entity - a silent, plausible-looking error. Printing the title next
+    to the feed id makes a swap obvious the first time it runs.
+    """
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError:
+        return ""
+    for path in ("channel/title", "atom:title", "title"):
+        found = root.find(path, NS)
+        if found is not None and (found.text or "").strip():
+            return " ".join((found.text or "").split())[:110]
+    return ""
+
+
 def parse_feed(payload: bytes) -> list[dict]:
     """Parse RSS 2.0 or Atom into a flat list of items."""
     root = ET.fromstring(payload)
@@ -425,6 +444,9 @@ def main() -> int:
             try:
                 payload = fetch(url, user_agent, timeout)
                 items = parse_feed(payload)
+                title = feed_title(payload)
+                if title:
+                    print(f"  {feed['id']}: feed says {title!r}")
             except (urllib.error.URLError, urllib.error.HTTPError,
                     ET.ParseError, OSError) as exc:
                 print(f"  FAIL {feed['id']}: {exc}", file=sys.stderr)

@@ -151,26 +151,26 @@ feeds:
   - id: google_alerts_rk_group
     platform: news
     entity: rk_group
-    enabled: false
-    url: "TODO: paste Google Alerts RSS URL for RK Group"
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/6114674906063014284"
 
   - id: google_alerts_rk_world
     platform: news
     entity: rk_world
-    enabled: false
-    url: "TODO: paste Google Alerts RSS URL for RK World"
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/6741995754671900552"
 
   - id: google_alerts_robust_kommerce
     platform: news
     entity: robust_kommerce
-    enabled: false
-    url: "TODO: paste Google Alerts RSS URL for Robust Kommerce"
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/629722955404059143"
 
   - id: google_alerts_westbury_kommerce
     platform: news
     entity: westbury_kommerce
-    enabled: false
-    url: "TODO: paste Google Alerts RSS URL for Westbury Kommerce"
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/1095068575065823383"
 
   # The cross-entity red-flag alert. Deliberately has NO 'entity' key: it
   # covers all four, so the collector assigns each item to whichever entity
@@ -179,8 +179,8 @@ feeds:
   # anything that reaches the open web.
   - id: google_alerts_red_flags
     platform: news
-    enabled: false
-    url: "TODO: paste Google Alerts RSS URL for the cross-entity red-flag alert"
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/6741995754671899454"
 
   - id: reddit_search_rk_world
     platform: reddit
