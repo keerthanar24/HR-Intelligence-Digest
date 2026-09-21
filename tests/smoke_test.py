@@ -769,6 +769,66 @@ def test_workbook_round_trip() -> None:
               f"({'; '.join(drift[:3])})")
 
 
+def test_rate_limit_backoff() -> None:
+    """A 429 must be retried, not counted as 'nothing found'.
+
+    The first real run of the collector got 429 on three of four Reddit
+    queries. Three entities were never searched, and the run still printed
+    "an empty week" - which reads as a finding rather than a failure.
+    """
+    print("collector backoff")
+    import urllib.error
+
+    calls = {"n": 0}
+    sleeps: list[float] = []
+
+    def flaky(request, timeout=None):
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise urllib.error.HTTPError(
+                request.full_url, 429, "Too Many Requests", {"Retry-After": "1"}, None)
+
+        class Response:
+            def read(self):
+                return b"<rss></rss>"
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+        return Response()
+
+    real_open, real_sleep = collect_feeds.urllib.request.urlopen, collect_feeds.time.sleep
+    collect_feeds.urllib.request.urlopen = flaky
+    collect_feeds.time.sleep = lambda s: sleeps.append(s)
+    collect_feeds._last_hit.clear()
+    try:
+        body = collect_feeds.fetch("https://www.reddit.com/search.rss?q=x", "agent", 10)
+        check("a throttled feed is retried until it answers", body == b"<rss></rss>")
+        check("it took three attempts", calls["n"] == 3, f"(got {calls['n']})")
+        check("it honoured Retry-After", 1 in sleeps, f"(slept {sleeps})")
+
+        calls["n"] = 0
+        collect_feeds._last_hit.clear()
+
+        def always429(request, timeout=None):
+            calls["n"] += 1
+            raise urllib.error.HTTPError(request.full_url, 429, "Too Many Requests", {}, None)
+
+        collect_feeds.urllib.request.urlopen = always429
+        try:
+            collect_feeds.fetch("https://www.reddit.com/search.rss?q=y", "agent", 10)
+            check("a permanently throttled feed raises rather than returning empty", False)
+        except urllib.error.HTTPError:
+            check("a permanently throttled feed raises rather than returning empty", True)
+        check("and it gave up after the attempt limit", calls["n"] == 3, f"(got {calls['n']})")
+    finally:
+        collect_feeds.urllib.request.urlopen = real_open
+        collect_feeds.time.sleep = real_sleep
+        collect_feeds._last_hit.clear()
+
+
 def test_red_flag_sla() -> None:
     """Section 5 has to evidence the *same-day* promise, not just the flag.
 
@@ -826,7 +886,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
