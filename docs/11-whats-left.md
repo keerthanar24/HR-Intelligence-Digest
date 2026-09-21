@@ -75,18 +75,14 @@ old query and still contains `OR "Robust Results"`. Edit it to match
 `python3 scripts/alert_queries.py --entity robust_kommerce --format google`, or it keeps pulling
 in another company.
 
-~~**Glassdoor employer 1882698**~~ **Resolved 2026-09-21: it is NOT Robust Kommerce.** The page
-is another company's, and Robust Kommerce has no Glassdoor presence at all. The 4.00 / 7 baseline
-is deleted and the URL is recorded as `none`.
+~~**Glassdoor employer 1882698**~~ **Resolved 2026-09-21: it IS Robust Kommerce.** The programme
+owner first said it was not, then supplied the Overview page for that same employer id as the
+company's own Glassdoor page. Taken as confirmed on the second, specific statement; the 4.00 / 7
+baseline stands.
 
-**This leaves Robust Kommerce with no review-site coverage whatsoever** — no Glassdoor page and no
-AmbitionBox page. It can never appear in section 2, so the digest now says so in as many words,
-because an entity that is merely missing from the table reads as a quiet week. It is covered by
-LinkedIn, Reddit, news and X only.
-
-Worth deciding: whether to create a Glassdoor employer profile for Robust Kommerce. Until then
-there is no rating series for it and no review-count check, so the completeness gate cannot
-verify anything about it.
+Robust Kommerce has **no AmbitionBox page**, so Glassdoor is its only review-site cover. Its
+seven reviews therefore carry more weight than the raw count suggests — there is no second
+platform to cross-check them against.
 
 ---
 

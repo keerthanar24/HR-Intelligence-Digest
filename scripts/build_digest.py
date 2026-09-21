@@ -454,7 +454,7 @@ def sheet_contents(mentions, ratings, escalations, week_of):
     return f"For this week it holds {held}. Every earlier week is in the same tabs."
 
 
-def unrated_entities(entities):
+def unrated_entities(entities, profiles=None):
     """Entities with no review-site page at all.
 
     Robust Kommerce has neither a Glassdoor nor an AmbitionBox profile, so it
@@ -463,7 +463,8 @@ def unrated_entities(entities):
     almost all the evidence cannot see it, and only LinkedIn, Reddit, news and
     X cover it at all. That has to be said, not inferred from a gap.
     """
-    covered = {entity_id for entity_id, _ in H.rated_profiles()}
+    covered = {entity_id for entity_id, _ in
+               (H.rated_profiles() if profiles is None else profiles)}
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 

@@ -10,17 +10,18 @@ A person reads the pages.
 
 ---
 
-## Six pages, not seven
+## Seven pages
 
 | Entity | AmbitionBox | Glassdoor |
 |---|---|---|
 | RK Group | [reviews](https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews) | [reviews](https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm) |
 | RK World Infocom | [reviews](https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews) | [reviews](https://www.glassdoor.co.in/Reviews/Rk-Worldinfocom-Reviews-E8268877.htm) |
 | Westbury Kommerce | [reviews](https://www.ambitionbox.com/reviews/westbury-kommerce-reviews) | [reviews](https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm) |
-| **Robust Kommerce** | *no page* | *no page* |
+| Robust Kommerce | *no page* | [reviews](https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm) |
 
-Robust Kommerce has no review-site presence at all. Nothing to back-read for it, and the digest
-says so rather than leaving it to look like a quiet company.
+Robust Kommerce is listed on Glassdoor as plain **"Robust"** (employer id 1882698). It has no
+AmbitionBox page, so Glassdoor is its only review-site cover — which makes its 7 reviews worth
+more attention, not less.
 
 **Sort each page by newest first**, not by "most relevant" or "most helpful" — the default sort
 is designed to surface good reviews, not recent ones.

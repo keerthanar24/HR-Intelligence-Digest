@@ -893,22 +893,33 @@ def test_red_flag_wording_has_context() -> None:
 def test_unrated_entity_is_named() -> None:
     """An entity with no review-site page must be named, not just absent.
 
-    Robust Kommerce has neither a Glassdoor nor an AmbitionBox profile, so it
-    can never appear in section 2. Simply missing from the table, it reads as a
-    quiet week - when the truth is that the two platforms carrying almost all
-    the evidence cannot see it at all.
+    Simply missing from section 2, it reads as a quiet week - when the truth
+    would be that the two platforms carrying almost all the evidence cannot
+    see it. Tested against injected profiles rather than live config, because
+    which entities have pages is a fact about the world that changes.
     """
     print("unrated entity is named")
     entities = H.entity_names()
-    unrated = build_digest.unrated_entities(entities)
-    check("Robust Kommerce is known to have no review-site page",
-          "Robust Kommerce" in unrated, f"(got {unrated})")
-    check("the other three are not listed",
-          all(n not in unrated for n in
-              ("RK Group", "RK World Infocom", "Westbury Kommerce")), f"(got {unrated})")
+    every = H.rated_profiles()
 
-    settings = H.load_yaml("settings")
-    _, body_html, body_text, _ = build_digest.build(WEEK, settings)
+    check("with the real source map nobody is unrated",
+          build_digest.unrated_entities(entities, every) == [],
+          f"(got {build_digest.unrated_entities(entities, every)})")
+
+    # Drop one entity's pages and it must be picked up.
+    without = [(e, p) for e, p in every if e != "robust_kommerce"]
+    named = build_digest.unrated_entities(entities, without)
+    check("an entity whose pages all disappear is picked up",
+          named == ["Robust Kommerce"], f"(got {named})")
+
+    # And the wording must reach both bodies. Build with the real config, then
+    # with robust_kommerce's page removed, and compare.
+    real = H.rated_profiles
+    try:
+        H.rated_profiles = lambda: without
+        _, body_html, body_text, _ = build_digest.build(WEEK, H.load_yaml("settings"))
+    finally:
+        H.rated_profiles = real
     for label, body in (("text", body_text), ("html", body_html)):
         check(f"the {label} body names it",
               "Robust Kommerce" in body and "no Glassdoor or AmbitionBox page" in body)
