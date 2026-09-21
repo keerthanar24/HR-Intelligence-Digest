@@ -635,6 +635,77 @@ def test_red_flags() -> None:
           red_flags.matches_pattern("Nice canteen, average pay") == [])
 
 
+def test_sheet_covers_schema() -> None:
+    """Every canonical field has a column in the tracker workbook.
+
+    The workbook is the data link the digest hands out, so a field the digest
+    holds but the sheet cannot show is a field nobody can audit. It also used
+    to be worse than invisible: import_sheet replaces each CSV wholesale, so a
+    field with no column came back blank and wiped the baseline figures that
+    were read off Glassdoor and AmbitionBox by hand.
+    """
+    print("sheet covers the schema")
+    try:
+        import openpyxl
+    except ImportError:
+        print("  skip  openpyxl not installed")
+        return
+
+    cfg = H.load_yaml("column_map")
+    wb = openpyxl.load_workbook(
+        os.path.join(ROOT, "templates", "HR_Intelligence_Master_Tracker.xlsx"))
+    schemas = {"mentions": H.MENTION_FIELDS, "ratings": H.RATING_FIELDS,
+               "escalations": H.ESCALATION_FIELDS}
+    for tab, fields in schemas.items():
+        spec = cfg["tabs"][tab]
+        sheet = import_sheet.find_tab({n: None for n in wb.sheetnames},
+                                      spec["sheet_names"])
+        check(f"{tab}: the workbook has its tab", sheet is not None)
+        if not sheet:
+            continue
+        headers = [c.value for c in wb[sheet][1] if c.value]
+        supplied = import_sheet.fields_in_sheet(tab, [headers], cfg)
+        # A wide tab carries the platform in the column name, not in a cell.
+        expected = set(fields) - ({"platform"} if spec.get("layout") == "wide" else set())
+        missing = sorted(expected - supplied)
+        check(f"{tab}: every schema field has a column", not missing,
+              f"(no column for {', '.join(missing)})")
+
+
+def test_carry_forward() -> None:
+    """An import must not blank a field the sheet has no column for."""
+    print("import carry-forward")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "ratings.csv")
+        import_sheet.write(path, H.RATING_FIELDS, [{
+            "week_of": "2026-09-19", "entity": "rk_group", "platform": "glassdoor",
+            "overall_rating": "3.60", "review_count": "16", "recommend_pct": "56",
+            "culture": "3.5", "url": "https://gd.invalid/rk",
+        }])
+        # The sheet supplied rating and count, and has no recommend-% column.
+        fresh = [{f: "" for f in H.RATING_FIELDS}]
+        fresh[0].update({"week_of": "2026-09-19", "entity": "rk_group",
+                         "platform": "glassdoor", "overall_rating": "3.70",
+                         "review_count": "17"})
+        notes = import_sheet.Notes()
+        out = import_sheet.carry_forward(
+            path, H.RATING_FIELDS, fresh, "ratings",
+            {"overall_rating", "review_count"}, notes)[0]
+        check("the new rating wins", out["overall_rating"] == "3.70")
+        check("recommend % survives the round trip", out["recommend_pct"] == "56",
+              f"(got {out['recommend_pct']!r})")
+        check("a sub-score survives the round trip", out["culture"] == "3.5")
+        check("the profile URL survives the round trip", out["url"].endswith("/rk"))
+        check("and it says so rather than doing it quietly", notes.warnings)
+
+        # A field the sheet DOES have must be clearable.
+        cleared = [dict(fresh[0], review_count="")]
+        out2 = import_sheet.carry_forward(
+            path, H.RATING_FIELDS, cleared, "ratings",
+            {"overall_rating", "review_count"}, import_sheet.Notes())[0]
+        check("clearing a column the sheet has is respected", out2["review_count"] == "")
+
+
 def test_red_flag_sla() -> None:
     """Section 5 has to evidence the *same-day* promise, not just the flag.
 
@@ -692,7 +763,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

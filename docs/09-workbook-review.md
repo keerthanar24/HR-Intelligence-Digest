@@ -122,3 +122,46 @@ enumerate people's profiles. That is exactly the surveillance pattern the brief 
 (`docs/00-brief.md` §4), so the generated strings target review and discussion sites only —
 AmbitionBox, Glassdoor, Indeed, Reddit, Quora. Please don't add profile X-ray to that column:
 the boundary is the thing that makes this programme defensible if anyone asks what it does.
+
+## Does the sheet hold everything the raw data holds?
+
+It does now. It did not before 2026-09-21, and the gap was worse than cosmetic.
+
+`scripts/import_sheet.py` rewrites each CSV from the sheet wholesale — the sheet is the working
+surface, so what it says wins. A field with no column in the sheet therefore came back **blank**
+on the next import and overwrote whatever was in the CSV. The baseline recommend-percentages,
+the ten sub-scores and both profile URLs were only ever read off Glassdoor and AmbitionBox by
+hand; one round trip through the workbook would have erased them with no error and no warning.
+
+Three changes close it:
+
+1. **Every canonical field has a column.** `Raw_Data_Log` went from 17 columns to 22 (adding
+   `Source`, `Title / Snippet`, `Role / Department`, `Stars`, `Logged By`), and `Rating_Tracker`
+   from 8 to 26 — recommend %, CEO approval, the five sub-scores per platform, a profile URL and
+   a notes cell per platform, and `Checked By`. `Escalations` already matched.
+   `tests/smoke_test.py::test_sheet_covers_schema` fails if a field is ever added to the schema
+   without a column, so this cannot silently regress.
+
+2. **An import keeps what the sheet cannot say.** `import_sheet.carry_forward` restores, per row,
+   any field the sheet has no column for. A field the sheet *does* have stays clearable — blanking
+   a cell there is a deliberate edit.
+
+3. **The tools stopped counting columns.** `build_tracker_workbook.py` and
+   `seed_rating_baseline.py` address columns by header name. The positional version put the
+   numbers one column to the left the first time a column was inserted, quietly.
+
+Two bugs surfaced while proving the round trip:
+
+- `str(value or "")` turned Westbury's **0% Glassdoor recommend rate** into a blank — the most
+  pointed figure on the tab, dropped by a falsy-zero test.
+- Notes were shared across both platforms, so AmbitionBox's "Bengaluru-filtered" caveat was
+  copied onto the Glassdoor row. Each platform has its own notes column now, falling back to the
+  shared one when empty.
+
+Verified: exporting `data/ratings.csv` into the workbook and importing it back returns the file
+byte-for-byte identical.
+
+### Which Rating_Tracker columns the weekly check actually fills
+
+`Rating` and `Reviews Count` — the two the three-minute Friday check reads. Recommend %, CEO
+approval and the sub-scores move slowly; type them when they change. The URLs are typed once.

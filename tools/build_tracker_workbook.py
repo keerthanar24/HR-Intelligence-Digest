@@ -50,6 +50,17 @@ SEVERITY = ["High", "Critical"]
 ESC_STATUS = ["Open", "Acknowledged", "Closed"]
 
 
+def col(headers, name) -> str:
+    """Column letter by header name.
+
+    The validations, formulas and conditional formats used to hard-code letters,
+    so inserting one column silently pointed the red-flag rule at the wrong
+    field. Looking the letter up by name makes the header list the only place
+    that has to be right.
+    """
+    return get_column_letter(headers.index(name) + 1)
+
+
 def style_header(ws, headers, widths):
     for i, (head, width) in enumerate(zip(headers, widths), start=1):
         cell = ws.cell(row=1, column=i, value=head)
@@ -94,13 +105,19 @@ for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=ws.max_column):
     for cell in row:
         cell.value = None
 
+# One column per field in the canonical mentions schema (scripts/hrintel.py
+# MENTION_FIELDS). The sheet is the data link the digest hands out, so a field
+# the digest holds and the sheet cannot show is a field nobody can audit -
+# and, before carry_forward existed, one the next import silently blanked.
 HEADERS = [
     "Mention ID", "Date Logged", "Date Posted", "Week Of", "Entity", "Platform",
-    "Sentiment", "Topic Category", "Summary Overview", "Direct Link / URL",
-    "Author Type", "Engagement", "Names Individual", "Red Flag Escalated",
-    "Red Flag Reason", "Status", "Notes",
+    "Source", "Sentiment", "Topic Category", "Title / Snippet", "Summary Overview",
+    "Direct Link / URL", "Author Type", "Role / Department", "Stars", "Engagement",
+    "Names Individual", "Red Flag Escalated", "Red Flag Reason", "Status",
+    "Logged By", "Notes",
 ]
-WIDTHS = [16, 12, 12, 12, 18, 15, 12, 16, 46, 34, 16, 12, 15, 16, 20, 14, 28]
+WIDTHS = [16, 12, 12, 12, 18, 15, 20, 12, 16, 30, 46, 34, 16, 18, 8,
+          12, 15, 16, 20, 14, 12, 28]
 style_header(ws, HEADERS, WIDTHS)
 set_body_font(ws, len(HEADERS))
 
@@ -109,34 +126,46 @@ set_body_font(ws, len(HEADERS))
 # lands on the configured first day of the reporting week. Read from config so
 # the sheet and the scripts cannot disagree about which day a week starts.
 WEEK_START = H.week_start_day()
+POSTED = col(HEADERS, "Date Posted")
 for r in range(2, ROWS + 1):
-    ws.cell(row=r, column=4).value = (
-        f'=IF($C{r}="","",$C{r}-MOD(WEEKDAY($C{r},3)-{WEEK_START},7))'
+    ws[f"{col(HEADERS, 'Week Of')}{r}"] = (
+        f'=IF(${POSTED}{r}="","",'
+        f'${POSTED}{r}-MOD(WEEKDAY(${POSTED}{r},3)-{WEEK_START},7))'
     )
-    ws.cell(row=r, column=4).number_format = "yyyy-mm-dd"
-    ws.cell(row=r, column=2).number_format = "yyyy-mm-dd"
-    ws.cell(row=r, column=3).number_format = "yyyy-mm-dd"
+    for name in ("Week Of", "Date Logged", "Date Posted"):
+        ws[f"{col(HEADERS, name)}{r}"].number_format = "yyyy-mm-dd"
+    ws[f"{col(HEADERS, 'Stars')}{r}"].number_format = "0.0"
 
-add_list_validation(ws, "E", ENTITIES, "Which group entity this is about.")
-add_list_validation(ws, "F", PLATFORMS, "Where it was posted.")
-add_list_validation(ws, "G", SENTIMENT,
+add_list_validation(ws, col(HEADERS, "Entity"), ENTITIES,
+                    "Which group entity this is about.")
+add_list_validation(ws, col(HEADERS, "Platform"), PLATFORMS, "Where it was posted.")
+add_list_validation(ws, col(HEADERS, "Sentiment"), SENTIMENT,
                     "Tag the post, not your view of the company. "
                     "Mixed = real praise AND a real complaint.")
-add_list_validation(ws, "H", TOPICS, "One topic. See the Guide tab.")
-add_list_validation(ws, "K", AUTHOR, "Only if the post states or clearly implies it.")
-add_list_validation(ws, "M", YESNO, "Does the post name an individual?")
-add_list_validation(ws, "N", YESNO, "One of the five triggers on the Guide tab.")
-add_list_validation(ws, "O", FLAG_REASON, "Which trigger fired.")
-add_list_validation(ws, "P", STATUS, "Needs Review until tagged.")
+add_list_validation(ws, col(HEADERS, "Topic Category"), TOPICS,
+                    "One topic. See the Guide tab.")
+add_list_validation(ws, col(HEADERS, "Author Type"), AUTHOR,
+                    "Only if the post states or clearly implies it.")
+add_list_validation(ws, col(HEADERS, "Names Individual"), YESNO,
+                    "Does the post name an individual?")
+add_list_validation(ws, col(HEADERS, "Red Flag Escalated"), YESNO,
+                    "One of the five triggers on the Guide tab.")
+add_list_validation(ws, col(HEADERS, "Red Flag Reason"), FLAG_REASON,
+                    "Which trigger fired.")
+add_list_validation(ws, col(HEADERS, "Status"), STATUS, "Needs Review until tagged.")
 
 # Red rows for flags, amber for anything still untagged on send day.
 # Conditional formats are *differential* formats: Excel reads the colour from
 # bgColor, not fgColor, so a fill built the usual way renders as no colour.
 red = PatternFill(bgColor="FADDDD", patternType="solid")
 amber = PatternFill(bgColor="FBF0D9", patternType="solid")
-span = f"A2:Q{ROWS}"
-ws.conditional_formatting.add(span, FormulaRule(formula=['$N2="Yes"'], fill=red, stopIfTrue=False))
-ws.conditional_formatting.add(span, FormulaRule(formula=['$P2="Needs Review"'], fill=amber))
+span = f"A2:{get_column_letter(len(HEADERS))}{ROWS}"
+flag = col(HEADERS, "Red Flag Escalated")
+state = col(HEADERS, "Status")
+ws.conditional_formatting.add(
+    span, FormulaRule(formula=[f'${flag}2="Yes"'], fill=red, stopIfTrue=False))
+ws.conditional_formatting.add(
+    span, FormulaRule(formula=[f'${state}2="Needs Review"'], fill=amber))
 
 # ===================== Rating_Tracker =====================
 ws = wb["Rating_Tracker"]
@@ -148,19 +177,39 @@ for row in ws.iter_rows(min_row=1, max_row=max(ws.max_row, 1), max_col=max(ws.ma
 # No stored delta column: build_digest.py derives week-on-week movement from
 # consecutive snapshots, and a copy kept by hand drifts the first time anyone
 # corrects a rating. Last week's row sits directly above for eyeballing.
-RT = ["Week Of", "Entity", "AmbitionBox Rating", "AmbitionBox Reviews Count",
-      "Glassdoor Rating", "Glassdoor Reviews Count", "Last Checked Date", "Notes"]
-RT_W = [12, 20, 16, 16, 16, 16, 14, 40]
+# Rating and Reviews Count are the two the weekly three-minute check fills in.
+# The rest - recommend %, CEO approval, sub-scores, profile URL - move slowly
+# and are typed when they change, but they are columns here because the digest
+# holds them and the sheet is what anyone auditing the digest opens.
+RT = ["Week Of", "Entity",
+      "AmbitionBox Rating", "AmbitionBox Reviews Count", "AmbitionBox Recommend %",
+      "AmbitionBox Work-Life", "AmbitionBox Salary", "AmbitionBox Job Security",
+      "AmbitionBox Growth", "AmbitionBox Culture", "AmbitionBox URL",
+      "AmbitionBox Notes",
+      "Glassdoor Rating", "Glassdoor Reviews Count", "Glassdoor Recommend %",
+      "Glassdoor CEO Approval %", "Glassdoor Work-Life", "Glassdoor Compensation",
+      "Glassdoor Job Security", "Glassdoor Career Opportunities", "Glassdoor Culture",
+      "Glassdoor URL", "Glassdoor Notes", "Last Checked Date", "Checked By",
+      "Notes"]
+RT_W = [12, 20, 14, 14, 15, 14, 13, 14, 13, 13, 30, 44,
+        14, 14, 15, 16, 14, 15, 14, 16, 13, 30, 44, 14, 12, 30]
 style_header(ws, RT, RT_W)
 set_body_font(ws, len(RT), rows=RT_ROWS)
-add_list_validation(ws, "B", ENTITIES, "One row per entity per week. APPEND, never overwrite.",
+add_list_validation(ws, col(RT, "Entity"), ENTITIES,
+                    "One row per entity per week. APPEND, never overwrite.",
                     rows=RT_ROWS)
 
+SCORES = [h for h in RT if h.endswith(
+    ("Rating", "Work-Life", "Salary", "Job Security", "Growth", "Culture",
+     "Compensation", "Career Opportunities"))]
 for r in range(2, RT_ROWS + 1):
-    ws.cell(row=r, column=1).number_format = "yyyy-mm-dd"
-    ws.cell(row=r, column=7).number_format = "yyyy-mm-dd"
-    ws.cell(row=r, column=3).number_format = "0.00"
-    ws.cell(row=r, column=5).number_format = "0.00"
+    for name in ("Week Of", "Last Checked Date"):
+        ws[f"{col(RT, name)}{r}"].number_format = "yyyy-mm-dd"
+    for name in SCORES:
+        ws[f"{col(RT, name)}{r}"].number_format = "0.00"
+    for name in ("AmbitionBox Recommend %", "Glassdoor Recommend %",
+                 "Glassdoor CEO Approval %"):
+        ws[f"{col(RT, name)}{r}"].number_format = "0"
 
 # ===================== Escalations (new) =====================
 ws = wb.create_sheet("Escalations", 2)
@@ -170,14 +219,16 @@ ESC = ["Escalation ID", "Raised At", "Week Of", "Mention ID", "Entity", "Platfor
 ESC_W = [15, 12, 12, 16, 18, 15, 34, 11, 20, 26, 12, 14, 40, 14, 12]
 style_header(ws, ESC, ESC_W)
 set_body_font(ws, len(ESC), rows=RT_ROWS)
-add_list_validation(ws, "E", ENTITIES, "", rows=RT_ROWS)
-add_list_validation(ws, "F", PLATFORMS, "", rows=RT_ROWS)
-add_list_validation(ws, "H", SEVERITY, "Critical = harassment/safety naming a person, or media involved.", rows=RT_ROWS)
-add_list_validation(ws, "I", FLAG_REASON, "Which of the five triggers.", rows=RT_ROWS)
-add_list_validation(ws, "N", ESC_STATUS, "Open until acknowledged.", rows=RT_ROWS)
+add_list_validation(ws, col(ESC, "Entity"), ENTITIES, "", rows=RT_ROWS)
+add_list_validation(ws, col(ESC, "Platform"), PLATFORMS, "", rows=RT_ROWS)
+add_list_validation(ws, col(ESC, "Severity"), SEVERITY, "Critical = harassment/safety naming a person, or media involved.", rows=RT_ROWS)
+add_list_validation(ws, col(ESC, "Reason"), FLAG_REASON,
+                    "Which of the five triggers.", rows=RT_ROWS)
+add_list_validation(ws, col(ESC, "Status"), ESC_STATUS,
+                    "Open until acknowledged.", rows=RT_ROWS)
 for r in range(2, RT_ROWS + 1):
-    for col in (2, 3, 11, 15):
-        ws.cell(row=r, column=col).number_format = "yyyy-mm-dd"
+    for name in ("Raised At", "Week Of", "Notified At", "Closed At"):
+        ws[f"{col(ESC, name)}{r}"].number_format = "yyyy-mm-dd"
 
 wb.save(DST)
 print("written:", DST)

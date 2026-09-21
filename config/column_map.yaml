@@ -19,15 +19,13 @@ tabs:
       one_line_summary:  [Summary Overview, Summary, one_line_summary]
       url:               [Direct Link / URL, URL, Link, url]
       red_flag:          [Red Flag Escalated, Red Flag, red_flag]
-      # Columns the workbook does not have yet. Listed so that adding one to
-      # the sheet makes it work with no code change.
       mention_id:        [Mention ID, mention_id, ID]
       week_of:           [Week Of, week_of]
       captured_by:       [Logged By, Captured By, captured_by]
       source_name:       [Source, source_name]
       author_type:       [Author Type, author_type, Reviewer Type]
-      role_or_dept:      [Role, Department, role_or_dept]
-      title_or_snippet:  [Title, Snippet, title_or_snippet]
+      role_or_dept:      [Role / Department, Role, Department, role_or_dept]
+      title_or_snippet:  [Title / Snippet, Title, Snippet, title_or_snippet]
       rating_given:      [Stars, Rating Given, rating_given]
       engagement:        [Engagement, Likes, engagement]
       names_individual:  [Names Individual, Names a Person, names_individual]
@@ -46,16 +44,34 @@ tabs:
       captured_at:     [Last Checked Date, Date Checked, captured_at]
       week_of:         [Week Of, week_of]
       captured_by:     [Checked By, captured_by]
+      # Falls back to the shared Notes column when the per-platform
+      # cell is blank. A scope caveat like 'Bengaluru-filtered' belongs
+      # to one platform's figure, not to both.
       notes:           [Notes, notes]
     per_platform:
       ambitionbox:
-        overall_rating: [AmbitionBox Rating, Ambition Box Rating]
-        review_count:   [AmbitionBox Reviews Count, AmbitionBox Review Count]
-        url:            [AmbitionBox URL, AmbitionBox Link]
+        overall_rating:    [AmbitionBox Rating, Ambition Box Rating]
+        review_count:      [AmbitionBox Reviews Count, AmbitionBox Review Count]
+        recommend_pct:     [AmbitionBox Recommend %, AmbitionBox Recommend Pct]
+        url:               [AmbitionBox URL, AmbitionBox Link]
+        work_life_balance: [AmbitionBox Work-Life]
+        salary_benefits:   [AmbitionBox Salary]
+        job_security:      [AmbitionBox Job Security]
+        career_growth:     [AmbitionBox Growth]
+        culture:           [AmbitionBox Culture]
+        notes:             [AmbitionBox Notes]
       glassdoor:
-        overall_rating: [Glassdoor Rating]
-        review_count:   [Glassdoor Reviews Count, Glassdoor Review Count]
-        url:            [Glassdoor URL, Glassdoor Link]
+        overall_rating:    [Glassdoor Rating]
+        review_count:      [Glassdoor Reviews Count, Glassdoor Review Count]
+        recommend_pct:     [Glassdoor Recommend %, Glassdoor Recommend Pct]
+        ceo_approval_pct:  [Glassdoor CEO Approval %, Glassdoor CEO Approval]
+        url:               [Glassdoor URL, Glassdoor Link]
+        work_life_balance: [Glassdoor Work-Life]
+        salary_benefits:   [Glassdoor Compensation]
+        job_security:      [Glassdoor Job Security]
+        career_growth:     [Glassdoor Career Opportunities]
+        culture:           [Glassdoor Culture]
+        notes:             [Glassdoor Notes]
     # Columns deliberately not imported, with the reason.
     ignore:
       # Computed by build_digest.py from consecutive snapshots. The in-sheet

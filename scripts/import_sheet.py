@@ -263,12 +263,30 @@ def import_ratings(rows, cfg, notes: Notes) -> list[dict]:
                     "captured_by": str(record.get("captured_by") or "sheet"),
                     "entity": entity,
                     "platform": platform,
-                    "overall_rating": str(values.get("overall_rating") or "").strip(),
-                    "review_count": str(values.get("review_count") or "").strip(),
-                    "url": str(values.get("url") or "").strip(),
                     "notes": str(record.get("notes") or "").strip(),
                 }
             )
+            # Lift every per-platform column the map names, not a fixed three,
+            # so adding 'Glassdoor Recommend %' to the sheet and to
+            # config/column_map.yaml is enough - no code change.
+            for field, value in values.items():
+                if field not in H.RATING_FIELDS:
+                    continue
+                # Not 'value or ""': Westbury's Glassdoor recommend rate is 0%,
+                # and a falsy-zero test drops the most pointed figure on the tab.
+                text = "" if value is None else str(value).strip()
+                if field == "notes" and not text:
+                    continue   # fall back to the shared Notes column
+                row[field] = text
+            # Keep the stored precision stable so a re-import does not rewrite
+            # 2.70 as 2.7 and churn the file on every sweep.
+            for field, places in (("overall_rating", 2), ("work_life_balance", 1),
+                                  ("salary_benefits", 1), ("job_security", 1),
+                                  ("career_growth", 1), ("culture", 1)):
+                if row.get(field):
+                    number = H.to_float(row[field])
+                    if number is not None:
+                        row[field] = f"{number:.{places}f}"
             out.append(row)
 
     if out:
@@ -322,6 +340,60 @@ def write(path: str, fields: list[str], rows: list[dict]) -> None:
             writer.writerow({f: row.get(f, "") for f in fields})
 
 
+ROW_KEYS = {
+    "mentions": ("mention_id",),
+    "ratings": ("week_of", "entity", "platform"),
+    "escalations": ("escalation_id",),
+}
+
+
+def fields_in_sheet(tab: str, rows: list[list], cfg: dict) -> set[str]:
+    """Which canonical fields this sheet actually has a column for."""
+    spec = cfg["tabs"][tab]
+    lookup = build_lookup(spec.get("columns", {}))
+    for block in (spec.get("per_platform") or {}).values():
+        lookup.update(build_lookup(block))
+    header = rows[0] if rows else []
+    return {lookup[key(name)] for name in header
+            if name is not None and key(name) in lookup}
+
+
+def carry_forward(path: str, fields: list[str], rows: list[dict],
+                  tab: str, supplied: set[str], notes: Notes) -> list[dict]:
+    """Keep the values the sheet has no column for.
+
+    write() replaces the CSV wholesale, because the sheet is the working
+    surface. But the sheet does not carry every field - Rating_Tracker has no
+    recommend-%, sub-score or profile-URL columns - so a straight import would
+    blank the baseline figures that were read off Glassdoor and AmbitionBox by
+    hand, silently and with no error. For a row the CSV already holds, any
+    field the sheet cannot supply keeps its existing value.
+
+    Fields the sheet DOES have a column for are left alone: clearing a cell
+    there is a deliberate edit and must survive the round trip.
+    """
+    if not os.path.exists(path):
+        return rows
+    keys = ROW_KEYS[tab]
+    previous = {tuple(old.get(k, "") for k in keys): old for old in H.read_csv(path)}
+    restored: set[str] = set()
+    for row in rows:
+        old = previous.get(tuple(row.get(k, "") for k in keys))
+        if not old:
+            continue
+        for field in fields:
+            if field in supplied or field in keys:
+                continue
+            if not str(row.get(field, "")).strip() and str(old.get(field, "")).strip():
+                row[field] = old[field]
+                restored.add(field)
+    if restored:
+        notes.warn(f"{tab}: kept the existing {', '.join(sorted(restored))} — "
+                   "the sheet has no column for those, so the import left them "
+                   "blank rather than meaning to clear them")
+    return rows
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("workbook", nargs="?", help="path to the .xlsx workbook")
@@ -353,6 +425,7 @@ def main() -> int:
         wanted = list(TARGETS)
 
     results: dict[str, list[dict]] = {}
+    supplied: dict[str, set[str]] = {}
     for tab in wanted:
         if args.csv:
             rows = sheets[tab]
@@ -365,9 +438,11 @@ def main() -> int:
                 continue
             rows = sheets[found]
         results[tab] = importers[tab](rows, cfg, notes)
+        supplied[tab] = fields_in_sheet(tab, rows, cfg)
 
     for tab, rows in results.items():
         path, fields = TARGETS[tab]
+        rows = carry_forward(path, fields, rows, tab, supplied.get(tab, set()), notes)
         print(f"  {tab}: {len(rows)} row(s)"
               f"{' (not written — dry run)' if args.dry_run else f' -> {os.path.relpath(path, H.ROOT)}'}")
         if not args.dry_run:
