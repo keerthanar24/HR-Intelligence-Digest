@@ -69,10 +69,11 @@ python3 scripts/log_rating.py -e rk_group -p ambitionbox -r <rating> -c <count> 
 
 ## 3. Two identity confirmations
 
-**`Robust Results`** is recorded as a former name of Robust Kommerce, flagged unconfirmed. If it
-is wrong the sweep pulls in another company's reviews; if it is right and stays unconfirmed,
-searches miss real ones. Confirm with HR, then either keep it as a plain alias in
-`config/entities.yaml` or delete it.
+~~**`Robust Results`**~~ **Resolved 2026-09-21: it was never a name of Robust Kommerce**, and the
+alias is removed. One follow-up: the live Google Alert for Robust Kommerce was created with the
+old query and still contains `OR "Robust Results"`. Edit it to match
+`python3 scripts/alert_queries.py --entity robust_kommerce --format google`, or it keeps pulling
+in another company.
 
 **Glassdoor employer 1882698** is listed as plain **"Robust"**. Confirm it is Robust Kommerce
 before the 4.00 / 7 reviews baseline is relied on.
