@@ -33,8 +33,12 @@ last Friday**. Sort by newest, not relevance.
 |---|---|---|
 | RK Group | ☐ | ☐ |
 | RK World Infocom | ☐ | ☐ |
-| Robust Kommerce | ☐ | ☐ |
+| Robust Kommerce | — *no page on this platform* | — |
 | Westbury Kommerce | ☐ | ☐ |
+
+> Robust Kommerce has **no review-site page on either platform**. Glassdoor employer 1882698
+> ("Robust") was checked on 2026-09-21 and is a different company. Do not re-add it. The only
+> cover for this entity is LinkedIn, Reddit, news and X.
 
 > RK Group is currently recorded from the **Bengaluru-filtered** view on both platforms.
 > Use the all-locations page and tell the desk, so the series switches scope once, knowingly.

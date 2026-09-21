@@ -53,6 +53,75 @@ def show_week(week: dt.date) -> int:
     return 0
 
 
+def ask(prompt, *, allowed=None, default="", required=False, multi=False):
+    """One prompt, re-asked until the answer is inside the vocabulary.
+
+    A back-read is thirty to sixty reviews. Composing a long command line for
+    each is where typos and invented theme names come from, so this asks field
+    by field and rejects a bad value on the spot rather than at validation
+    time, when the reviewer has closed the page and cannot check.
+    """
+    hint = ""
+    if allowed:
+        hint = "\n    " + " | ".join(allowed)
+    while True:
+        shown = f" [{default}]" if default else ""
+        raw = input(f"  {prompt}{shown}{hint}\n  > ").strip()
+        if not raw:
+            raw = default
+        if not raw and required:
+            print("    needed.")
+            continue
+        if allowed and raw:
+            values = [v.strip() for v in raw.replace(",", "|").split("|") if v.strip()] \
+                if multi else [raw]
+            bad = [v for v in values if v not in allowed]
+            if bad:
+                print(f"    not on the list: {', '.join(bad)}")
+                continue
+            return "|".join(values) if multi else raw
+        return raw
+
+
+def interactive(defaults) -> list[argparse.Namespace]:
+    """Walk one review at a time. Entity, platform and date carry over.
+
+    Reading a page means logging several reviews from the same page in a row,
+    so the fields that do not change between them are remembered and offered
+    as the default.
+    """
+    entities, platforms = H.entity_names(), H.platform_names()
+    print("\nLogging reviews one at a time. Blank answer = the value in [brackets].")
+    print("Ctrl-C when the page is done.\n")
+    collected, last = [], dict(entity=defaults.entity or "", platform=defaults.platform or "")
+    while True:
+        print("-" * 68)
+        entity = ask("entity", allowed=list(entities), default=last["entity"], required=True)
+        platform = ask("platform", allowed=list(platforms), default=last["platform"],
+                       required=True)
+        date = ask("date the review was posted (YYYY-MM-DD)", required=True)
+        title = ask("review title, as published (optional)")
+        summary = ask("one factual sentence - no names, no interpretation", required=True)
+        sentiment = ask("sentiment", allowed=list(H.SENTIMENT_SCORES), required=True)
+        themes = ask("theme(s), comma separated", allowed=H.THEMES, multi=True, required=True)
+        author = ask("who wrote it", allowed=H.AUTHOR_TYPES, default="unknown")
+        stars = ask("stars the reviewer gave, 1-5 (optional)")
+        url = ask("link to the review (optional)")
+        flag = ask("red-flag trigger, blank if none", allowed=H.RED_FLAG_REASONS)
+        names = ask("does it name an individual? y/N", default="n").lower().startswith("y")
+
+        collected.append(argparse.Namespace(
+            entity=entity, platform=platform, date=date, summary=summary,
+            sentiment=sentiment, themes=themes, author=author, url=url, title=title,
+            role="", rating=stars, engagement=None, names_individual=names,
+            flag=flag or None, notes="", mixed_post=False, by=defaults.by,
+            vocab=False, list=False, week=None))
+        last = {"entity": entity, "platform": platform}
+        print(f"  queued ({len(collected)} so far)")
+        if not ask("another from this page? Y/n", default="y").lower().startswith("y"):
+            return collected
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -79,6 +148,9 @@ def main() -> int:
     p.add_argument("--vocab", action="store_true", help="print the allowed values")
     p.add_argument("--list", action="store_true", help="show what is logged for a week")
     p.add_argument("--week", help="with --list, the week to show")
+    p.add_argument("-i", "--interactive", action="store_true",
+                   help="prompt for each field instead of composing a command line; "
+                        "the way to do a back-read")
     args = p.parse_args()
 
     if args.vocab:
@@ -86,6 +158,23 @@ def main() -> int:
     if args.list:
         week = H.parse_date(args.week) if args.week else H.last_complete_week()
         return show_week(H.week_start_of(week))
+    if args.interactive:
+        try:
+            queued = interactive(args)
+        except (KeyboardInterrupt, EOFError):
+            print("\n  stopped; nothing from this session was written.")
+            return 0
+        failed = 0
+        for one in queued:
+            if log_one(one) != 0:
+                failed += 1
+        print(f"\n{len(queued) - failed} logged, {failed} rejected.")
+        return 1 if failed else 0
+
+    return log_one(args)
+
+
+def log_one(args) -> int:
 
     entities, platforms = H.entity_names(), H.platform_names()
     problems = []
