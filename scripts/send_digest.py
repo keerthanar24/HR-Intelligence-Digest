@@ -54,12 +54,32 @@ def build_message(subject: str, body_html: str, body_text: str,
     return mailer.build_message(subject, to, sender, body_text, body_html, reply_to)
 
 
+def coverage_refusal(stats: dict) -> list[str]:
+    """Why the week is not ready to send, if reviews are still unread.
+
+    The digest used to carry a "not everything was captured" caption and go out
+    anyway, which told four people it under-reports the week and left them no
+    way to act on that. Refusing instead keeps the sweep honest at the only
+    point where it still can be.
+    """
+    if not stats.get("coverage_gaps"):
+        return []
+    gaps = stats.get("coverage_detail", [])
+    outstanding = sum(g["missing"] for g in gaps)
+    detail = "; ".join(f"{g['entity']}/{g['platform']} {g['missing']}" for g in gaps)
+    return [f"{outstanding} review(s) still unread ({detail}) - the digest would "
+            "under-report the week and would not say so. Log them first, or "
+            "--allow-gaps if that is genuinely intended"]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--week", help="week_of start day; default = the reporting week")
     parser.add_argument("--send", action="store_true",
                         help="actually send; without it this only prints")
+    parser.add_argument("--allow-gaps", action="store_true",
+                        help="send even when reviews are still unread")
     parser.add_argument("--force", action="store_true",
                         help="send even if the week is still running")
     parser.add_argument("--subject-prefix", default="",
@@ -93,6 +113,8 @@ def main() -> int:
         refusals.append("no usable recipient addresses in config/recipients.yaml")
     if missing:
         refusals.append(f"no address yet for {', '.join(missing)}")
+    if not args.allow_gaps:
+        refusals += coverage_refusal(stats)
     if stats["partial"] and not args.force:
         refusals.append(f"the week is still running ({stats['days_elapsed']} of 7 days) - "
                         "a partial week reads as a full one; use --force if that is intended")

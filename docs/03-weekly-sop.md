@@ -149,6 +149,26 @@ python3 scripts/validate_data.py --week $(python3 -c "import sys;sys.path.insert
 Fix every ERROR **in the sheet**, then re-export — a fix made in the CSV is lost on the next
 export. WARNINGs are judgement calls; an empty week is a warning, and it is fine.
 
+## Step 4b — The completeness gate
+
+The build refuses while the review counts say more arrived than was logged:
+
+```
+NOT SENDABLE — 2 review(s) still to read.
+  RK World Infocom / AmbitionBox: 3 new, 1 logged, 2 TO READ
+    https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews
+```
+
+This used to be a caption inside the email — *"not everything was captured"* — and the digest
+went out anyway. That told four people the table under-reports the week and gave none of them a
+way to act on it. The sweep is finished when the logged rows account for every review the counts
+say arrived, so that is the gate now, and the lines above are the worklist: open the URL, read
+the reviews you have not logged, log them, build again.
+
+`--allow-gaps` builds anyway, for a mid-sweep look. Use it knowing the email will **not** say the
+week is incomplete — the disclosure was removed along with the caption, because an incomplete
+digest is no longer supposed to reach anyone.
+
 ## Step 5 — Build and send (20 min)
 
 Refresh the sheet first, then build. Section 6 tells four people the sheet holds this week's raw
@@ -173,6 +193,8 @@ Writes `out/digest-<week>.html` and `out/digest-<week>.txt`.
    - Every row in What's New has a working link.
    - The data link in section 6 opens the tracking sheet, and `Raw_Data_Log` shows this
      week's rows — not just headers. Section 6 states the counts; check they match section 3.
+   - The build exited 0. A non-zero exit means reviews are still unread; the digest is not
+     finished, whatever it looks like on screen.
 
 ## Step 6 — Commit (5 min)
 

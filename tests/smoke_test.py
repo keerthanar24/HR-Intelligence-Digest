@@ -457,9 +457,16 @@ def test_digest() -> None:
     # states its coverage and checks the rating count against what was logged.
     check("coverage gap detected from the review count",
           stats["coverage_gaps"] >= 1, f"(got {stats['coverage_gaps']})")
-    check("the shortfall is stated in both bodies",
-          "NOT EVERYTHING WAS CAPTURED" in body_text
-          and "Not everything was captured" in body_html)
+    # The shortfall is a gate, not a caption. Telling four people the table is
+    # incomplete does not make it complete; it moves the problem to their inbox.
+    check("the shortfall is not announced to recipients",
+          "NOT EVERYTHING WAS CAPTURED" not in body_text
+          and "Not everything was captured" not in body_html)
+    check("but it is carried where the send can refuse on it",
+          bool(stats["coverage_detail"]) and
+          all("missing" in g and "url" in g for g in stats["coverage_detail"]))
+    check("the outstanding count is the arithmetic, not a guess",
+          all(g["missing"] == g["new"] - g["logged"] for g in stats["coverage_detail"]))
     check("what was swept is named", "Swept this week" in body_text)
 
     # Deliverable 4: a theme recurring across weeks is invisible to a 7-day
@@ -829,6 +836,53 @@ def test_rate_limit_backoff() -> None:
         collect_feeds._last_hit.clear()
 
 
+def test_coverage_gate() -> None:
+    """An incomplete sweep must not be sendable.
+
+    The old behaviour printed "not everything was captured" in the email and
+    sent it anyway. That told four people the digest under-reports the week
+    without giving anyone a way to fix it. The sweep is finished when the
+    logged rows account for every review the counts say arrived, so that is
+    the gate - and the worklist says exactly what is left to read.
+    """
+    print("coverage gate")
+    import send_digest
+
+    entities = {"rk_world": "RK World Infocom"}
+    platforms = {"ambitionbox": "AmbitionBox"}
+    week = dt.date(2026, 9, 12)
+    ratings = [
+        {"week_of": "2026-09-05", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "51", "url": "https://ab.invalid/rkw"},
+        {"week_of": "2026-09-12", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "54", "url": "https://ab.invalid/rkw"},
+    ]
+    logged_one = [{"entity": "rk_world", "platform": "ambitionbox"}]
+
+    _, gaps = build_digest.coverage_rows(logged_one, ratings, week, entities, platforms)
+    check("three new reviews with one logged is a gap", len(gaps) == 1, f"(got {gaps})")
+    check("the worklist says how many are left", gaps[0]["missing"] == 2,
+          f"(got {gaps[0]['missing']})")
+    check("and where to read them", gaps[0]["url"] == "https://ab.invalid/rkw")
+
+    logged_all = logged_one * 3
+    _, none = build_digest.coverage_rows(logged_all, ratings, week, entities, platforms)
+    check("logging all three closes the gap", none == [], f"(got {none})")
+
+    # Logging more than the count moved is not a gap either: a LinkedIn post
+    # and a review can both be real in a week the count only moved once.
+    _, over = build_digest.coverage_rows(logged_one * 5, ratings, week, entities, platforms)
+    check("logging more than the count moved is not a gap", over == [])
+
+    # The send must refuse on it, the way it refuses a missing address.
+    refusals = send_digest.coverage_refusal({"coverage_gaps": 1, "coverage_detail": gaps})
+    check("the send refuses while reviews are unread", bool(refusals))
+    check("and the refusal names the outstanding count", "2 review(s)" in refusals[0],
+          f"(got {refusals[0]!r})")
+    check("no gap, no refusal",
+          send_digest.coverage_refusal({"coverage_gaps": 0, "coverage_detail": []}) == [])
+
+
 def test_red_flag_sla() -> None:
     """Section 5 has to evidence the *same-day* promise, not just the flag.
 
@@ -886,7 +940,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

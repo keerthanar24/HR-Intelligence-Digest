@@ -169,6 +169,7 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms):
         key = (row.get("entity"), row.get("platform"))
         if row.get("week_of") == this_week:
             counts.setdefault(key, {})["now"] = H.to_int(row.get("review_count"), -1)
+            counts[key]["url"] = row.get("url", "")
         elif row.get("week_of") == prev_week:
             counts.setdefault(key, {})["prev"] = H.to_int(row.get("review_count"), -1)
 
@@ -189,6 +190,8 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms):
                 "platform": platforms.get(platform, platform),
                 "new": new_reviews,
                 "logged": logged.get((entity_id, platform), 0),
+                "missing": new_reviews - logged.get((entity_id, platform), 0),
+                "url": seen.get("url", ""),
             })
     swept |= {m.get("platform") for m in mentions_now if m.get("platform")}
     return sorted(platforms.get(p, p) for p in swept if p), gaps
@@ -458,6 +461,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         "red_flags": len(flags),
         "week_label": week_label,
         "coverage_gaps": len(gaps),
+        "coverage_detail": gaps,
         "rolling_themes": len(rolling),
     }
 
@@ -544,14 +548,6 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if swept:
         h.append(f'<p style="margin:0 0 4px;font-size:12px;color:#52606d;">Swept this week: '
                  f'{E(", ".join(swept))}.</p>')
-    if gaps:
-        detail = "; ".join(f"{g['entity']} on {g['platform']} gained {g['new']} review(s), "
-                           f"{g['logged']} logged" for g in gaps)
-        h.append(
-            '<p style="margin:0 0 8px;padding:8px 10px;background:#FBF0D9;border-radius:4px;'
-            'font-size:12px;color:#8a6d3b;"><strong>Not everything was captured.</strong> '
-            f'{E(detail)}. The review counts moved further than the rows above account for, '
-            'so this table is incomplete.</p>')
 
     # 4. Themes
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">4 · Themes</h3>')
@@ -684,10 +680,6 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if swept:
         t.append("")
         t.append(f"Swept this week: {', '.join(swept)}.")
-    if gaps:
-        t.append("NOT EVERYTHING WAS CAPTURED - " + "; ".join(
-            f"{g['entity']} on {g['platform']} gained {g['new']} review(s), {g['logged']} logged"
-            for g in gaps) + ". This table is incomplete.")
     t.append("")
     t.append("4. THEMES")
     if themes:
@@ -766,6 +758,9 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--week", help="week_of Monday (YYYY-MM-DD); default = last complete week")
     parser.add_argument("--stdout", action="store_true", help="print the plain-text body")
+    parser.add_argument("--allow-gaps", action="store_true",
+                        help="build even when reviews are still unread; the email "
+                             "does not disclose the shortfall, so only for a mid-sweep look")
     parser.add_argument("--strict", action="store_true",
                         help="exit non-zero if any mention in the week is untagged")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
@@ -811,6 +806,24 @@ def main() -> int:
         print(f"NOT SENDABLE YET — no address for {', '.join(pending)} "
               "(config/recipients.yaml). The body above is complete and reviewable.")
     print("Paste the HTML body into the email — the brief says body only, no attachments.")
+
+    # A shortfall used to be a caption in the email. Telling four people the
+    # table is incomplete does not make it complete - it just moves the problem
+    # to their inbox. The sweep is finished when the logged rows account for
+    # every review the counts say arrived, so that is now a gate, and the
+    # worklist below says exactly what is left to read.
+    if stats["coverage_gaps"] and not args.allow_gaps:
+        outstanding = sum(g["missing"] for g in stats["coverage_detail"])
+        print(f"\nNOT SENDABLE — {outstanding} review(s) still to read. "
+              "The counts moved further than the logged rows account for.", file=sys.stderr)
+        for g in stats["coverage_detail"]:
+            print(f"  {g['entity']} / {g['platform']}: {g['new']} new, {g['logged']} logged, "
+                  f"{g['missing']} TO READ", file=sys.stderr)
+            if g["url"]:
+                print(f"    {g['url']}", file=sys.stderr)
+        print("\nLog them (scripts/log_mention.py) and build again. To look at the digest "
+              "before the sweep is finished, add --allow-gaps.", file=sys.stderr)
+        return 1
 
     if args.strict and stats["untagged"]:
         print(f"STRICT: {stats['untagged']} untagged mention(s) in the week.", file=sys.stderr)
