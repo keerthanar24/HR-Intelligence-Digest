@@ -72,8 +72,8 @@ platforms:
     urls:
       rk_group: "https://www.linkedin.com/company/rk-groupp/"
       # linkedin.com/company/valuecart belongs to ValueCart, which is out of
-      # scope, so it is not listed here. RK World Infocom needs its own page.
-      rk_world: "TODO: paste the LinkedIn page for RK World Infocom Pvt Ltd"
+      # scope, so it is not listed here.
+      rk_world: "https://www.linkedin.com/company/rk-world-infocom-private-limited/"
       robust_kommerce: "https://www.linkedin.com/company/robust-kommerce-india/"
       westbury_kommerce: "https://www.linkedin.com/company/westbury-kommerce/"
 

@@ -86,11 +86,8 @@ live run — each feed reports its own query as its title, which confirms every 
 entity it belongs to. They return 0 items today because a Google Alert only carries items indexed
 after it was created; they fill from here.
 
-**RK World Infocom's LinkedIn page** — now the only platform URL still a placeholder:
-
-```
-linkedin  rk_world  TODO: paste the LinkedIn page for RK World Infocom Pvt Ltd
-```
+~~**RK World Infocom's LinkedIn page.**~~ **Done.** The platform map is complete: every entity
+has a page on every platform that carries one.
 
 **X bearer token** (optional) — set `X_BEARER_TOKEN` as a repository secret and the four X
 searches start running. Without it they are skipped and X stays manual.
