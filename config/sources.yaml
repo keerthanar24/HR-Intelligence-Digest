@@ -20,17 +20,17 @@ platforms:
       Highest expected volume for India. Record the overall rating and review count
       into data/ratings.csv on every sweep, even when no new review appeared.
     urls:
-      # The sweep must open the company-level REVIEWS page, not a location- or
-      # overview-scoped one, or reviews from other offices are never seen and
-      # the gap is invisible. URLs marked (derived) were built from the slug in
-      # the link supplied and need one click to confirm before Week 1.
+      # Company identities confirmed by the programme owner, 2026-09-21.
+      # URLs are held in the canonical all-locations REVIEWS form: a location-
+      # or overview-scoped link hides reviews from other offices and nothing
+      # downstream reveals the gap. The supplied link is kept beside each one.
       #
       # supplied: .../reviews/r-dot-k-dot-group-reviews/bengaluru-location
-      rk_group: "https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews"   # (derived) drop the Bengaluru filter
+      rk_group: "https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews"   # Bengaluru filter dropped
       # supplied: .../overview/r-k-world-infocom-overview/locations/bengaluru-offices
-      rk_world: "https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews"   # (derived) reviews page, all locations
+      rk_world: "https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews"   # reviews page, all locations
       # supplied: .../overview/robust-results-overview  -- listed as "Robust Results"
-      robust_kommerce: "https://www.ambitionbox.com/reviews/robust-results-reviews"   # (derived) reviews page
+      robust_kommerce: "https://www.ambitionbox.com/reviews/robust-results-reviews"   # reviews page
       westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
 
   - id: glassdoor
@@ -41,19 +41,19 @@ platforms:
     captures: [reviews, ratings, interviews, salaries]
     notes: Record rating + review count weekly into data/ratings.csv.
     urls:
-      # Canonical all-locations reviews form is /Reviews/<Name>-Reviews-E<id>.htm.
-      # URLs marked (derived) were rebuilt from the employer id in the supplied
-      # link and need one click to confirm before Week 1.
+      # Company identities confirmed by the programme owner, 2026-09-21.
+      # Canonical all-locations form is /Reviews/<Name>-Reviews-E<id>.htm. The
+      # employer id is what resolves the company; the name slug is cosmetic, so
+      # the id is always kept. The supplied link is noted beside each one.
       #
       # supplied: /Reviews/RK-Group-Bangalore-Reviews-EI_IE653077.0,8_IL.9,18_IM1091.htm
-      rk_group: "https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm"   # (derived) drop the Bangalore filter
+      rk_group: "https://www.glassdoor.co.in/Reviews/RK-Group-Reviews-E653077.htm"   # Bangalore filter dropped
       # supplied: /Overview/Working-at-Rk-Worldinfocom-EI_IE8268877.11,26.htm
-      rk_world: "https://www.glassdoor.co.in/Reviews/Rk-Worldinfocom-Reviews-E8268877.htm"   # (derived) reviews, not overview
+      rk_world: "https://www.glassdoor.co.in/Reviews/Rk-Worldinfocom-Reviews-E8268877.htm"   # reviews, not overview
       # supplied: /Overview/Working-at-Robust-EI_IE1882698.11,17.htm
-      # CAUTION: this profile is named only "Robust". Confirm employer id
-      # 1882698 is Robust Kommerce and not an unrelated company before the
-      # baseline sweep - a wrong id pollutes the series for the whole trial.
-      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"   # (derived, UNCONFIRMED)
+      # Listed on Glassdoor as plain "Robust"; confirmed as Robust Kommerce by
+      # the programme owner on 2026-09-21.
+      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"
       westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
 
   - id: linkedin

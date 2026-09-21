@@ -24,7 +24,10 @@ entities:
       - RK group of companies
       - RK Groups
     needs_confirmation:
-      - RK Enterprises        # TODO(HR): confirm whether this was a previous name
+      # Placeholder invented during setup, with no evidence behind it. No
+      # platform listing has corroborated it. Confirm with HR or delete it -
+      # do not treat it as a known former name.
+      - RK Enterprises
     exclude_terms:
       - RK Group of Hotels
       - RK Group Dubai
@@ -40,20 +43,19 @@ entities:
       - RK Worlds
       - RK World Pvt
       - RK World Private Limited
-    needs_confirmation:
-      # RK World's LinkedIn company page is branded ValueCart. If that is the
-      # trading/customer-facing name, it is likely the name employees actually
-      # use in reviews. Searched now, flagged until HR confirms the link.
+      # Confirmed 2026-09-21: the LinkedIn page for this entity is branded
+      # ValueCart, so this is the customer-facing name and very likely what
+      # employees write.
       - ValueCart
       - Value Cart
-      # AmbitionBox lists the company under the slug 'r-k-world-infocom',
-      # so the registered name is probably RK World Infocom. That is the name
-      # on the offer letter, and the one reviewers tend to copy.
+      # Confirmed 2026-09-21: AmbitionBox lists it as R K World Infocom and
+      # Glassdoor as Rk Worldinfocom. This is the name on the offer letter,
+      # and the one reviewers copy.
       - RK World Infocom
       - R K World Infocom
-      # Glassdoor spells it as one word.
       - RK Worldinfocom
       - Worldinfocom
+    needs_confirmation: []
     exclude_terms:
       - RK World Tours
 
@@ -68,11 +70,13 @@ entities:
       - RobustKommerce
       - Robust E-Commerce
       - Robust Ecommerce
-    needs_confirmation:
-      # AmbitionBox lists this company under the slug 'robust-results', and
-      # Glassdoor under plain "Robust". If Robust Results is a trading name,
-      # reviewers will use it. Searched now, flagged until HR confirms.
+      # Confirmed 2026-09-21: AmbitionBox lists this company as Robust Results.
       - Robust Results
+    needs_confirmation: []
+    # Glassdoor lists this company as plain "Robust" (employer id 1882698).
+    # Deliberately NOT added as an alias: on its own the word matches "robust
+    # growth", "robust system" and so on, and would bury the sheet in noise.
+    # The Glassdoor page is swept directly by URL, so nothing is lost.
     exclude_terms: []
 
   - id: westbury_kommerce
