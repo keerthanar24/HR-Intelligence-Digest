@@ -25,21 +25,23 @@ that escalate the same day. See `docs/04-red-flag-protocol.md`.
 
 ```
 RK Group  (parent / corporate brand)
- |- RK World Infocom Pvt Ltd    - customer-facing brand: ValueCart
- |- Robust Kommerce             - listed on AmbitionBox as Robust Results
+ |- ValueCart
+ |- RK World Infocom Pvt Ltd
+ |- Robust Kommerce
  \- Westbury Kommerce
 ```
 
 | # | Entity | Role | Also appears as |
 |---|--------|------|-----------------|
 | 1 | RK Group | Parent / corporate brand | R.K. Group |
-| 2 | RK World Infocom | Subsidiary | **ValueCart**, Rk Worldinfocom |
-| 3 | Robust Kommerce | Subsidiary | Robust Results, Robust |
-| 4 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
+| 2 | ValueCart | Subsidiary | Value Cart, ValueKart |
+| 3 | RK World Infocom | Subsidiary | R K World Infocom, Rk Worldinfocom |
+| 4 | Robust Kommerce | Subsidiary | Robust Results *(unconfirmed)*, Robust |
+| 5 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
 
-**ValueCart is a brand of RK World Infocom, not a separate company**, so its mentions roll up
-to that entity rather than getting a row of their own. It is also the name employees and
-candidates use most often, so it carries much of that entity's signal.
+**ValueCart is a separate company**, not a brand of RK World Infocom, so it gets its own row
+in the digest headline. It was briefly treated as an alias during setup; that was corrected on
+2026-09-21, and it still needs its own review-site pages and baseline.
 
 We track **common misspellings and previous names** alongside the registered names — employees
 rarely write the registered entity name. The maintained list lives in `config/entities.yaml`

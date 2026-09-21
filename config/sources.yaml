@@ -35,6 +35,9 @@ platforms:
       # was supplied for this entity; if that page is not Robust Kommerce then
       # "Robust Results" is not one of its names either - see entities.yaml.
       robust_kommerce: "none"
+      # ValueCart split out as its own entity 2026-09-21 and has no baseline.
+      # Search AmbitionBox for it; write none here if it genuinely has no page.
+      valuecart: "TODO: search AmbitionBox for ValueCart"
       westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
 
   - id: glassdoor
@@ -58,6 +61,8 @@ platforms:
       # Listed on Glassdoor as plain "Robust"; confirmed as Robust Kommerce by
       # the programme owner on 2026-09-21.
       robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"
+      # ValueCart split out as its own entity 2026-09-21 and has no baseline.
+      valuecart: "TODO: search Glassdoor for ValueCart"
       westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
 
   - id: linkedin
@@ -71,10 +76,11 @@ platforms:
       individual personal profiles — see the boundary in docs/00-brief.md section 4.
     urls:
       rk_group: "https://www.linkedin.com/company/rk-groupp/"
-      # NOTE: RK World's page is branded ValueCart. If ValueCart is the
-      # customer-facing name, employees will write that, not "RK World" —
-      # see the needs_confirmation entry in config/entities.yaml.
-      rk_world: "https://www.linkedin.com/company/valuecart/"
+      # Confirmed 2026-09-21: ValueCart is a separate company, so this page is
+      # ValueCart's, not RK World Infocom's - it was filed under the wrong
+      # entity while the two were treated as one.
+      valuecart: "https://www.linkedin.com/company/valuecart/"
+      rk_world: "TODO: paste the LinkedIn page for RK World Infocom Pvt Ltd (the valuecart page belongs to ValueCart)"
       robust_kommerce: "https://www.linkedin.com/company/robust-kommerce-india/"
       westbury_kommerce: "https://www.linkedin.com/company/westbury-kommerce/"
 
@@ -223,6 +229,24 @@ feeds:
     entity: westbury_kommerce
     source: x_api
     enabled: false
+
+  - id: x_search_valuecart
+    platform: x
+    entity: valuecart
+    source: x_api
+    enabled: false
+
+  - id: reddit_search_valuecart
+    platform: reddit
+    entity: valuecart
+    enabled: true
+    auto_query: reddit
+
+  - id: google_alerts_valuecart
+    platform: news
+    entity: valuecart
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for ValueCart"
 
   - id: reddit_search_rk_group
     platform: reddit

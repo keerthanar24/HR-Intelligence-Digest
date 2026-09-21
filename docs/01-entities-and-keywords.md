@@ -67,14 +67,15 @@ Review the list at the end of Week 2 (the end of Phase 1) and again at the Phase
 
 | Entity | Aliases | Confirmed via | Unconfirmed |
 |---|---|---|---|
-| RK Group | 7 | — | `RK Enterprises` — **invented at setup, confirm or delete** |
-| RK World Infocom | 13 | ValueCart (LinkedIn), R K World Infocom (AmbitionBox), Rk Worldinfocom (Glassdoor) | none |
-| Robust Kommerce | 8 | Robust Results (AmbitionBox) | none |
+| RK Group | 7 | — | none |
+| ValueCart | 6 | LinkedIn company page | none |
+| RK World Infocom | 11 | R K World Infocom (AmbitionBox), Rk Worldinfocom (Glassdoor) | none |
+| Robust Kommerce | 7 | — | `Robust Results` — rests on one AmbitionBox page that may be a different company |
 | Westbury Kommerce | 7 | — | none |
 
-RK World Infocom is discussed under four different names across three platforms. A sweep
-searching only the registered name would see a fraction of its chatter — this is the clearest
-evidence so far that the alias register earns its keep.
+RK World Infocom is written three different ways across two platforms, none of them the form
+in the original brief ("RK World"). A sweep searching only the registered name would see a
+fraction of its chatter — the clearest evidence so far that the alias register earns its keep.
 
 `RK Enterprises` is a placeholder recorded during setup. It is searched but flagged by
 `scripts/validate_data.py` until someone confirms or removes it. Do not treat it as fact.

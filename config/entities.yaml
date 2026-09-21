@@ -14,12 +14,14 @@
 # Group structure, confirmed by the programme owner 2026-09-21:
 #
 #   RK Group (parent)
-#    |- RK World Infocom Pvt Ltd   -- customer-facing brand: ValueCart
-#    |- Robust Kommerce            -- listed on AmbitionBox as Robust Results
+#    |- ValueCart
+#    |- RK World Infocom Pvt Ltd
+#    |- Robust Kommerce
 #    \- Westbury Kommerce
 #
-# ValueCart is a BRAND of RK World Infocom, not a separate company, so its
-# mentions roll up to that entity rather than getting a row of their own.
+# ValueCart is a SEPARATE COMPANY, not a brand of RK World Infocom
+# (confirmed 2026-09-21, correcting an earlier reading). It gets its own row
+# in the digest headline and needs its own review pages and baseline.
 
 entities:
   - id: rk_group
@@ -41,14 +43,26 @@ entities:
       - RK Group of Hotels
       - RK Group Dubai
 
+  - id: valuecart
+    name: ValueCart
+    legal_name: "TODO: registered name, if different from ValueCart"
+    role: Operating entity (subsidiary of RK Group)
+    parent: rk_group
+    aliases:
+      - ValueCart
+      - Value Cart
+      - Value-Cart
+      - Valuecart
+      - ValueKart
+      - Value Kart
+    needs_confirmation: []
+    exclude_terms: []
+
   - id: rk_world
     name: RK World Infocom
     legal_name: RK World Infocom Pvt Ltd
     role: Operating entity (subsidiary of RK Group)
     parent: rk_group
-    # Customer-facing brand. Employees and candidates write this far more often
-    # than the registered name, so it carries most of the signal.
-    brands: [ValueCart]
     aliases:
       - RK World
       - R K World
@@ -57,11 +71,6 @@ entities:
       - RK Worlds
       - RK World Pvt
       - RK World Private Limited
-      # Confirmed 2026-09-21: the LinkedIn page for this entity is branded
-      # ValueCart, so this is the customer-facing name and very likely what
-      # employees write.
-      - ValueCart
-      - Value Cart
       # Confirmed 2026-09-21: AmbitionBox lists it as R K World Infocom and
       # Glassdoor as Rk Worldinfocom. This is the name on the offer letter,
       # and the one reviewers copy.

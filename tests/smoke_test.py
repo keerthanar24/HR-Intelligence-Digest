@@ -111,7 +111,16 @@ def test_x_collection() -> None:
     query = collect_feeds.build_x_query(entities["rk_world"])
     check("query fits the API tier limit",
           len(query) <= collect_feeds.X_QUERY_LIMIT, f"({len(query)} chars)")
-    check("confirmed trading name is in the query", '"ValueCart"' in query)
+    # ValueCart is its own company, so it must NOT widen RK World Infocom's
+    # query - that would file ValueCart's chatter under the wrong entity.
+    check("a separate company is not folded into this query",
+          '"ValueCart"' not in query)
+    check("the registered-name variants are in the query",
+          '"RK World Infocom"' in query and '"Worldinfocom"' in query)
+    vc_query = collect_feeds.build_x_query(entities["valuecart"])
+    check("ValueCart has a query of its own", '"ValueCart"' in vc_query)
+    check("ValueCart's query does not pull in RK World Infocom",
+          "Worldinfocom" not in vc_query)
     check("retweets excluded so a viral post is one row", "-is:retweet" in query)
     check("context spans more than pay",
           all(term in query for term in ("harassment", "layoff", "interview")))
