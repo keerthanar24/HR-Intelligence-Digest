@@ -48,10 +48,13 @@ platforms:
       Company page activity and public post search only. Do not browse or compile
       individual personal profiles — see the boundary in docs/00-brief.md section 4.
     urls:
-      rk_group: "TODO: paste LinkedIn company page URL"
-      rk_world: "TODO: paste LinkedIn company page URL"
-      robust_kommerce: "TODO: paste LinkedIn company page URL"
-      westbury_kommerce: "TODO: paste LinkedIn company page URL"
+      rk_group: "https://www.linkedin.com/company/rk-groupp/"
+      # NOTE: RK World's page is branded ValueCart. If ValueCart is the
+      # customer-facing name, employees will write that, not "RK World" —
+      # see the needs_confirmation entry in config/entities.yaml.
+      rk_world: "https://www.linkedin.com/company/valuecart/"
+      robust_kommerce: "https://www.linkedin.com/company/robust-kommerce-india/"
+      westbury_kommerce: "https://www.linkedin.com/company/westbury-kommerce/"
 
   - id: indeed
     name: Indeed

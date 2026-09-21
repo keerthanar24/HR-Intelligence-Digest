@@ -40,7 +40,12 @@ entities:
       - RK Worlds
       - RK World Pvt
       - RK World Private Limited
-    needs_confirmation: []
+    needs_confirmation:
+      # RK World's LinkedIn company page is branded ValueCart. If that is the
+      # trading/customer-facing name, it is likely the name employees actually
+      # use in reviews. Searched now, flagged until HR confirms the link.
+      - ValueCart
+      - Value Cart
     exclude_terms:
       - RK World Tours
 
