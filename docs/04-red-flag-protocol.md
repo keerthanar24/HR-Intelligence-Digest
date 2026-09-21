@@ -21,6 +21,34 @@ flag is one of these, and only these:
 
 If it is not on this list, it goes in the weekly digest, not into anyone's evening.
 
+## Making "same day" true
+
+A red flag is only same-day if it is *found* the same day, and three of the six platforms
+cannot be polled. Four things together close that, and none of them is the weekly sweep:
+
+| Cover | Channel | Effort |
+|---|---|---|
+| **Claim the employer profiles** | Glassdoor, and AmbitionBox if it offers it | One-off, free. The platform emails you on every new review |
+| Daily automated scan | Reddit, news, X | None — `.github/workflows/daily-red-flag-scan.yml` |
+| **Daily count check** | Glassdoor, AmbitionBox | ~3 min — `make daily` |
+| Cross-entity Google Alert | News, blogs, forums | Read it daily |
+
+The **daily count check** is the cheap one. Reading every review daily is unrealistic;
+comparing a *number* is not. Each review page shows a review count, and the count moving is
+the only signal needed — if it has not moved, nothing was posted. Seven pages, twenty seconds
+each.
+
+```bash
+make daily                                            # the list with last known counts
+python3 scripts/daily_check.py --bump ambitionbox rk_world 54
+```
+
+A bump tells you how many arrived and points at the page to read.
+
+**Without at least the employer profiles or the daily check, "immediate, same-day
+escalation" is not being delivered** — a Tuesday allegation waits until Friday. Say so to the
+four rather than letting the brief imply otherwise.
+
 ## The same-day path
 
 1. **Spot it.** During the sweep, or from `python3 scripts/red_flags.py --scan`.

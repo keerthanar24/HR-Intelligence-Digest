@@ -13,6 +13,7 @@ help:
 	@echo "  make sheet     print tab headers, dropdowns and formatting for the sheet"
 	@echo "  make alerts    print search strings for Google Alerts and manual sweeps"
 	@echo "  make sweep     print this week's sweep worksheet with every URL"
+	@echo "  make daily     the 3-minute daily count check (same-day cover)"
 	@echo "  make import BOOK=tracker.xlsx   pull the workbook into data/"
 	@echo "  make collect   pull the permitted feeds into data/mentions.csv"
 	@echo "  make log       show how to log a review as a mention"
@@ -35,6 +36,9 @@ sheet:
 
 alerts:
 	$(PY) scripts/alert_queries.py
+
+daily:
+	$(PY) scripts/daily_check.py
 
 sweep:
 	$(PY) scripts/alert_queries.py --format sweep
