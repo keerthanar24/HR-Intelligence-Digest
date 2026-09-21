@@ -541,6 +541,25 @@ def test_red_flags() -> None:
     check("alert asks only for acknowledgement", "Acknowledgement only" in body)
     check("alert carries the boundary reminder", "public, employment-related" in body)
 
+    # Punctuation variants must match: "full-and-final" is written hyphenated
+    # as often as not, and it is the commonest non-payment phrasing here.
+    for phrasing in ("full-and-final settlement pending",
+                     "full and final settlement pending",
+                     "F&F not settled yet",
+                     "my FnF is stuck"):
+        check(f"{phrasing!r} trips non-payment",
+              "non_payment" in red_flags.matches_pattern(phrasing))
+    check("a labour-court mention trips the legal trigger",
+          "legal_or_regulatory" in red_flags.matches_pattern("took it to the labour court"))
+
+    existing = [{"escalation_id": f"E-{dt.date.today().year}-001"},
+                {"escalation_id": f"E-{dt.date.today().year}-002"}]
+    check("escalation ids continue the sequence",
+          red_flags.next_escalation_id(existing).endswith("-003"),
+          f"(got {red_flags.next_escalation_id(existing)})")
+    check("first escalation of a year starts at 001",
+          red_flags.next_escalation_id([]).endswith("-001"))
+
     suggested = red_flags.matches_pattern("Salary not paid for two months, went to labour court")
     check("scan spots non-payment wording", "non_payment" in suggested)
     check("scan spots legal wording", "legal_or_regulatory" in suggested)

@@ -51,17 +51,31 @@ four rather than letting the brief imply otherwise.
 
 ## The same-day path
 
-1. **Spot it.** During the sweep, or from `python3 scripts/red_flags.py --scan`.
-   The scan is a prompt, not a decision — a human confirms every flag.
-2. **Log it.** On the mention row set `red_flag=yes`, `red_flag_reason=<one of the five>`,
-   `status=escalated`. Add a row to `data/escalations.csv` with severity and owner.
-3. **Draft it.** `python3 scripts/red_flags.py --alert <MENTION_ID>` writes the alert to
-   `out/red-flag-<id>.txt`.
-4. **Send it, same day**, to the `red_flag` list in `config/recipients.yaml`.
-5. **Record the acknowledgement** — who replied and when — in `data/escalations.csv`
-   (`notified`, `notified_at`, `status`).
-6. **Repeat it in the digest.** Section 5 lists every flag raised that week and its status,
-   so the weekly record is complete even for items already handled.
+1. **Spot it.** From the daily check, the daily scan, or the Friday sweep.
+   `python3 scripts/red_flags.py --scan` suggests; **a human confirms every flag.**
+
+2. **Raise it — one command.** This sets the flag on the mention, logs the escalation with
+   severity and owner, drafts the alert, and sends it:
+
+   ```bash
+   python3 scripts/red_flags.py --raise M-20260919-001 \
+       --reason non_payment --severity high --send
+   ```
+
+   Without `--send` it does everything except send, and prints the alert for review.
+
+   It used to take four steps — edit the mention row, add an escalation row, draft, then
+   copy the draft into a mail client. Every one of those is somewhere an urgent thing
+   stalls on a Friday afternoon.
+
+   If sending is not configured it says so and points at the drafted file, rather than
+   failing silently and leaving the alert unsent.
+
+3. **Record the acknowledgement** — who replied and when — in `data/escalations.csv`
+   (`notified_at`, `status`).
+
+4. **It reappears in the digest.** Section 5 lists every flag raised that week and its
+   status, so the weekly record is complete even for items already handled.
 
 ## What the alert says, and does not say
 

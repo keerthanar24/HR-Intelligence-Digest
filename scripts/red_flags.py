@@ -19,13 +19,16 @@ A red flag is not a bad review. It is one of five pre-agreed triggers
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import os
+import smtplib
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import hrintel as H  # noqa: E402
+import mailer  # noqa: E402
 
 # Wording that suggests a trigger. Used only to prompt a human — never to raise
 # an escalation on its own. False positives here are cheap; misses are not.
@@ -53,9 +56,16 @@ SCAN_PATTERNS = {
 
 
 def matches_pattern(text: str) -> list[str]:
-    lowered = (text or "").lower()
+    """Which triggers the wording suggests.
+
+    Matching is done on normalised text: punctuation becomes spaces, so
+    "full-and-final", "full and final" and "full & final" all match the same
+    pattern. Without this the commonest Indian non-payment phrasing - written
+    hyphenated as often as not - slipped straight past the scan.
+    """
+    normalised = H.normalise(text)
     return [reason for reason, words in SCAN_PATTERNS.items()
-            if any(word in lowered for word in words)]
+            if any(H.normalise(word) in normalised for word in words)]
 
 
 def mention_text(row: dict) -> str:
@@ -127,6 +137,123 @@ def draft_alert(row: dict, settings: dict, recipients: dict) -> str:
     return "\n".join(lines)
 
 
+def next_escalation_id(existing: list[dict]) -> str:
+    year = dt.date.today().year
+    prefix = f"E-{year}-"
+    used = [H.to_int(r["escalation_id"][len(prefix):], 0) for r in existing
+            if (r.get("escalation_id") or "").startswith(prefix)]
+    return f"{prefix}{(max(used) + 1) if used else 1:03d}"
+
+
+def raise_flag(args, settings, recipients) -> int:
+    """Confirm a flag, record it, and get the alert out the same day.
+
+    Doing this by hand meant editing two files and copying a draft into a mail
+    client - four steps between deciding something is urgent and anyone hearing
+    about it. Each one is a place a Friday-afternoon escalation stalls.
+    """
+    if not args.reason:
+        print(f"--reason is required; one of: {', '.join(H.RED_FLAG_REASONS)}", file=sys.stderr)
+        return 2
+    if args.reason not in H.RED_FLAG_REASONS:
+        print(f"Unknown reason {args.reason!r}; one of: {', '.join(H.RED_FLAG_REASONS)}",
+              file=sys.stderr)
+        return 2
+
+    rows = H.read_csv(H.MENTIONS_CSV)
+    row = next((r for r in rows if r.get("mention_id") == args.raise_id), None)
+    if row is None:
+        print(f"No mention {args.raise_id!r} in data/mentions.csv", file=sys.stderr)
+        return 2
+
+    row["red_flag"] = "yes"
+    row["red_flag_reason"] = args.reason
+    row["status"] = "escalated"
+    with open(H.MENTIONS_CSV, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=H.MENTION_FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        for r in rows:
+            writer.writerow({k: r.get(k, "") for k in H.MENTION_FIELDS})
+
+    escalations = H.read_csv(H.ESCALATIONS_CSV)
+    if any(e.get("mention_id") == args.raise_id for e in escalations):
+        print(f"{args.raise_id} already has an escalation logged.")
+    else:
+        names = ", ".join(p.get("name", "") for p in recipients.get("red_flag", []))
+        H.append_csv(H.ESCALATIONS_CSV, H.ESCALATION_FIELDS, [{
+            "escalation_id": next_escalation_id(escalations),
+            "raised_at": dt.date.today().isoformat(),
+            "week_of": row.get("week_of", ""),
+            "mention_id": args.raise_id,
+            "entity": row.get("entity", ""),
+            "platform": row.get("platform", ""),
+            "url": row.get("url", ""),
+            "severity": args.severity,
+            "reason": args.reason,
+            "notified": names,
+            "notified_at": dt.date.today().isoformat() if args.send else "",
+            "owner": args.owner,
+            "action_taken": "Alert sent" if args.send else "Alert drafted, not yet sent",
+            "status": "open",
+            "closed_at": "",
+        }])
+        print(f"Logged escalation for {args.raise_id} ({args.severity}, {args.reason}).")
+
+    body = draft_alert(row, settings, recipients)
+    os.makedirs(args.out_dir, exist_ok=True)
+    path = os.path.join(args.out_dir, f"red-flag-{args.raise_id}.txt")
+    with open(path, "w", encoding="utf-8") as fh:
+        fh.write(body + "\n")
+    print(f"Alert drafted: {path}\n")
+
+    to, missing = [], []
+    for person in recipients.get("red_flag", []):
+        email = str(person.get("email", "")).strip()
+        if not email or H.is_todo(email):
+            missing.append(person.get("name", "?"))
+        else:
+            to.append(f"{person.get('name','')} <{email}>".strip())
+
+    if not args.send:
+        print(body)
+        print("\nNot sent. Add --send to email it now.")
+        return 0
+
+    cfg, missing_env = mailer.smtp_settings()
+    blockers = []
+    if missing:
+        blockers.append(f"no address for {', '.join(missing)}")
+    if not to:
+        blockers.append("no recipient addresses at all")
+    if missing_env:
+        blockers.append(f"{', '.join(missing_env)} not set")
+    if not cfg["sender"]:
+        blockers.append("SMTP_FROM not set")
+    if blockers:
+        print("Not sent:", file=sys.stderr)
+        for b in blockers:
+            print(f"  - {b}", file=sys.stderr)
+        print(f"\nThe alert is at {path} - send it by hand rather than letting it wait.",
+              file=sys.stderr)
+        return 1
+
+    entities = H.entity_names()
+    subject = (f"[RED FLAG] {entities.get(row.get('entity'), row.get('entity',''))} - "
+               f"{args.reason.replace('_', ' ')} - "
+               f"{row.get('post_date') or dt.date.today().isoformat()}")
+    message = mailer.build_message(
+        subject, to, cfg["sender"], body,
+        reply_to=str(settings.get("programme", {}).get("reply_to", "")).strip()
+        if not H.is_todo(settings.get("programme", {}).get("reply_to", "")) else "")
+    try:
+        mailer.send(message, cfg)
+    except (smtplib.SMTPException, OSError) as exc:
+        print(f"Send failed: {exc}\nThe alert is at {path} - send it by hand.", file=sys.stderr)
+        return 1
+    print(f"Alert sent to {len(to)} recipient(s).")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--week", help="restrict to one week_of Monday (YYYY-MM-DD)")
@@ -134,6 +261,14 @@ def main() -> int:
                         help="suggest rows whose wording looks like a trigger")
     parser.add_argument("--alert", metavar="MENTION_ID", help="draft the alert email for one mention")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
+    parser.add_argument("--raise", dest="raise_id", metavar="MENTION_ID",
+                        help="confirm a red flag: set it on the row, log the escalation, "
+                             "and draft the alert")
+    parser.add_argument("--reason", help=f"required with --raise: {', '.join(H.RED_FLAG_REASONS)}")
+    parser.add_argument("--severity", default="high", choices=["high", "critical"])
+    parser.add_argument("--owner", default="desk")
+    parser.add_argument("--send", action="store_true",
+                        help="with --raise, actually email the alert now")
     parser.add_argument("--exit-code", action="store_true",
                         help="exit 1 if the scan finds candidates, so a scheduled run "
                              "can raise them instead of passing quietly")
@@ -150,6 +285,9 @@ def main() -> int:
             print(f"Could not read --week {args.week!r}", file=sys.stderr)
             return 2
         mentions = H.mentions_for_week(mentions, H.monday_of(week_of))
+
+    if args.raise_id:
+        return raise_flag(args, settings, recipients)
 
     if args.alert:
         row = next((m for m in mentions if m.get("mention_id") == args.alert), None)

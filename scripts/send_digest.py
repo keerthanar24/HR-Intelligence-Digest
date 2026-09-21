@@ -25,14 +25,13 @@ from __future__ import annotations
 import argparse
 import os
 import smtplib
-import ssl
 import sys
-from email.message import EmailMessage
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import build_digest  # noqa: E402
 import hrintel as H  # noqa: E402
+import mailer  # noqa: E402
 
 
 def recipients(group: str = "digest") -> tuple[list[str], list[str]]:
@@ -49,16 +48,10 @@ def recipients(group: str = "digest") -> tuple[list[str], list[str]]:
 
 
 def build_message(subject: str, body_html: str, body_text: str,
-                  to: list[str], sender: str, reply_to: str = "") -> EmailMessage:
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = sender
-    message["To"] = ", ".join(to)
-    if reply_to and not H.is_todo(reply_to):
-        message["Reply-To"] = reply_to
-    message.set_content(body_text)
-    message.add_alternative(body_html, subtype="html")
-    return message
+                  to: list[str], sender: str, reply_to: str = ""):
+    if reply_to and H.is_todo(reply_to):
+        reply_to = ""
+    return mailer.build_message(subject, to, sender, body_text, body_html, reply_to)
 
 
 def main() -> int:
@@ -122,27 +115,15 @@ def main() -> int:
         print(body_text)
         return 0
 
-    host = os.environ.get("SMTP_HOST", "").strip()
-    user = os.environ.get("SMTP_USER", "").strip()
-    password = os.environ.get("SMTP_PASSWORD", "")
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    if not (host and user and password):
-        print("\nSMTP_HOST, SMTP_USER and SMTP_PASSWORD must all be set.", file=sys.stderr)
+    cfg, missing = mailer.smtp_settings()
+    if missing:
+        print(f"\n{', '.join(missing)} must be set.", file=sys.stderr)
         return 2
 
     message = build_message(subject, body_html, body_text, to, from_addr,
                             settings.get("programme", {}).get("reply_to", ""))
-    context = ssl.create_default_context()
     try:
-        if port == 465:
-            with smtplib.SMTP_SSL(host, port, context=context, timeout=30) as smtp:
-                smtp.login(user, password)
-                smtp.send_message(message)
-        else:
-            with smtplib.SMTP(host, port, timeout=30) as smtp:
-                smtp.starttls(context=context)
-                smtp.login(user, password)
-                smtp.send_message(message)
+        mailer.send(message, cfg)
     except (smtplib.SMTPException, OSError) as exc:
         print(f"\nSend failed: {exc}", file=sys.stderr)
         return 1
