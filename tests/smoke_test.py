@@ -836,6 +836,36 @@ def test_rate_limit_backoff() -> None:
         collect_feeds._last_hit.clear()
 
 
+def test_red_flag_wording_has_context() -> None:
+    """Every red-flag trigger must read as employment context.
+
+    The cross-entity Google Alert searches for unpaid, harassment, labour
+    court and layoff. Three of those passed the employment-context filter and
+    two did not: matching is word-boundary, so 'layoff' never matched
+    'layoffs', and 'labour court' was a trigger with no context term at all.
+    A news item about either was dropped before anyone saw it.
+    """
+    print("red-flag wording carries context")
+    matcher = H.EntityMatcher()
+    for text in (
+        "Westbury Kommerce staff say salary not paid",
+        "RK World Infocom layoffs reported this week",
+        "Ex-employees take RK Group to labour court over unpaid wages",
+        "Robust Kommerce faces harassment complaint",
+        "RK Group announces retrenchment at its Bengaluru unit",
+    ):
+        matches = matcher.match(text)
+        check(f"{text[:44]!r} matches an entity", bool(matches))
+        check(f"{text[:44]!r} reads as employment",
+              bool(matches) and matches[0].has_context)
+
+    # And the filter must still reject a customer complaint that names one.
+    customer = matcher.match("Ordered from Westbury Kommerce, parcel never arrived")
+    check("a delivery complaint is not employment context",
+          not customer or not customer[0].has_context,
+          f"(got {customer})")
+
+
 def test_coverage_gate() -> None:
     """An incomplete sweep must not be sendable.
 
@@ -984,7 +1014,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

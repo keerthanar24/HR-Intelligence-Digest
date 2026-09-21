@@ -175,6 +175,28 @@ context_terms:
   - probation
   - appraisal cycle
   - unpaid
+  # Plural and Indian-legal forms the singular did not catch. Matching is
+  # word-boundary, so 'layoff' never matched 'layoffs' - the commoner form -
+  # and 'labour court' is a red-flag trigger that had no context term at all,
+  # so a news item about one was dropped for lack of employment context.
+  - layoffs
+  - labour court
+  - labor court
+  - labour commissioner
+  - labour tribunal
+  - retrenchment
+  - retrenched
+  - termination
+  - severance
+  - wages
+  - wage
+  - payroll
+  - arrears
+  - posh act
+  - workplace
+  - staff
+  - workers
+  - employment
 
 # Terms that mark a hit as almost certainly out of scope (customer/product side).
 # Used as a demotion signal, not an automatic delete — a human confirms.

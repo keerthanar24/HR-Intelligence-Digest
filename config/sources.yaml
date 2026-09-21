@@ -172,6 +172,16 @@ feeds:
     enabled: false
     url: "TODO: paste Google Alerts RSS URL for Westbury Kommerce"
 
+  # The cross-entity red-flag alert. Deliberately has NO 'entity' key: it
+  # covers all four, so the collector assigns each item to whichever entity
+  # the text actually matches rather than to a fixed one. Worth checking
+  # daily - it is the closest thing to same-day cover between sweeps for
+  # anything that reaches the open web.
+  - id: google_alerts_red_flags
+    platform: news
+    enabled: false
+    url: "TODO: paste Google Alerts RSS URL for the cross-entity red-flag alert"
+
   - id: reddit_search_rk_world
     platform: reddit
     entity: rk_world
