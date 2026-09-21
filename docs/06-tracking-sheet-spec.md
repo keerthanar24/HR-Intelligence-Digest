@@ -12,8 +12,8 @@ tell you if the schema drifted.
 
 | Column | Required | Values / format | Notes |
 |---|---|---|---|
-| `mention_id` | yes | `M-YYYYMMDD-NNN` | `YYYYMMDD` is the week's start day (Friday); `NNN` sequential within the week |
-| `week_of` | yes | `YYYY-MM-DD` | Must be the week-start day (**Friday**, per `digest.week_start`). The reporting week the item counts toward |
+| `mention_id` | yes | `M-YYYYMMDD-NNN` | `YYYYMMDD` is the week's start day (Saturday); `NNN` sequential within the week |
+| `week_of` | yes | `YYYY-MM-DD` | Must be the week-start day (**Saturday**, per `digest.week_start`). The reporting week the item counts toward |
 | `captured_at` | yes | `YYYY-MM-DD` | When we found it, not when it was posted |
 | `captured_by` | yes | name or `collector` | `collector` = added by `scripts/collect_feeds.py` |
 | `entity` | yes | entity id from `config/entities.yaml` | `rk_group`, `rk_world`, `robust_kommerce`, `westbury_kommerce` |
@@ -45,7 +45,7 @@ digest is a time series and a skipped week leaves a hole that never fills.
 
 | Column | Format | Notes |
 |---|---|---|
-| `week_of` | `YYYY-MM-DD` (Friday) | The week the snapshot belongs to |
+| `week_of` | `YYYY-MM-DD` (Saturday) | The week the snapshot belongs to |
 | `captured_at`, `captured_by` | date, name | |
 | `entity`, `platform` | ids | `glassdoor` or `ambitionbox` |
 | `overall_rating` | decimal | As displayed, e.g. `3.4` |

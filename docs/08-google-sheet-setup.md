@@ -72,7 +72,7 @@ Before building the digest:
 
 1. **File → Download → Comma-separated values**, one tab at a time
 2. Save as `data/mentions.csv`, `data/ratings.csv`, `data/escalations.csv`
-3. `python3 scripts/validate_data.py --week <friday>`
+3. `python3 scripts/validate_data.py --week <saturday>`
 4. Fix every ERROR **in the sheet**, re-export, then build
 
 Fix errors in the sheet rather than in the CSV — the next export overwrites the CSV and you

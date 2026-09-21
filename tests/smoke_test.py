@@ -32,8 +32,9 @@ import collect_feeds  # noqa: E402
 import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
 
-# The reporting week is Friday-anchored (config/settings.yaml).
-WEEK = dt.date(2026, 9, 11)   # Fri 11 - Thu 17 Sep 2026
+# The reporting week runs Saturday to Friday and is reported on the Friday it
+# ends (config/settings.yaml).
+WEEK = dt.date(2026, 9, 12)   # Sat 12 - Fri 18 Sep 2026
 failures: list[str] = []
 
 
@@ -85,24 +86,29 @@ def test_weeks() -> None:
     check("plain date still parses", H.parse_date("2026-08-31") == dt.date(2026, 8, 31))
     check("day-first date still parses", H.parse_date("31/08/2026") == dt.date(2026, 8, 31))
     check("nonsense is still rejected", H.parse_date("not a date") is None)
-    check("configured week starts on Friday", H.week_start_day() == 4,
+    check("configured week starts on Saturday", H.week_start_day() == 5,
           f"(got {H.week_start_day()})")
-    check("send-day Friday resolves to the week that just closed",
+    # The week ends on the send day, so Friday reports the week finishing that
+    # same day - not the one that ended a week earlier.
+    check("the Friday send reports the week ending that day",
           H.last_complete_week(dt.date(2026, 9, 18)) == WEEK)
-    check("a Sunday falls in the week that began Friday",
-          H.week_start_of(dt.date(2026, 9, 13)) == WEEK)
-    check("a Thursday is the last day of that week",
-          H.week_start_of(dt.date(2026, 9, 17)) == WEEK)
-    check("the next Friday starts a new week",
-          H.week_start_of(dt.date(2026, 9, 18)) == dt.date(2026, 9, 18))
+    check("mid-week reports the last finished week",
+          H.last_complete_week(dt.date(2026, 9, 21)) == WEEK,
+          f"(got {H.last_complete_week(dt.date(2026, 9, 21))})")
+    check("the day after the send starts a new week",
+          H.week_start_of(dt.date(2026, 9, 19)) == dt.date(2026, 9, 19))
+    check("a Monday falls in the week that began Saturday",
+          H.week_start_of(dt.date(2026, 9, 14)) == WEEK)
+    check("the Friday is the last day of that week",
+          H.week_start_of(dt.date(2026, 9, 18)) == WEEK)
     # Every day must land in exactly one week - a gap would silently drop a
     # mention posted on the missing day.
     covered = {H.week_start_of(WEEK + dt.timedelta(days=i)) for i in range(7)}
     check("all seven days belong to one week", covered == {WEEK}, f"({covered})")
-    check("week label", H.fmt_week(WEEK) == "11–17 Sep 2026", f"(got {H.fmt_week(WEEK)!r})")
+    check("week label", H.fmt_week(WEEK) == "12–18 Sep 2026", f"(got {H.fmt_week(WEEK)!r})")
     check("cross-month label",
-          H.fmt_week(dt.date(2026, 8, 28)) == "28 Aug – 3 Sep 2026",
-          f"(got {H.fmt_week(dt.date(2026, 8, 28))!r})")
+          H.fmt_week(dt.date(2026, 8, 29)) == "29 Aug – 4 Sep 2026",
+          f"(got {H.fmt_week(dt.date(2026, 8, 29))!r})")
 
 
 def test_urls() -> None:
@@ -145,7 +151,7 @@ def test_x_collection() -> None:
           f"({items[0]['url']})")
     check("a post with no handle still gets a resolvable url",
           items[2]["url"].startswith("https://x.com/i/web/status/"))
-    check("date taken from created_at", items[0]["published"] == "2026-09-11")
+    check("date taken from created_at", items[0]["published"] == "2026-09-16")
     # Engagement is the only red-flag trigger with a numeric threshold, and X is
     # the one source that supplies it.
     check("engagement sums all four metrics",
@@ -213,7 +219,7 @@ def test_sheet_import() -> None:
           any("Red Flag Reason" in w for w in notes.warnings))
 
     # week_of is derived from Date Posted, since the sheet has no week column.
-    dated = [m for m in mentions if m["post_date"] == "2026-09-13"]
+    dated = [m for m in mentions if m["post_date"] == "2026-09-14"]
     check("week derived from Date Posted",
           dated and dated[0]["week_of"] == WEEK.isoformat(),
           f"(got {dated[0]['week_of'] if dated else None})")
@@ -269,15 +275,15 @@ def test_sheet_import_v2() -> None:
 
     by_id = {r["mention_id"]: r for r in rows}
     check("sheet-supplied mention ids are kept, not regenerated",
-          "M-20260911-002" in by_id)
+          "M-20260912-002" in by_id)
     check("'Mixed' sentiment survives the round trip",
           any(r["sentiment"] == "mixed" for r in rows))
     check("'Payroll Delay' maps to its own theme, not compensation",
-          by_id["M-20260911-002"]["themes"] == "payroll_delay")
+          by_id["M-20260912-002"]["themes"] == "payroll_delay")
     check("author type vocabulary maps",
-          by_id["M-20260911-002"]["author_type"] == "ex_employee")
+          by_id["M-20260912-002"]["author_type"] == "ex_employee")
     check("red flag reason maps to a canonical trigger",
-          by_id["M-20260911-002"]["red_flag_reason"] in H.RED_FLAG_REASONS)
+          by_id["M-20260912-002"]["red_flag_reason"] in H.RED_FLAG_REASONS)
     check("status vocabulary maps",
           all(r["status"] in H.STATUSES for r in rows))
 
@@ -382,9 +388,9 @@ def test_collector() -> None:
     check("atom link read from href",
           atom[0]["url"].startswith("https://reddit.example.invalid/"))
     check("rfc822 date parsed",
-          collect_feeds.parse_published(rss[0]["published"]) == dt.date(2026, 9, 11))
+          collect_feeds.parse_published(rss[0]["published"]) == dt.date(2026, 9, 16))
     check("iso date parsed",
-          collect_feeds.parse_published(atom[0]["published"]) == dt.date(2026, 9, 12))
+          collect_feeds.parse_published(atom[0]["published"]) == dt.date(2026, 9, 17))
     check("html stripped from summary",
           "<b>" not in collect_feeds.strip_html(rss[0]["summary"])
           and "RK World" in collect_feeds.strip_html(rss[0]["summary"]))
@@ -402,7 +408,7 @@ def test_collector() -> None:
         row = rows[0]
         check("row lands as needs_review", row["status"] == "needs_review")
         check("row is untagged for a human", row["sentiment"] == "" and row["themes"] == "")
-        check("row dated from the feed, not today", row["post_date"] == "2026-09-11")
+        check("row dated from the feed, not today", row["post_date"] == "2026-09-16")
         check("row filed in the right week", row["week_of"] == WEEK.isoformat())
         check("row records its provenance", "test_news" in row["notes"])
 

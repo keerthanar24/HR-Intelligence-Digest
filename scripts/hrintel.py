@@ -190,13 +190,16 @@ monday_of = week_start_of
 
 
 def last_complete_week(today: dt.date | None = None) -> dt.date:
-    """First day of the most recently finished reporting week.
+    """First day of the most recent reporting week that has run its course.
 
-    The digest covers the week that has already closed, so 'this week so far'
-    is never reported as a full week.
+    The week ends on the send day, so on a send day the week finishing that
+    same day is the one to report. On any other day the current week is still
+    running and the previous one is reported instead. Without this, a Friday
+    send would report the week that ended a week ago.
     """
     today = today or dt.date.today()
-    return week_start_of(today) - dt.timedelta(days=7)
+    start = week_start_of(today)
+    return start if start + dt.timedelta(days=6) <= today else start - dt.timedelta(days=7)
 
 
 def week_range(week_of: dt.date) -> tuple[dt.date, dt.date]:

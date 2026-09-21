@@ -97,9 +97,9 @@ mixed nature in the summary.
 
 ## 5. Deliverable
 
-One email per week, sent **Friday morning** covering the reporting week that closed Thursday
-night (Friday 00:00 → Thursday 23:59), **in the body of the email — no attachments**,
-structured as:
+One email per week, sent **Friday between 15:00 and 17:00**, covering the reporting week that
+ends that same day (**Saturday 00:00 → Friday**), **in the body of the email — no
+attachments**, structured as:
 
 1. **Headline** — total mentions for the week by entity, with net sentiment change week-on-week.
 2. **Rating Movement** — Glassdoor and AmbitionBox score updates per entity.
@@ -122,7 +122,7 @@ trial, and the raw sheet is shared with the same four plus the desk owner.
 
 | Phase | Weeks | Work |
 |---|---|---|
-| Phase 1 — Setup | 1–2 | Finalise entity/keyword lists, map platform sources, stand up the tracking sheet, run a manual baseline sweep |
+| Phase 1 — Setup | 1–2 | Finalise entity/keyword lists, map platform sources, stand up the tracking sheet, run a manual baseline sweep. The Week 1 digest covers the **past 60 days** rather than seven, to log historical reviews and set the rating baseline |
 | Phase 2 — Execution | 3–8 | Weekly semi-automated collection where platforms allow, supplemented by manual sweeps |
 | Phase 3 — Review | End of Month 2 | Evaluate utility; decide: automate further / expand scope / transition to HR / stop |
 

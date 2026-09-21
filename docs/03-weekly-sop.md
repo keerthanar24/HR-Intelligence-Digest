@@ -3,12 +3,23 @@
 Budget: **3–4 hours**, once a week. If it runs materially over for two weeks running, log it —
 that is a finding for the Phase 3 review, not something to absorb quietly.
 
-Slot: **Friday morning**, covering the week that closed the previous night
-(Friday 00:00 → Thursday 23:59). `scripts/build_digest.py` defaults to exactly that week.
+**Friday.** The reporting week runs **Saturday 00:00 → Friday**, so it ends on the day it is
+reported and the digest carries the week right up to the send.
 
-The team works Sunday to Thursday, and those days sit entirely inside the window. The window
-is a full seven days on purpose: a Sunday-to-Thursday window would leave Friday and Saturday
-outside every week, and a review posted then would never reach a digest.
+| | |
+|---|---|
+| **09:00–11:00** | Sweep, update the sheet, draft the email |
+| **15:00–17:00** | Send |
+
+Sending mid-afternoon gets the summary to leadership before the workweek closes, and leaves
+the morning for the sweep. `scripts/build_digest.py` with no arguments picks the right week on
+any day: on a Friday it reports the week ending that day; on any other day, the last week that
+finished.
+
+**Week 1 is different.** The baseline digest covers the **past 60 days**, to log historical
+reviews and establish the platform ratings everything later is measured against. From Week 2
+the digest covers strictly the last seven days, Saturday to Friday, and reports new mentions
+and week-on-week rating movement.
 
 ---
 

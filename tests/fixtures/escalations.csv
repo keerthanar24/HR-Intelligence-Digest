@@ -1,2 +1,2 @@
 escalation_id,raised_at,week_of,mention_id,entity,platform,url,severity,reason,notified,notified_at,owner,action_taken,status,closed_at
-E-2026-001,2026-09-18,2026-09-11,M-20260911-002,rk_world,ambitionbox,https://example.invalid/ab/4,high,non_payment,"Mahendra, Sonal, Ramesh, Akshay",2026-09-18,desk,Same-day alert sent; acknowledged by Sonal,acknowledged,
+E-2026-001,2026-09-19,2026-09-12,M-20260912-002,rk_world,ambitionbox,https://example.invalid/ab/4,high,non_payment,"Mahendra, Sonal, Ramesh, Akshay",2026-09-19,desk,Same-day alert sent; acknowledged by Sonal,acknowledged,

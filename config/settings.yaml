@@ -2,22 +2,25 @@
 
 programme:
   name: HR Intelligence Digest
-  trial_start: "2026-09-18"   # week 1 start (Friday); drives the Phase 3 review date
+  trial_start: "2026-09-19"   # week 1 start (Saturday); drives the Phase 3 review date
   owner: "TODO: name of the desk owner"
   reply_to: "TODO: hr-intel@example.com"
 
 digest:
-  # The reporting week runs Friday 00:00 to Thursday 23:59, and the digest is
-  # sent on Friday covering the week that closed the night before. week_of is
-  # the Friday that starts the week.
+  # The reporting week runs Saturday 00:00 to Friday, and the digest is sent
+  # that Friday afternoon - so the week ends on the day it is reported, and
+  # leadership gets the summary before the workweek closes. week_of is the
+  # Saturday that starts the week.
   #
-  # The team's working days are Sunday to Thursday, which sit entirely inside
-  # this window. The window is the full seven days on purpose: a five-day
-  # window would leave Friday and Saturday outside every week, and anything
-  # posted then would never reach a digest.
-  week_start: friday
+  #   Sweep window  Friday 09:00-11:00  (sweep, update the sheet, draft)
+  #   Send window   Friday 15:00-17:00
+  #
+  # Seven full days, so no date falls outside a reporting week.
+  week_start: saturday
   send_day: friday
-  send_time: "10:00"
+  send_time: "15:00"
+  sweep_window: "09:00-11:00"
+  send_window: "15:00-17:00"
   subject_template: "HR Intelligence Digest — week of {week_of} ({mention_count} mentions)"
   # The shared spreadsheet the digest links to in section 6.
   data_link: "https://docs.google.com/spreadsheets/d/155xO1Ui6aIL7KLh9qMEhbxAtnTe6b6eAnl3kO36pRGg/edit"
