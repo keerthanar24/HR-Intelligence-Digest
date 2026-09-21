@@ -46,6 +46,11 @@ entities:
       # use in reviews. Searched now, flagged until HR confirms the link.
       - ValueCart
       - Value Cart
+      # AmbitionBox lists the company under the slug 'r-k-world-infocom',
+      # so the registered name is probably RK World Infocom. That is the name
+      # on the offer letter, and the one reviewers tend to copy.
+      - RK World Infocom
+      - R K World Infocom
     exclude_terms:
       - RK World Tours
 

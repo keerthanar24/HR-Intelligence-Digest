@@ -23,6 +23,27 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import hrintel as H  # noqa: E402
 
 
+# Domain a platform's company URL should live on. A URL filed under the wrong
+# platform sends the sweeper to the wrong site every week and mislabels every
+# row it produces.
+PLATFORM_DOMAINS = {
+    "ambitionbox": ["ambitionbox.com"],
+    "glassdoor": ["glassdoor.com", "glassdoor.co.in", "glassdoor.co.uk", "glassdoor.ca"],
+    "linkedin": ["linkedin.com"],
+    "indeed": ["indeed.com", "indeed.co.in"],
+    "quora": ["quora.com"],
+    "reddit": ["reddit.com"],
+    "youtube": ["youtube.com"],
+    "x": ["x.com", "twitter.com"],
+    "google_reviews": ["google.com", "google.co.in", "maps.app.goo.gl"],
+}
+
+# Fragments that mean the link shows a filtered subset. A location-scoped
+# reviews page hides reviews from every other office, and nothing in the digest
+# reveals the gap.
+SCOPED_URL_MARKERS = ["/locations/", "-location", "/departments/", "-department"]
+
+
 class Report:
     def __init__(self) -> None:
         self.errors: list[str] = []
@@ -76,12 +97,30 @@ def check_config(report: Report) -> None:
 
     todo_urls = 0
     for platform in sources.get("platforms", []):
+        expected = PLATFORM_DOMAINS.get(platform["id"], [])
         for entity_id, url in (platform.get("urls") or {}).items():
             if entity_id not in entity_ids:
                 report.error(f"config/sources.yaml: {platform['id']} references unknown entity "
                              f"{entity_id!r}.")
             if H.is_todo(url):
                 todo_urls += 1
+                continue
+            if not url or url.strip().lower() == "none":
+                continue
+
+            host = H.canonical_url(url).split("/")[0]
+            if expected and not any(host == d or host.endswith("." + d) for d in expected):
+                report.error(
+                    f"config/sources.yaml: the {platform['id']} URL for {entity_id} points at "
+                    f"{host!r}, not {' or '.join(expected)}. It is filed under the wrong "
+                    "platform."
+                )
+            if any(marker in url.lower() for marker in SCOPED_URL_MARKERS):
+                report.warn(
+                    f"config/sources.yaml: the {platform['id']} URL for {entity_id} is scoped to "
+                    "a location or department, so the sweep would never see reviews from "
+                    "elsewhere. Use the company-level page."
+                )
     if todo_urls:
         report.warn(f"config/sources.yaml: {todo_urls} platform URL(s) still TODO — "
                     "the manual sweep cannot be run consistently until these are filled in.")

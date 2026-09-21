@@ -20,10 +20,17 @@ platforms:
       Highest expected volume for India. Record the overall rating and review count
       into data/ratings.csv on every sweep, even when no new review appeared.
     urls:
-      rk_group: "TODO: paste AmbitionBox company URL"
-      rk_world: "TODO: paste AmbitionBox company URL"
-      robust_kommerce: "TODO: paste AmbitionBox company URL"
-      westbury_kommerce: "TODO: paste AmbitionBox company URL"
+      # The sweep must open the company-level REVIEWS page, not a location- or
+      # overview-scoped one, or reviews from other offices are never seen and
+      # the gap is invisible. URLs marked (derived) were built from the slug in
+      # the link supplied and need one click to confirm before Week 1.
+      #
+      # supplied: .../reviews/r-dot-k-dot-group-reviews/bengaluru-location
+      rk_group: "https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews"   # (derived) drop the Bengaluru filter
+      # supplied: .../overview/r-k-world-infocom-overview/locations/bengaluru-offices
+      rk_world: "https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews"   # (derived) reviews page, all locations
+      robust_kommerce: "TODO: paste AmbitionBox reviews URL (not yet supplied)"
+      westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
 
   - id: glassdoor
     name: Glassdoor
@@ -33,7 +40,7 @@ platforms:
     captures: [reviews, ratings, interviews, salaries]
     notes: Record rating + review count weekly into data/ratings.csv.
     urls:
-      rk_group: "TODO: paste Glassdoor company URL"
+      rk_group: "TODO: paste Glassdoor company URL (the 4 supplied were AmbitionBox)"
       rk_world: "TODO: paste Glassdoor company URL"
       robust_kommerce: "TODO: paste Glassdoor company URL"
       westbury_kommerce: "TODO: paste Glassdoor company URL"
