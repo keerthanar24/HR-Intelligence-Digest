@@ -293,9 +293,15 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
         report.warn(f"week {week_of}: {len(untagged)} mention(s) still untagged; "
                     "they will be excluded from net sentiment.")
 
+    sources = H.load_yaml("sources")
+    urls = {p["id"]: (p.get("urls") or {}) for p in sources.get("platforms", [])}
     for platform in ("glassdoor", "ambitionbox"):
         covered = {r.get("entity") for r in week_ratings if r.get("platform") == platform}
-        missing = [name for eid, name in entities.items() if eid not in covered]
+        # An entity with no page on a platform can never have a snapshot there.
+        absent = {eid for eid, url in urls.get(platform, {}).items()
+                  if str(url).strip().lower() == "none"}
+        missing = [name for eid, name in entities.items()
+                   if eid not in covered and eid not in absent]
         if missing:
             report.warn(f"week {week_of}: no {platform} rating snapshot for "
                         f"{', '.join(missing)} — section 2 will be incomplete.")

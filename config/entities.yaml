@@ -87,9 +87,13 @@ entities:
       - RobustKommerce
       - Robust E-Commerce
       - Robust Ecommerce
-      # Confirmed 2026-09-21: AmbitionBox lists this company as Robust Results.
+    needs_confirmation:
+      # Promoted when the AmbitionBox page .../robust-results-overview was
+      # given as this entity's, then demoted on 2026-09-21 when no Robust
+      # Kommerce page could be found on AmbitionBox at all. The alias rests
+      # entirely on that page, so if the page is a different company this name
+      # is not ours. Still searched, but flagged until someone confirms.
       - Robust Results
-    needs_confirmation: []
     # Glassdoor lists this company as plain "Robust" (employer id 1882698).
     # Deliberately NOT added as an alias: on its own the word matches "robust
     # growth", "robust system" and so on, and would bury the sheet in noise.

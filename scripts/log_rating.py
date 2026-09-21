@@ -32,6 +32,11 @@ def platform_url(platform: str, entity: str) -> str:
     return ""
 
 
+def has_no_page(platform: str, entity: str) -> bool:
+    """True where config records the entity as absent from the platform."""
+    return platform_url(platform, entity).strip().lower() == "none"
+
+
 def show_status(week: dt.date) -> int:
     entities = H.entity_names()
     rows = [r for r in H.read_csv(H.RATINGS_CSV) if r.get("week_of") == week.isoformat()]
@@ -47,13 +52,15 @@ def show_status(week: dt.date) -> int:
                 rating = row.get("overall_rating") or "?"
                 count = row.get("review_count") or "?"
                 print(f"{label} {rating:>5}  ({count} reviews)")
+            elif has_no_page(platform, entity_id):
+                print(f"{label}     -  no page on this platform")
             else:
                 missing += 1
                 url = platform_url(platform, entity_id)
                 print(f"{label}     -  NOT RECORDED")
                 if url:
                     print(f"  {'':<33}{url}")
-    total = len(entities) * len(REVIEW_PLATFORMS)
+    total = sum(1 for e in entities for p in REVIEW_PLATFORMS if not has_no_page(p, e))
     print(f"\n{total - missing}/{total} recorded.")
     if missing:
         print("Record each one with:")

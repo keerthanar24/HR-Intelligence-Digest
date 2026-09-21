@@ -29,8 +29,12 @@ platforms:
       rk_group: "https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews"   # Bengaluru filter dropped
       # supplied: .../overview/r-k-world-infocom-overview/locations/bengaluru-offices
       rk_world: "https://www.ambitionbox.com/reviews/r-k-world-infocom-reviews"   # reviews page, all locations
-      # supplied: .../overview/robust-results-overview  -- listed as "Robust Results"
-      robust_kommerce: "https://www.ambitionbox.com/reviews/robust-results-reviews"   # reviews page
+      # none = confirmed absent, as opposed to not yet filled in. The programme
+      # owner could not find any Robust Kommerce page on AmbitionBox
+      # (2026-09-21). An earlier link, .../overview/robust-results-overview,
+      # was supplied for this entity; if that page is not Robust Kommerce then
+      # "Robust Results" is not one of its names either - see entities.yaml.
+      robust_kommerce: "none"
       westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
 
   - id: glassdoor
