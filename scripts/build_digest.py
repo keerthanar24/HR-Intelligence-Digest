@@ -440,9 +440,10 @@ def sheet_contents(mentions, ratings, escalations, week_of):
     ]
     listed = [f"{n} {word}{'' if n == 1 else 's'}" for n, word in counts if n]
     if not listed:
-        return ("nothing has been logged for this week yet, so the sheet shows "
-                "the earlier weeks only")
-    return ", ".join(listed[:-1]) + (" and " if len(listed) > 1 else "") + listed[-1]
+        return ("Nothing has been logged for this week yet; the sheet still holds "
+                "every earlier week.")
+    held = ", ".join(listed[:-1]) + (" and " if len(listed) > 1 else "") + listed[-1]
+    return f"For this week it holds {held}. Every earlier week is in the same tabs."
 
 
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
@@ -657,8 +658,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">6 · Data</h3>')
     if data_link and not H.is_todo(data_link):
         h.append(f'<p style="margin:0 0 8px;"><a href="{E(data_link)}" style="color:#2b6cb0;">'
-                 f'Open the tracking sheet</a> — for this week it holds {E(holdings)}. '
-                 'Every earlier week is in the same tabs.</p>')
+                 f'Open the tracking sheet</a> — {E(holdings)}</p>')
     else:
         h.append('<p style="margin:0 0 8px;color:#a12622;">Tracking sheet link not set — '
                  'add <code>digest.data_link</code> in config/settings.yaml.</p>')
@@ -768,8 +768,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     t.append("6. DATA")
     if data_link and not H.is_todo(data_link):
         t.append(data_link)
-        t.append(f"For this week the sheet holds {holdings}. "
-                 "Every earlier week is in the same tabs.")
+        t.append(holdings)
     else:
         t.append("Tracking sheet link not set — add digest.data_link in config/settings.yaml.")
     t.append("")
