@@ -419,6 +419,18 @@ def test_digest() -> None:
     check("untagged rows disclosed", "not yet sentiment-tagged" in body_html)
     check("data link rendered", "sheets.example.invalid" in body_html)
 
+    # Mail clients clip horizontal overflow rather than scrolling, so a table
+    # wider than the viewport silently loses its rightmost columns.
+    import re as _re
+    tables = _re.findall(r"<table.*?</table>", body_html, _re.S)
+    check("every table uses fixed layout",
+          all("table-layout:fixed" in t for t in tables), f"({len(tables)} tables)")
+    for i, table in enumerate(tables, 1):
+        widths = [int(w.rstrip("%")) for w in _re.findall(r'width="(\d+)%"', table)]
+        check(f"table {i} column widths sum to 100%", sum(widths) == 100, f"(got {sum(widths)})")
+    check("long cells wrap instead of overflowing",
+          "word-break:break-word" in body_html and "overflow-wrap:anywhere" in body_html)
+
     # A week that has already ended is never labelled partial; one still
     # running must be, or a three-day count reads as a full week.
     check("a finished week is not marked partial", not stats["partial"],

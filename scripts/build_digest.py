@@ -282,15 +282,28 @@ def red_flag_rows(mentions, escalations, entities, platforms):
 E = html.escape
 
 
-def h_table(headers, rows, aligns=None):
+def h_table(headers, rows, aligns=None, widths=None):
+    """An email-safe table that cannot overflow its container.
+
+    Without table-layout:fixed a long summary widens its column until the table
+    runs past the viewport, and mail clients clip the overflow rather than
+    scrolling - the rightmost columns simply vanish. Fixed layout plus explicit
+    percentage widths and word-break keeps every column on screen and wraps the
+    text instead.
+    """
     aligns = aligns or ["left"] * len(headers)
+    if not widths:
+        share = round(100 / len(headers), 2)
+        widths = [f"{share}%"] * len(headers)
     out = ['<table role="presentation" cellpadding="8" cellspacing="0" border="0" '
-           'style="border-collapse:collapse;width:100%;font-size:14px;margin:0 0 8px;">']
+           'style="border-collapse:collapse;width:100%;max-width:100%;table-layout:fixed;'
+           'font-size:14px;margin:0 0 8px;">']
     out.append("<tr>")
-    for header, align in zip(headers, aligns):
+    for header, align, width in zip(headers, aligns, widths):
         out.append(
-            f'<th align="{align}" style="background:#f2f4f7;border:1px solid #d7dbe0;'
-            f'font-weight:600;color:#1f2933;">{E(str(header))}</th>'
+            f'<th width="{width}" align="{align}" style="width:{width};background:#f2f4f7;'
+            f'border:1px solid #d7dbe0;font-weight:600;color:#1f2933;'
+            f'word-break:break-word;">{E(str(header))}</th>'
         )
     out.append("</tr>")
     for index, row in enumerate(rows):
@@ -299,7 +312,8 @@ def h_table(headers, rows, aligns=None):
         for cell, align in zip(row, aligns):
             out.append(
                 f'<td align="{align}" style="background:{bg};border:1px solid #e3e6ea;'
-                f'color:#1f2933;vertical-align:top;">{cell}</td>'
+                f'color:#1f2933;vertical-align:top;word-break:break-word;'
+                f'overflow-wrap:anywhere;">{cell}</td>'
             )
         out.append("</tr>")
     out.append("</table>")
@@ -409,6 +423,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
           E(r["count_delta"]), E(r["net"]), E(r["net_delta"])]
          for r in heads],
         ["left", "right", "right", "right", "right"],
+        ["32%", "15%", "18%", "18%", "17%"],
     ))
     if untagged:
         h.append(
@@ -424,6 +439,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             [[E(r["entity"]), E(r["platform"]), E(r["rating"]), E(r["rating_delta"]),
               r["reviews"], E(r["reviews_delta"])] for r in ratings],
             ["left", "left", "right", "right", "right", "right"],
+            ["26%", "17%", "13%", "16%", "13%", "15%"],
         ))
     else:
         h.append('<p style="margin:0 0 8px;">No rating snapshot recorded for this week. '
@@ -446,7 +462,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 E(H.SENTIMENT_LABELS.get((m.get("sentiment") or "").lower(), "Untagged")),
                 cell,
             ])
-        h.append(h_table(["Entity", "Platform", "Date", "Sentiment", "Summary"], rows))
+        # The summary is the column people read, so it gets half the width.
+        h.append(h_table(["Entity", "Platform", "Date", "Sentiment", "Summary"], rows,
+                         widths=["15%", "12%", "11%", "12%", "50%"]))
     else:
         h.append('<p style="margin:0 0 8px;">No new reviews or posts this week.</p>')
 
@@ -507,6 +525,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
               (E(truncate(r["summary"], 120)) +
                (f' <a href="{E(r["url"])}" style="color:#2b6cb0;">link</a>' if r["url"] else ""))]
              for r in flags],
+            widths=["14%", "14%", "11%", "10%", "14%", "11%", "26%"],
         ))
     else:
         h.append('<p style="margin:0 0 8px;">None this week.</p>')
