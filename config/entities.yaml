@@ -55,6 +55,9 @@ entities:
       - Valuecart
       - ValueKart
       - Value Kart
+      # Glassdoor lists the company as "ValueCart.in".
+      - ValueCart.in
+      - Valuecart.in
     needs_confirmation: []
     exclude_terms: []
 
