@@ -830,6 +830,30 @@ def test_rate_limit_backoff() -> None:
         except urllib.error.HTTPError:
             check("a permanently throttled feed raises rather than returning empty", True)
         check("and it gave up after the attempt limit", calls["n"] == 4, f"(got {calls['n']})")
+
+        # Retrying is per-request, so without a cap the worst case multiplies
+        # across every feed. One run must not spend twenty minutes sleeping.
+        collect_feeds.reset_budget()
+        sleeps.clear()
+        calls["n"] = 0
+        rounds = 10          # 10 x 14s of backoff comfortably exceeds the budget
+        for _ in range(rounds):
+            try:
+                collect_feeds.fetch("https://www.reddit.com/search.rss?q=z", "agent", 10)
+            except urllib.error.HTTPError:
+                pass
+        # The budget governs retry waits, not the polite spacing between
+        # requests to one host - spacing is normal operation and scales with
+        # the number of feeds, not with how badly a host is throttling.
+        check("total retry backoff is capped for the run",
+              collect_feeds._backoff_spent <= collect_feeds.TOTAL_BACKOFF_BUDGET,
+              f"(spent {collect_feeds._backoff_spent}s, "
+              f"budget {collect_feeds.TOTAL_BACKOFF_BUDGET}s)")
+        check("and once it is spent a feed fails fast rather than retrying",
+              calls["n"] < rounds * 4,
+              f"(made {calls['n']} of a possible {rounds * 4} attempts)")
+        check("a fresh run gets its patience back",
+              (collect_feeds.reset_budget() or collect_feeds._backoff_spent) == 0)
     finally:
         collect_feeds.urllib.request.urlopen = real_open
         collect_feeds.time.sleep = real_sleep

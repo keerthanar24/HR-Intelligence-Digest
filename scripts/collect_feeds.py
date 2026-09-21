@@ -171,7 +171,21 @@ def fetch_x_search(query: str, token: str, timeout: int, max_results: int = 100)
 # shares its IP. This is a weekly job, so patience is nearly free and a skipped
 # entity is not.
 MIN_SECONDS_BETWEEN_HITS = 5.0
+# Retrying is per-request, so the worst case multiplies: 4 attempts x (5s
+# spacing + a 20s timeout) + 14s of backoff is nearly two minutes for ONE
+# feed, and there are nine. A run that takes twenty minutes to report an empty
+# week is its own kind of broken, so patience is capped for the run as a whole
+# - once the budget is spent, feeds fail fast and say so.
+TOTAL_BACKOFF_BUDGET = 90.0
 _last_hit: dict[str, float] = {}
+_backoff_spent = 0.0
+
+
+def reset_budget() -> None:
+    """Start a fresh run's patience budget (and host spacing)."""
+    global _backoff_spent
+    _backoff_spent = 0.0
+    _last_hit.clear()
 
 
 def _space_out(host: str) -> None:
@@ -198,15 +212,21 @@ def fetch(url: str, user_agent: str, timeout: int, attempts: int = 4) -> bytes:
             with urllib.request.urlopen(request, timeout=timeout) as response:
                 return response.read()
         except urllib.error.HTTPError as exc:
+            global _backoff_spent
             if exc.code not in (429, 503) or attempt == attempts:
                 raise
             wait = delay
             retry_after = exc.headers.get("Retry-After") if exc.headers else None
             if retry_after and str(retry_after).strip().isdigit():
                 wait = min(int(str(retry_after).strip()), 30)
+            if _backoff_spent + wait > TOTAL_BACKOFF_BUDGET:
+                print(f"  {host} returned {exc.code}; the run has spent its "
+                      f"{TOTAL_BACKOFF_BUDGET:.0f}s of retry budget, giving up on this feed")
+                raise
             print(f"  {host} returned {exc.code}; waiting {wait}s "
                   f"(attempt {attempt} of {attempts})")
             time.sleep(wait)
+            _backoff_spent += wait
             delay *= 2
     raise urllib.error.HTTPError(url, 429, "rate limited after retries", None, None)
 
@@ -380,6 +400,7 @@ def main() -> int:
     collector = settings.get("collector", {})
     user_agent = collector.get("user_agent", "HR-Intelligence-Digest/1.0")
     timeout = int(collector.get("timeout_seconds", 20))
+    reset_budget()
     delay = float(collector.get("delay_seconds", 2))
     context_required = set(collector.get("context_required_for", []))
 
