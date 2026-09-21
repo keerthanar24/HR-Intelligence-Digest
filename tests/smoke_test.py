@@ -111,16 +111,12 @@ def test_x_collection() -> None:
     query = collect_feeds.build_x_query(entities["rk_world"])
     check("query fits the API tier limit",
           len(query) <= collect_feeds.X_QUERY_LIMIT, f"({len(query)} chars)")
-    # ValueCart is its own company, so it must NOT widen RK World Infocom's
-    # query - that would file ValueCart's chatter under the wrong entity.
-    check("a separate company is not folded into this query",
-          '"ValueCart"' not in query)
+    # ValueCart is a separate company and out of scope, so it must not appear
+    # in any entity's query - not RK World Infocom's, and not at all.
+    check("out-of-scope company absent from the query", "ValueCart" not in query)
     check("the registered-name variants are in the query",
           '"RK World Infocom"' in query and '"Worldinfocom"' in query)
-    vc_query = collect_feeds.build_x_query(entities["valuecart"])
-    check("ValueCart has a query of its own", '"ValueCart"' in vc_query)
-    check("ValueCart's query does not pull in RK World Infocom",
-          "Worldinfocom" not in vc_query)
+    check("out-of-scope company is not an entity", "valuecart" not in entities)
     check("retweets excluded so a viral post is one row", "-is:retweet" in query)
     check("context spans more than pay",
           all(term in query for term in ("harassment", "layoff", "interview")))
@@ -131,7 +127,7 @@ def test_x_collection() -> None:
 
     with open(os.path.join(FIXTURES, "x-search-response.json"), encoding="utf-8") as fh:
         items = collect_feeds.parse_x_payload(json.load(fh))
-    check("all posts parsed", len(items) == 3, f"(got {len(items)})")
+    check("all posts parsed", len(items) == 4, f"(got {len(items)})")
     check("url built from the author handle",
           items[0]["url"] == "https://x.com/exemployee_blr/status/1800000000000000001",
           f"({items[0]['url']})")
@@ -147,8 +143,12 @@ def test_x_collection() -> None:
     feed = {"id": "x_search_rk_world", "platform": "x", "entity": "rk_world"}
     rows, skipped = collect_feeds.collect_from_items(
         items, feed, matcher, H.platform_names(), WEEK, set(), {"x"})
-    check("similarly-named travel company excluded", len(rows) == 2, f"(got {len(rows)})")
-    check("the exclusion was the Tours post", skipped["no_entity"] == 1)
+    # Dropped: the "RK World Tours" post (different company) and the ValueCart
+    # post (separate company, deliberately out of scope).
+    check("out-of-scope and wrong-company posts dropped", len(rows) == 2, f"(got {len(rows)})")
+    check("both exclusions counted", skipped["no_entity"] == 2, f"(got {skipped['no_entity']})")
+    check("no ValueCart post reaches the sheet",
+          not any("ValueCart" in r["title_or_snippet"] for r in rows))
 
     by_url = {r["url"]: r for r in rows}
     hot = by_url["https://x.com/exemployee_blr/status/1800000000000000001"]

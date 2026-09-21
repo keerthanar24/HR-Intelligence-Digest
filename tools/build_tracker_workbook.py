@@ -1,5 +1,5 @@
 """Apply the docs/09-workbook-review.md fixes to the Master Tracker."""
-import sys, os, subprocess
+import sys
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -23,8 +23,7 @@ THIN = Side(style="thin", color="BCCCDC")
 BORDER = Border(bottom=THIN)
 
 # --- controlled vocabularies (must stay in step with config/column_map.yaml) ---
-ENTITIES = ["RK Group", "ValueCart", "RK World Infocom", "Robust Kommerce",
-            "Westbury Kommerce"]
+ENTITIES = ["RK Group", "RK World Infocom", "Robust Kommerce", "Westbury Kommerce"]
 PLATFORMS = ["AmbitionBox", "Glassdoor", "LinkedIn", "X / Twitter", "Reddit",
              "Quora", "YouTube", "Google Reviews", "Indeed"]
 # 'Red Flag' removed: it is not a point on a sentiment scale and there is a

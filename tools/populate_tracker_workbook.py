@@ -1,5 +1,5 @@
 """Fill Keyword_Matrix from the alias register, and add the Guide tab."""
-import subprocess, sys, os
+import subprocess, sys
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment
 from openpyxl.utils import get_column_letter

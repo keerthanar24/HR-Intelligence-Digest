@@ -14,14 +14,16 @@
 # Group structure, confirmed by the programme owner 2026-09-21:
 #
 #   RK Group (parent)
-#    |- ValueCart
 #    |- RK World Infocom Pvt Ltd
 #    |- Robust Kommerce
 #    \- Westbury Kommerce
 #
-# ValueCart is a SEPARATE COMPANY, not a brand of RK World Infocom
-# (confirmed 2026-09-21, correcting an earlier reading). It gets its own row
-# in the digest headline and needs its own review pages and baseline.
+# ValueCart is a separate company under the same parent, and is deliberately
+# OUT OF SCOPE for this trial (programme owner, 2026-09-21). Its names are not
+# in the register, so its chatter matches nothing and is neither tracked nor
+# misfiled against RK World Infocom. Do not add them back without asking: it
+# was briefly in scope and its Glassdoor baseline was 4.70 on 14 reviews, so
+# adding it later changes the group total and the headline range.
 
 entities:
   - id: rk_group
@@ -42,24 +44,6 @@ entities:
     exclude_terms:
       - RK Group of Hotels
       - RK Group Dubai
-
-  - id: valuecart
-    name: ValueCart
-    legal_name: "TODO: registered name, if different from ValueCart"
-    role: Operating entity (subsidiary of RK Group)
-    parent: rk_group
-    aliases:
-      - ValueCart
-      - Value Cart
-      - Value-Cart
-      - Valuecart
-      - ValueKart
-      - Value Kart
-      # Glassdoor lists the company as "ValueCart.in".
-      - ValueCart.in
-      - Valuecart.in
-    needs_confirmation: []
-    exclude_terms: []
 
   - id: rk_world
     name: RK World Infocom

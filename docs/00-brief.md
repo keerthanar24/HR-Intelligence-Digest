@@ -25,7 +25,6 @@ that escalate the same day. See `docs/04-red-flag-protocol.md`.
 
 ```
 RK Group  (parent / corporate brand)
- |- ValueCart
  |- RK World Infocom Pvt Ltd
  |- Robust Kommerce
  \- Westbury Kommerce
@@ -34,14 +33,20 @@ RK Group  (parent / corporate brand)
 | # | Entity | Role | Also appears as |
 |---|--------|------|-----------------|
 | 1 | RK Group | Parent / corporate brand | R.K. Group |
-| 2 | ValueCart | Subsidiary | Value Cart, ValueKart |
-| 3 | RK World Infocom | Subsidiary | R K World Infocom, Rk Worldinfocom |
-| 4 | Robust Kommerce | Subsidiary | Robust Results *(unconfirmed)*, Robust |
-| 5 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
+| 2 | RK World Infocom | Subsidiary | R K World Infocom, Rk Worldinfocom |
+| 3 | Robust Kommerce | Subsidiary | Robust Results *(unconfirmed)*, Robust |
+| 4 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
 
-**ValueCart is a separate company**, not a brand of RK World Infocom, so it gets its own row
-in the digest headline. It was briefly treated as an alias during setup; that was corrected on
-2026-09-21, and it still needs its own review-site pages and baseline.
+**ValueCart — deliberately out of scope.** It is a separate company under the same parent, and
+the programme owner excluded it from the trial on 2026-09-21. Its names are not in the
+register, so its chatter matches nothing and is neither tracked nor misfiled against RK World
+Infocom.
+
+It was briefly in scope, long enough to record a Glassdoor baseline of **4.70 on 14 reviews,
+91% recommend** — the highest in the group. That figure is noted here rather than in the data
+so the exclusion stays clean, and so that anyone proposing to add ValueCart later knows it
+would raise the group total and widen the headline range. Adding it back is a scope decision
+for the four, not a desk one.
 
 We track **common misspellings and previous names** alongside the registered names — employees
 rarely write the registered entity name. The maintained list lives in `config/entities.yaml`

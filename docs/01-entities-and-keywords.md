@@ -68,7 +68,6 @@ Review the list at the end of Week 2 (the end of Phase 1) and again at the Phase
 | Entity | Aliases | Confirmed via | Unconfirmed |
 |---|---|---|---|
 | RK Group | 7 | — | none |
-| ValueCart | 6 | LinkedIn company page | none |
 | RK World Infocom | 11 | R K World Infocom (AmbitionBox), Rk Worldinfocom (Glassdoor) | none |
 | Robust Kommerce | 7 | — | `Robust Results` — rests on one AmbitionBox page that may be a different company |
 | Westbury Kommerce | 7 | — | none |
