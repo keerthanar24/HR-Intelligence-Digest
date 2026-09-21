@@ -14,6 +14,7 @@ Exit code 0 = clean or warnings only, 1 = errors found.
 from __future__ import annotations
 
 import argparse
+import collections
 import datetime as dt
 import os
 import sys
@@ -231,6 +232,53 @@ def check_escalations(report: Report, mentions: list[dict], escalations: list[di
             report.warn(f"{where}: unusual status {esc.get('status')!r}.")
 
 
+def check_rating_continuity(report: Report, ratings: list[dict]) -> None:
+    """Catch a snapshot read from a different page than last week's.
+
+    A location filter, the Overview tab instead of Reviews, or a wrong employer
+    id all produce a perfectly plausible number. The tell is discontinuity: a
+    review count that jumps or drops far more than a week of reviews could, or
+    a rating that moves further than a real week's reviews would move it. Both
+    would otherwise be reported as genuine movement in section 2.
+    """
+    series = collections.defaultdict(list)
+    for row in ratings:
+        week = H.parse_date(row.get("week_of", ""))
+        if week:
+            series[(row.get("entity"), row.get("platform"))].append((week, row))
+
+    entities = H.entity_names()
+    for (entity_id, platform), rows in sorted(series.items()):
+        rows.sort(key=lambda pair: pair[0])
+        label = f"{entities.get(entity_id, entity_id)}/{platform}"
+        for (prev_week, prev), (week, now) in zip(rows, rows[1:]):
+            gap_weeks = max(1, (week - prev_week).days // 7)
+
+            before = H.to_int(prev.get("review_count"), -1)
+            after = H.to_int(now.get("review_count"), -1)
+            if before > 0 and after >= 0:
+                if after < before:
+                    report.warn(
+                        f"{label}: review count fell from {before} to {after} in week "
+                        f"{week}. Reviews are rarely removed - more likely this snapshot "
+                        "came from a filtered or different page than last week's.")
+                elif after > before * 1.5 and after - before > 10:
+                    report.warn(
+                        f"{label}: review count jumped from {before} to {after} in week "
+                        f"{week}. Check it is the same page and scope as last week "
+                        "before reading the rating change as real.")
+
+            was = H.to_float(prev.get("overall_rating"))
+            is_now = H.to_float(now.get("overall_rating"))
+            if was is not None and is_now is not None:
+                move = abs(is_now - was) / gap_weeks
+                if move >= 0.5 and before > 20:
+                    report.warn(
+                        f"{label}: rating moved {is_now - was:+.2f} in week {week} on a base "
+                        f"of {before} reviews. That is a large move for the volume - "
+                        "confirm it is the same page before reporting it.")
+
+
 def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
                    week_of: dt.date | None) -> None:
     if week_of is None:
@@ -279,6 +327,7 @@ def main() -> int:
     check_config(report)
     check_mentions(report, mentions, week_of)
     check_escalations(report, mentions, escalations)
+    check_rating_continuity(report, ratings)
     check_coverage(report, mentions, ratings, week_of)
 
     print(f"Checked {len(mentions)} mention(s), {len(ratings)} rating snapshot(s), "
