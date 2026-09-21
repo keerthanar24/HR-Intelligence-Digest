@@ -363,6 +363,22 @@ def test_digest() -> None:
     check("untagged rows disclosed", "not yet sentiment-tagged" in body_html)
     check("data link rendered", "sheets.example.invalid" in body_html)
 
+    # A week that has already ended is never labelled partial; one still
+    # running must be, or a three-day count reads as a full week.
+    check("a finished week is not marked partial", not stats["partial"],
+          f"(days_elapsed {stats['days_elapsed']})")
+    check("no partial notice on a finished week",
+          "PARTIAL WEEK" not in body_text and "Partial week" not in body_html)
+    running = H.week_start_of(dt.date.today())
+    _, part_html, part_text, part_stats = build_digest.build(running, settings)
+    if part_stats["days_elapsed"] < 7:
+        check("a running week is marked partial", part_stats["partial"])
+        check("the notice names how many days", "of 7 days" in part_text)
+        check("the subject warns too",
+              "PARTIAL" in build_digest.build(running, settings)[0])
+        check("the notice is in both bodies",
+              "Partial week" in part_html and "PARTIAL WEEK" in part_text)
+
     # Appraisal appears twice this week and must surface as a recurring theme.
     check("recurring theme surfaced", "Appraisal" in body_html)
 

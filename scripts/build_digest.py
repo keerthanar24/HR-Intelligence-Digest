@@ -282,7 +282,17 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     data_link = digest_cfg.get("data_link", "")
     week_label = H.fmt_week(week_of)
 
+    # A week built before it has ended covers fewer than seven days. Say so:
+    # three days read as seven would understate the week and distort every
+    # week-on-week comparison drawn from it.
+    today = dt.date.today()
+    week_end = week_of + dt.timedelta(days=6)
+    days_elapsed = min(7, max(0, (today - week_of).days + 1)) if today <= week_end else 7
+    partial = days_elapsed < 7
+
     stats = {
+        "partial": partial,
+        "days_elapsed": days_elapsed,
         "total": total,
         "total_prev": total_prev,
         "untagged": untagged,
@@ -304,6 +314,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         f'· net sentiment {E(sentiment_text(net_now))} '
         f'({E(delta_text(net_now, net_prev, digits=2))})</p>'
     )
+
+    if partial:
+        h.append(
+            '<p style="margin:0 0 16px;padding:8px 10px;background:#FBF0D9;border-radius:4px;'
+            f'font-size:13px;color:#8a6d3b;"><strong>Partial week</strong> \u2014 covers '
+            f'{days_elapsed} of 7 days, to {today.strftime("%-d %b")}. The week closes '
+            f'{week_end.strftime("%-d %b")}; counts and comparisons here are incomplete.</p>'
+        )
 
     # 1. Headline
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">1 · Headline</h3>')
@@ -416,6 +434,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         f"net sentiment {sentiment_text(net_now)} "
         f"({delta_text(net_now, net_prev, digits=2)} vs previous week)"
     )
+    if partial:
+        t.append(f"PARTIAL WEEK - covers {days_elapsed} of 7 days, to "
+                 f"{today.strftime('%-d %b')}. The week closes {week_end.strftime('%-d %b')}; "
+                 "counts and comparisons here are incomplete.")
     t.append("")
     t.append("1. HEADLINE")
     head_rows = [[r["entity"], r["count"], r["count_delta"], r["net"], r["net_delta"]]
@@ -491,6 +513,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     subject = subject_template.format(
         week_of=week_label, mention_count=total, red_flags=len(flags),
     )
+    if partial:
+        subject += f" \u00b7 PARTIAL ({days_elapsed}/7 days)"
     if flags:
         subject += f" · {len(flags)} red flag{'s' if len(flags) != 1 else ''}"
 
@@ -533,6 +557,9 @@ def main() -> int:
     print(f"HTML body : {html_path}")
     print(f"Text body : {text_path}")
     print(f"Mentions {stats['total']} · red flags {stats['red_flags']} · untagged {stats['untagged']}")
+    if stats["partial"]:
+        print(f"PARTIAL WEEK — {stats['days_elapsed']} of 7 days. Fine for a mid-week look; "
+              "do not send it as the weekly digest.")
 
     recipients = H.load_yaml("recipients").get("digest", [])
     ready = [r for r in recipients if str(r.get("email", "")).strip() and not H.is_todo(r.get("email", ""))]
