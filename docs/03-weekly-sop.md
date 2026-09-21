@@ -61,6 +61,36 @@ python3 scripts/log_mention.py -e rk_world -p ambitionbox -d 2026-09-20 \
 duplicate URL is refused, and a red flag prints the alert command rather than waiting for
 Friday.
 
+### Knowing when you have them all
+
+Record the rating and review count **first**, then log the reviews. The count is the
+platform's own tally, so the change in it is exactly how many new reviews exist:
+
+```bash
+python3 scripts/log_rating.py --status
+```
+
+```
+RK World Infocom  ambitionbox  3.00  (54 reviews)  <-- 3 new review(s), 1 logged: 2 TO READ
+
+10 review(s) exist that have not been logged as mentions:
+  RK World Infocom     ambitionbox  3 to read
+  Westbury Kommerce    ambitionbox  2 to read
+```
+
+That is the sweep's target, not a warning. Work until it says nothing is outstanding, and
+"did I get everything?" stops being a feeling and becomes arithmetic. The same check runs in
+the digest, so a shortfall is disclosed to the four rather than hidden.
+
+**Two reasons the numbers can legitimately disagree**, so do not hunt indefinitely:
+
+- A review was **edited or removed**, so the count moved without a new review to find.
+- The page shows a **ratings** count rather than a written-reviews count. Glassdoor
+  distinguishes the two, and a star-only rating has no text to log.
+
+In either case note it and move on. The digest says the table is incomplete, which is the
+honest outcome.
+
 **This is the step that fills sections 1, 3 and 4.** A rating snapshot is one number for a
 whole company; a mention is one row per review, and the digest cannot summarise reviews it
 has never been given.

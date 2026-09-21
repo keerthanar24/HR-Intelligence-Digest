@@ -37,10 +37,40 @@ def has_no_page(platform: str, entity: str) -> bool:
     return platform_url(platform, entity).strip().lower() == "none"
 
 
+def expected_new(week: dt.date) -> dict[tuple[str, str], int]:
+    """How many new reviews each page gained, from the change in its count.
+
+    This is the sweep's target number. The count is the platform's own tally,
+    so it says how many reviews exist that the sweeper has not read yet -
+    turning "did I get everything?" from a feeling into arithmetic.
+    """
+    prev = (week - dt.timedelta(days=7)).isoformat()
+    this = week.isoformat()
+    counts: dict[tuple[str, str], dict[str, int]] = {}
+    for row in H.read_csv(H.RATINGS_CSV):
+        key = (row.get("entity"), row.get("platform"))
+        count = H.to_int(row.get("review_count"), -1)
+        if row.get("week_of") == this:
+            counts.setdefault(key, {})["now"] = count
+        elif row.get("week_of") == prev:
+            counts.setdefault(key, {})["prev"] = count
+    out = {}
+    for key, seen in counts.items():
+        if seen.get("now", -1) >= 0 and seen.get("prev", -1) >= 0:
+            out[key] = seen["now"] - seen["prev"]
+    return out
+
+
 def show_status(week: dt.date) -> int:
     entities = H.entity_names()
     rows = [r for r in H.read_csv(H.RATINGS_CSV) if r.get("week_of") == week.isoformat()]
     have = {(r.get("entity"), r.get("platform")): r for r in rows}
+
+    import collections
+    logged = collections.Counter(
+        (m.get("entity"), m.get("platform"))
+        for m in H.mentions_for_week(H.read_csv(H.MENTIONS_CSV), week))
+    expected = expected_new(week)
 
     print(f"Rating snapshot for week of {H.fmt_week(week)}\n")
     missing = 0
@@ -51,7 +81,15 @@ def show_status(week: dt.date) -> int:
             if row:
                 rating = row.get("overall_rating") or "?"
                 count = row.get("review_count") or "?"
-                print(f"{label} {rating:>5}  ({count} reviews)")
+                key = (entity_id, platform)
+                note = ""
+                if key in expected:
+                    want, got = expected[key], logged.get(key, 0)
+                    if want > got:
+                        note = f"  <-- {want} new review(s), {got} logged: {want - got} TO READ"
+                    elif want > 0:
+                        note = f"  ({want} new, all logged)"
+                print(f"{label} {rating:>5}  ({count} reviews){note}")
             elif has_no_page(platform, entity_id):
                 print(f"{label}     -  no page on this platform")
             else:
@@ -62,6 +100,18 @@ def show_status(week: dt.date) -> int:
                     print(f"  {'':<33}{url}")
     total = sum(1 for e in entities for p in REVIEW_PLATFORMS if not has_no_page(p, e))
     print(f"\n{total - missing}/{total} recorded.")
+
+    shortfall = {k: v - logged.get(k, 0) for k, v in expected.items() if v > logged.get(k, 0)}
+    if shortfall:
+        outstanding = sum(shortfall.values())
+        print(f"\n{outstanding} review(s) exist that have not been logged as mentions:")
+        for (entity_id, platform), count in sorted(shortfall.items()):
+            print(f"  {entities.get(entity_id, entity_id):<20} {platform:<12} {count} to read")
+        print("\nOpen each page, sort by newest, and log them:")
+        print("  python3 scripts/log_mention.py --vocab")
+        print("\nThe count is the platform's own tally, so it is the target. If a page shows")
+        print("fewer new reviews than the count implies, a review was edited or removed -")
+        print("note it and move on rather than hunting.")
     if missing:
         print("Record each one with:")
         print("  python3 scripts/log_rating.py -e <entity> -p <platform> -r <rating> -c <count>")
