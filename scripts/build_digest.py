@@ -169,9 +169,11 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms,
     expected to cover is enumerated up front and each one has to come back
     accounted for:
 
-      not_swept   - no snapshot this week; nobody looked
-      no_baseline - snapshot this week but none last week; nothing to subtract
-      unread      - the count moved further than the logged rows explain
+      not_swept     - no snapshot this week; nobody looked
+      no_baseline   - snapshot this week but none last week; nothing to subtract
+      unread        - the count moved further than the logged rows explain
+      count_dropped - fewer reviews than last week, which cannot happen; the
+                      page was read a different way
 
     Week 1 is the exception: a baseline week has no previous snapshot by
     definition, so no_baseline is not raised there. not_swept still is - a
@@ -224,7 +226,13 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms,
 
         new_reviews = now - before
         already = logged.get(key, 0)
-        if new_reviews > already:
+        if new_reviews < 0:
+            # Review counts do not go down. A drop means the page was read a
+            # different way from last week - a location filter applied or
+            # cleared, or the wrong profile opened - and every comparison in
+            # section 2 is then measuring two different populations.
+            note("count_dropped", entity_id, platform, new=new_reviews)
+        elif new_reviews > already:
             note("unread", entity_id, platform,
                  new=new_reviews, missing=new_reviews - already)
 
@@ -856,11 +864,15 @@ def main() -> int:
             "unread": "reviews still to read",
             "not_swept": "NOT SWEPT — no snapshot this week",
             "no_baseline": "no previous snapshot to compare against",
+            "count_dropped": "REVIEW COUNT FELL — the page was read differently",
         }
         for g in stats["coverage_detail"]:
             kind = g.get("kind", "unread")
             if kind == "unread":
                 detail = (f"{g['new']} new, {g['logged']} logged, {g['missing']} TO READ")
+            elif kind == "count_dropped":
+                detail = (f"{labels[kind]} ({g['new']} vs last week). Check the location "
+                          "filter and re-read the page the same way as last week.")
             else:
                 detail = labels[kind]
             print(f"  {g['entity']} / {g['platform']}: {detail}", file=sys.stderr)

@@ -82,6 +82,12 @@ def coverage_refusal(stats: dict) -> list[str]:
                            for g in by_kind["not_swept"])
         out.append(f"{len(by_kind['not_swept'])} profile(s) not swept at all ({detail}) - "
                    "no snapshot this week, so nothing about them has been checked")
+    if by_kind.get("count_dropped"):
+        detail = "; ".join(f"{g['entity']}/{g['platform']} {g['new']}"
+                           for g in by_kind["count_dropped"])
+        out.append(f"{len(by_kind['count_dropped'])} profile(s) show FEWER reviews than last "
+                   f"week ({detail}) - counts do not fall, so the page was read a different "
+                   "way and section 2 is comparing two different populations")
     if by_kind.get("no_baseline"):
         detail = "; ".join(f"{g['entity']}/{g['platform']}"
                            for g in by_kind["no_baseline"])

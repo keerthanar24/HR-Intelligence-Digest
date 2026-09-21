@@ -950,6 +950,24 @@ def test_coverage_gate() -> None:
           nothing and nothing[0]["kind"] == "not_swept", f"(got {nothing})")
     check("and it names which profile", nothing and nothing[0]["entity"] == "RK World Infocom")
 
+    # A review count that falls is impossible, and is the signature of the page
+    # having been read a different way - a location filter applied or cleared.
+    # RK Group's baseline is Bengaluru-filtered on both platforms, so this is a
+    # live risk from week 2 onward, and it used to pass as a clean week.
+    dropped = [
+        {"week_of": "2026-09-05", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "51", "url": "https://ab.invalid/rkw"},
+        {"week_of": "2026-09-12", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "44", "url": "https://ab.invalid/rkw"},
+    ]
+    fell = cover(logged_one, rows=dropped)
+    check("a falling review count is caught", len(fell) == 1, f"(got {fell})")
+    check("and named as a reading problem, not unread reviews",
+          fell and fell[0]["kind"] == "count_dropped", f"(got {fell})")
+    check("the send refuses on it",
+          bool(send_digest.coverage_refusal(
+              {"coverage_gaps": 1, "coverage_detail": fell})))
+
     # A profile that does not exist is not a gap: Robust Kommerce has no
     # AmbitionBox page, and config records that as 'none'.
     check("a profile that does not exist is not expected",
