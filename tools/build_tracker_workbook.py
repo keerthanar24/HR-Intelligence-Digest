@@ -1,5 +1,9 @@
 """Apply the docs/09-workbook-review.md fixes to the Master Tracker."""
+import os
 import sys
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scripts"))
+import hrintel as H
+
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -101,9 +105,14 @@ style_header(ws, HEADERS, WIDTHS)
 set_body_font(ws, len(HEADERS))
 
 # Week Of derives from Date Posted so the sweeper never types it. WEEKDAY(d,3)
-# is 0 on Monday, so d - WEEKDAY(d,3) is that week's Monday.
+# is 0 on Monday through 6 on Sunday, so subtracting MOD(WEEKDAY(d,3) - start, 7)
+# lands on the configured first day of the reporting week. Read from config so
+# the sheet and the scripts cannot disagree about which day a week starts.
+WEEK_START = H.week_start_day()
 for r in range(2, ROWS + 1):
-    ws.cell(row=r, column=4).value = f'=IF($C{r}="","",$C{r}-WEEKDAY($C{r},3))'
+    ws.cell(row=r, column=4).value = (
+        f'=IF($C{r}="","",$C{r}-MOD(WEEKDAY($C{r},3)-{WEEK_START},7))'
+    )
     ws.cell(row=r, column=4).number_format = "yyyy-mm-dd"
     ws.cell(row=r, column=2).number_format = "yyyy-mm-dd"
     ws.cell(row=r, column=3).number_format = "yyyy-mm-dd"

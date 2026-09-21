@@ -32,7 +32,8 @@ import collect_feeds  # noqa: E402
 import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
 
-WEEK = dt.date(2026, 9, 7)
+# The reporting week is Friday-anchored (config/settings.yaml).
+WEEK = dt.date(2026, 9, 11)   # Fri 11 - Thu 17 Sep 2026
 failures: list[str] = []
 
 
@@ -84,13 +85,24 @@ def test_weeks() -> None:
     check("plain date still parses", H.parse_date("2026-08-31") == dt.date(2026, 8, 31))
     check("day-first date still parses", H.parse_date("31/08/2026") == dt.date(2026, 8, 31))
     check("nonsense is still rejected", H.parse_date("not a date") is None)
-    check("last_complete_week on a Friday", H.last_complete_week(dt.date(2026, 9, 18)) == WEEK)
-    check("last_complete_week on a Monday", H.last_complete_week(dt.date(2026, 9, 14)) == WEEK)
-    check("monday_of a Sunday", H.monday_of(dt.date(2026, 9, 13)) == WEEK)
-    check("week label", H.fmt_week(WEEK) == "7–13 Sep 2026", f"(got {H.fmt_week(WEEK)!r})")
+    check("configured week starts on Friday", H.week_start_day() == 4,
+          f"(got {H.week_start_day()})")
+    check("send-day Friday resolves to the week that just closed",
+          H.last_complete_week(dt.date(2026, 9, 18)) == WEEK)
+    check("a Sunday falls in the week that began Friday",
+          H.week_start_of(dt.date(2026, 9, 13)) == WEEK)
+    check("a Thursday is the last day of that week",
+          H.week_start_of(dt.date(2026, 9, 17)) == WEEK)
+    check("the next Friday starts a new week",
+          H.week_start_of(dt.date(2026, 9, 18)) == dt.date(2026, 9, 18))
+    # Every day must land in exactly one week - a gap would silently drop a
+    # mention posted on the missing day.
+    covered = {H.week_start_of(WEEK + dt.timedelta(days=i)) for i in range(7)}
+    check("all seven days belong to one week", covered == {WEEK}, f"({covered})")
+    check("week label", H.fmt_week(WEEK) == "11–17 Sep 2026", f"(got {H.fmt_week(WEEK)!r})")
     check("cross-month label",
-          H.fmt_week(dt.date(2026, 8, 31)) == "31 Aug – 6 Sep 2026",
-          f"(got {H.fmt_week(dt.date(2026, 8, 31))!r})")
+          H.fmt_week(dt.date(2026, 8, 28)) == "28 Aug – 3 Sep 2026",
+          f"(got {H.fmt_week(dt.date(2026, 8, 28))!r})")
 
 
 def test_urls() -> None:
@@ -201,7 +213,7 @@ def test_sheet_import() -> None:
           any("Red Flag Reason" in w for w in notes.warnings))
 
     # week_of is derived from Date Posted, since the sheet has no week column.
-    dated = [m for m in mentions if m["post_date"] == "2026-09-09"]
+    dated = [m for m in mentions if m["post_date"] == "2026-09-13"]
     check("week derived from Date Posted",
           dated and dated[0]["week_of"] == WEEK.isoformat(),
           f"(got {dated[0]['week_of'] if dated else None})")
@@ -257,15 +269,15 @@ def test_sheet_import_v2() -> None:
 
     by_id = {r["mention_id"]: r for r in rows}
     check("sheet-supplied mention ids are kept, not regenerated",
-          "M-20260907-002" in by_id)
+          "M-20260911-002" in by_id)
     check("'Mixed' sentiment survives the round trip",
           any(r["sentiment"] == "mixed" for r in rows))
     check("'Payroll Delay' maps to its own theme, not compensation",
-          by_id["M-20260907-002"]["themes"] == "payroll_delay")
+          by_id["M-20260911-002"]["themes"] == "payroll_delay")
     check("author type vocabulary maps",
-          by_id["M-20260907-002"]["author_type"] == "ex_employee")
+          by_id["M-20260911-002"]["author_type"] == "ex_employee")
     check("red flag reason maps to a canonical trigger",
-          by_id["M-20260907-002"]["red_flag_reason"] in H.RED_FLAG_REASONS)
+          by_id["M-20260911-002"]["red_flag_reason"] in H.RED_FLAG_REASONS)
     check("status vocabulary maps",
           all(r["status"] in H.STATUSES for r in rows))
 

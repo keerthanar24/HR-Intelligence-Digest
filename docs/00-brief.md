@@ -97,7 +97,9 @@ mixed nature in the summary.
 
 ## 5. Deliverable
 
-One email per week, **in the body of the email — no attachments**, structured as:
+One email per week, sent **Friday morning** covering the reporting week that closed Thursday
+night (Friday 00:00 → Thursday 23:59), **in the body of the email — no attachments**,
+structured as:
 
 1. **Headline** — total mentions for the week by entity, with net sentiment change week-on-week.
 2. **Rating Movement** — Glassdoor and AmbitionBox score updates per entity.

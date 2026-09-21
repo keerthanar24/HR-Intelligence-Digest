@@ -161,19 +161,42 @@ def parse_date(value: str) -> dt.date | None:
     return None
 
 
-def monday_of(day: dt.date) -> dt.date:
-    """The Monday that starts the week containing `day`."""
-    return day - dt.timedelta(days=day.weekday())
+# Python's date.weekday(): Monday is 0, Sunday is 6.
+WEEKDAY_INDEX = {
+    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+    "friday": 4, "saturday": 5, "sunday": 6,
+}
+
+
+def week_start_day() -> int:
+    """Which weekday starts the reporting week, from config/settings.yaml.
+
+    Every day must fall inside exactly one week. A window shorter than seven
+    days would drop the days outside it, and a mention posted on a dropped day
+    would never appear in any digest.
+    """
+    name = str(load_yaml("settings").get("digest", {}).get("week_start", "monday"))
+    return WEEKDAY_INDEX.get(name.strip().lower(), 0)
+
+
+def week_start_of(day: dt.date) -> dt.date:
+    """The first day of the reporting week containing `day`."""
+    return day - dt.timedelta(days=(day.weekday() - week_start_day()) % 7)
+
+
+# Kept as the historical name so older callers and docs keep working; it
+# follows the configured week start rather than always meaning Monday.
+monday_of = week_start_of
 
 
 def last_complete_week(today: dt.date | None = None) -> dt.date:
-    """Monday of the most recently finished week.
+    """First day of the most recently finished reporting week.
 
-    The digest goes out on Monday morning covering the week that just closed,
-    so 'this week so far' is never reported as a full week.
+    The digest covers the week that has already closed, so 'this week so far'
+    is never reported as a full week.
     """
     today = today or dt.date.today()
-    return monday_of(today) - dt.timedelta(days=7)
+    return week_start_of(today) - dt.timedelta(days=7)
 
 
 def week_range(week_of: dt.date) -> tuple[dt.date, dt.date]:

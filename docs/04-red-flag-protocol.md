@@ -1,6 +1,6 @@
 # Red Flag Protocol
 
-The one part of this programme that does not wait for Monday.
+The one part of this programme that does not wait for the Friday send.
 
 Everything else in the trial is awareness only. A red flag is escalated **the same day it is
 found**, to the four recipients, with an acknowledgement expected within

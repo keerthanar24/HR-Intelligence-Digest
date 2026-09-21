@@ -207,8 +207,11 @@ def check_mentions(report: Report, rows: list[dict], week_of: dt.date | None) ->
         if posted and recorded_week and H.monday_of(posted) != recorded_week:
             report.warn(f"{where}: post_date {row['post_date']} falls in week "
                         f"{H.monday_of(posted)}, but week_of says {row['week_of']}.")
-        if recorded_week and recorded_week != H.monday_of(recorded_week):
-            report.error(f"{where}: week_of {row['week_of']} is not a Monday.")
+        if recorded_week and recorded_week != H.week_start_of(recorded_week):
+            start_name = [k for k, v in H.WEEKDAY_INDEX.items()
+                          if v == H.week_start_day()][0].title()
+            report.error(f"{where}: week_of {row['week_of']} is not a {start_name}; "
+                         f"the reporting week starts on {start_name}.")
         if posted and posted > dt.date.today():
             report.error(f"{where}: post_date {row['post_date']} is in the future.")
 

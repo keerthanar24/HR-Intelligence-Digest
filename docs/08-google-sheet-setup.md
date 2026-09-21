@@ -57,7 +57,7 @@ Two rules, both worth having:
 - Amber background where `status = needs_review`
 
 A row still amber on send day has not been tagged. The digest will say so in section 1, but
-seeing it in the sheet on Thursday is better than reading it in the email on Monday.
+seeing it in the sheet mid-week is better than reading it in the email on Friday.
 
 ## Sharing
 
@@ -72,7 +72,7 @@ Before building the digest:
 
 1. **File → Download → Comma-separated values**, one tab at a time
 2. Save as `data/mentions.csv`, `data/ratings.csv`, `data/escalations.csv`
-3. `python3 scripts/validate_data.py --week <monday>`
+3. `python3 scripts/validate_data.py --week <friday>`
 4. Fix every ERROR **in the sheet**, re-export, then build
 
 Fix errors in the sheet rather than in the CSV — the next export overwrites the CSV and you

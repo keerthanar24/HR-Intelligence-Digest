@@ -3,8 +3,12 @@
 Budget: **3–4 hours**, once a week. If it runs materially over for two weeks running, log it —
 that is a finding for the Phase 3 review, not something to absorb quietly.
 
-Suggested slot: Monday morning, covering the week that closed the previous night
-(Monday 00:00 → Sunday 23:59). `scripts/build_digest.py` defaults to exactly that week.
+Slot: **Friday morning**, covering the week that closed the previous night
+(Friday 00:00 → Thursday 23:59). `scripts/build_digest.py` defaults to exactly that week.
+
+The team works Sunday to Thursday, and those days sit entirely inside the window. The window
+is a full seven days on purpose: a Sunday-to-Thursday window would leave Friday and Saturday
+outside every week, and a review posted then would never reach a digest.
 
 ---
 
@@ -71,7 +75,7 @@ that is a genuine trigger:
 2. Add a row to `data/escalations.csv`.
 3. `python3 scripts/red_flags.py --alert <MENTION_ID>` and send it the same day.
 
-Red flags do **not** wait for the Monday digest. Full protocol: `docs/04-red-flag-protocol.md`.
+Red flags do **not** wait for the Friday digest. Full protocol: `docs/04-red-flag-protocol.md`.
 
 ## Step 4 — Export and validate (10 min)
 
@@ -82,7 +86,7 @@ Working in Google Sheets? Export first — the scripts read the CSVs, not the sh
 `data/ratings.csv`, `data/escalations.csv`. Then:
 
 ```bash
-python3 scripts/validate_data.py --week $(date -d 'last monday - 7 days' +%F)
+python3 scripts/validate_data.py --week $(python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 ```
 
 Fix every ERROR **in the sheet**, then re-export — a fix made in the CSV is lost on the next
