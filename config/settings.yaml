@@ -2,7 +2,7 @@
 
 programme:
   name: HR Intelligence Digest
-  trial_start: "TODO: YYYY-MM-DD"   # week 1 Monday; drives the Phase 3 review date
+  trial_start: "2026-09-21"   # week 1 Monday; drives the Phase 3 review date
   owner: "TODO: name of the desk owner"
   reply_to: "TODO: hr-intel@example.com"
 
