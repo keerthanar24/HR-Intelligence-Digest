@@ -184,6 +184,30 @@ def test_x_collection() -> None:
           all(r["sentiment"] == "" and r["status"] == "needs_review" for r in rows))
 
 
+def test_config_consistency() -> None:
+    """The sheet's vocabulary and the importer's map must not drift apart.
+
+    Renaming an entity in entities.yaml without adding the new display name to
+    column_map.yaml leaves a dropdown value the importer cannot resolve - the
+    row imports with a bogus entity and the digest silently loses it.
+    """
+    print("config consistency")
+    cfg = H.load_yaml("column_map")
+    entity_map = {k.strip().lower(): v for k, v in cfg["values"]["entity"].items()}
+    for entity_id, name in H.entity_names().items():
+        check(f"display name {name!r} maps back to {entity_id}",
+              entity_map.get(name.strip().lower()) == entity_id,
+              f"(got {entity_map.get(name.strip().lower())!r})")
+
+    platform_map = {k.strip().lower(): v for k, v in cfg["values"]["platform"].items()}
+    for platform_id, name in H.platform_names().items():
+        if platform_id in ("news",):   # feed-only, never typed into the sheet
+            continue
+        check(f"platform {name!r} maps back to {platform_id}",
+              platform_map.get(name.strip().lower()) == platform_id,
+              f"(got {platform_map.get(name.strip().lower())!r})")
+
+
 def test_sheet_import() -> None:
     """The workbook's own headers and dropdown vocabulary map onto the schema."""
     print("sheet import")
@@ -465,7 +489,7 @@ def test_red_flags() -> None:
 
 def main() -> int:
     for test in (test_matching, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_red_flags):
         test()
     print()

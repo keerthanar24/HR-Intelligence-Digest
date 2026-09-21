@@ -92,6 +92,10 @@ tabs:
 values:
   entity:
     RK Group: rk_group
+    # The display name in config/entities.yaml must appear here, or a row typed
+    # from the sheet's own dropdown fails to map to an entity id.
+    RK World Infocom: rk_world
+    RK World Infocom Pvt Ltd: rk_world
     RKWorld: rk_world
     RK World: rk_world
     Robust Kommerce: robust_kommerce
