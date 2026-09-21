@@ -60,6 +60,34 @@ accepts a specific week.
 Local time, so 09:00 Friday. Prefer Actions unless the repository must stay off GitHub —
 a laptop that is asleep on Friday morning silently skips a week.
 
+## Sending it
+
+```bash
+make send                       # dry run - prints, sends nothing
+python3 scripts/send_digest.py --send
+```
+
+Sends multipart/alternative: the HTML body plus a plain-text fallback, no attachments, as the
+brief requires. Credentials come from the environment and never from this repo:
+
+```bash
+export SMTP_HOST=smtp.zeptomail.in     # 587 STARTTLS, or 465 for implicit TLS
+export SMTP_USER=... SMTP_PASSWORD=...
+export SMTP_FROM="HR Intelligence <hr-intel@example.com>"
+```
+
+Nothing is sent without `--send`, and it refuses outright when:
+
+- any of the four still has no address
+- the week is still running — a partial week reads as a full one (`--force` overrides)
+- there is no From address
+
+An untagged mention is a warning rather than a refusal: the digest already discloses the count.
+
+To send from the scheduled workflow, add the SMTP values as repository secrets and append a
+send step. Do that only once a few digests have been reviewed by hand — an unattended send to
+four executives is not where to discover a tagging mistake.
+
 ## What automation cannot rescue
 
 - **A missed rating snapshot.** Ratings are read from a page by a person. Miss a Friday and

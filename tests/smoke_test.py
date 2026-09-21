@@ -483,6 +483,29 @@ def test_collector() -> None:
     check("news platforms require context", len(kept_news) == 0)
 
 
+def test_send_guards() -> None:
+    """The send refuses in every state where an email should not go out."""
+    print("send guards")
+    import send_digest
+
+    to, missing = send_digest.recipients("digest")
+    check("placeholder addresses are not treated as usable", to == [],
+          f"(got {to})")
+    check("the four are reported as missing", len(missing) == 4, f"(got {missing})")
+
+    message = send_digest.build_message(
+        "Subject line", "<p>html body</p>", "text body",
+        ["A <a@example.invalid>"], "From <f@example.invalid>", "r@example.invalid")
+    check("sent as multipart/alternative", message.is_multipart())
+    types = {part.get_content_type() for part in message.walk() if not part.is_multipart()}
+    check("carries both a text and an html body",
+          {"text/plain", "text/html"} <= types, f"({types})")
+    # The brief says body only, no attachments.
+    check("no attachments", not any(
+        part.get_content_disposition() == "attachment" for part in message.walk()))
+    check("reply-to set", message["Reply-To"] == "r@example.invalid")
+
+
 def test_red_flags() -> None:
     print("red flags")
     mentions = H.read_csv(H.MENTIONS_CSV)
@@ -506,7 +529,7 @@ def test_red_flags() -> None:
 def main() -> int:
     for test in (test_matching, test_weeks, test_urls, test_collector, test_x_collection,
                  test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
-                 test_red_flags):
+                 test_send_guards, test_red_flags):
         test()
     print()
     if failures:

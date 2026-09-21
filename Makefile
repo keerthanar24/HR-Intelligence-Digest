@@ -21,6 +21,7 @@ help:
 	@echo "  make digest    build out/digest-$(WEEK).html and .txt"
 	@echo "  make weekly    scan + validate + digest, in order"
 	@echo "  make auto      collect + validate + digest (what the scheduler runs)"
+	@echo "  make send      dry-run the email send (add --send to really send)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
 	@echo "Override the week:  make digest WEEK=2026-09-07"
@@ -69,6 +70,9 @@ auto:
 weekly: scan validate digest
 	@echo ""
 	@echo "Paste out/digest-$(WEEK).html into the email body. No attachments."
+
+send:
+	$(PY) scripts/send_digest.py --week $(WEEK)
 
 test:
 	$(PY) tests/smoke_test.py
