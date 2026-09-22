@@ -614,11 +614,18 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     )
 
     if partial:
+        notice = (
+            (f'<strong>Baseline still open</strong> \u2014 complete to '
+             f'{H.day_month(today)}. It closes {H.day_month(week_end)}; anything posted '
+             'between now and then is not in here yet.')
+            if baseline else
+            (f'<strong>Partial week</strong> \u2014 covers {days_elapsed} of 7 days, to '
+             f'{H.day_month(today)}. The week closes {H.day_month(week_end)}; counts and '
+             'comparisons here are incomplete.')
+        )
         h.append(
             '<p style="margin:0 0 16px;padding:8px 10px;background:#FBF0D9;border-radius:4px;'
-            f'font-size:13px;color:#8a6d3b;"><strong>Partial week</strong> \u2014 covers '
-            f'{days_elapsed} of 7 days, to {H.day_month(today)}. The week closes '
-            f'{H.day_month(week_end)}; counts and comparisons here are incomplete.</p>'
+            f'font-size:13px;color:#8a6d3b;">{notice}</p>'
         )
 
     # 1. Headline
@@ -778,7 +785,11 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         f"net sentiment {sentiment_text(net_now)} "
         f"({vs_previous(net_now, net_prev, digits=2)} vs previous week)"
     )
-    if partial:
+    if partial and baseline:
+        t.append(f"BASELINE STILL OPEN - complete to {H.day_month(today)}. It closes "
+                 f"{H.day_month(week_end)}; anything posted between now and then is "
+                 "not in here yet.")
+    elif partial:
         t.append(f"PARTIAL WEEK - covers {days_elapsed} of 7 days, to "
                  f"{H.day_month(today)}. The week closes {H.day_month(week_end)}; "
                  "counts and comparisons here are incomplete.")
@@ -890,11 +901,18 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     subject_template = digest_cfg.get(
         "subject_template", "HR Intelligence Digest — week of {week_of} ({mention_count} mentions)"
     )
-    subject = subject_template.format(
-        week_of=week_label, mention_count=total, red_flags=len(flags),
-    )
+    if baseline:
+        # The template says "week of {week_of}", which over a sixty-day
+        # baseline reads "week of 60-day baseline, 28 Jul to 25 Sep".
+        subject = (f"HR Intelligence Digest \u2014 {week_label} "
+                   f"({plural(total, 'mention')})")
+    else:
+        subject = subject_template.format(
+            week_of=week_label, mention_count=total, red_flags=len(flags),
+        )
     if partial:
-        subject += f" \u00b7 PARTIAL ({days_elapsed}/7 days)"
+        subject += (f" \u00b7 IN PROGRESS, closes {H.day_month(week_end)}" if baseline
+                    else f" \u00b7 PARTIAL ({days_elapsed}/7 days)")
     if flags:
         subject += f" · {len(flags)} red flag{'s' if len(flags) != 1 else ''}"
 
