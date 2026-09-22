@@ -149,11 +149,13 @@ def interactive(defaults) -> list[argparse.Namespace]:
         platform = ask("platform", allowed=list(platforms), default=last["platform"],
                        required=True)
         date = ask("date the review was posted (YYYY-MM-DD)", required=True)
-        title = ask("review title, as published (optional)")
+        title = ask("the review's own words - its title, or its first line",
+                    required=platform in H.VERBATIM_REQUIRED)
         summary = ask("one factual sentence - no names, no interpretation", required=True)
         sentiment = ask("sentiment", allowed=list(H.SENTIMENT_SCORES), required=True)
         themes = ask("theme(s), comma separated", allowed=H.THEMES, multi=True, required=True)
         author = ask("who wrote it", allowed=H.AUTHOR_TYPES, default="unknown")
+        role = ask("department or role, if the page shows one (optional)")
         stars = ask("stars the reviewer gave, 1-5 (optional)")
         url = ask("link to the review (optional)")
         flag = ask("red-flag trigger, blank if none", allowed=H.RED_FLAG_REASONS)
@@ -162,7 +164,7 @@ def interactive(defaults) -> list[argparse.Namespace]:
         one = argparse.Namespace(
             entity=entity, platform=platform, date=date, summary=summary,
             sentiment=sentiment, themes=themes, author=author, url=url, title=title,
-            role="", rating=stars, engagement=None, names_individual=names,
+            role=role, rating=stars, engagement=None, names_individual=names,
             flag=flag or None, notes="", mixed_post=False, by=defaults.by,
             vocab=False, list=False, week=None, all=False, remove=None,
             interactive=False)
@@ -228,7 +230,8 @@ def main() -> int:
     p.add_argument("--author", default="unknown")
     p.add_argument("--url", default="")
     p.add_argument("--title", default="", help="review title or first line, as published")
-    p.add_argument("--role", default="")
+    p.add_argument("--role", default="",
+                   help="department or role, when the review page shows one")
     p.add_argument("--rating", help="stars the reviewer gave, 1-5")
     p.add_argument("--engagement", type=int, help="likes + reposts + comments")
     p.add_argument("--names-individual", action="store_true",
@@ -316,6 +319,17 @@ def log_one(args) -> int:
             print(f"  invalid {problem}", file=sys.stderr)
         return 2
 
+    # The review's own words are the only thing in the row that is not an
+    # interpretation. Optional meant nobody typed one, so a summary written in
+    # August has nothing behind it when someone asks in November what the
+    # review actually said.
+    if not args.title.strip() and args.platform in H.VERBATIM_REQUIRED:
+        print(f"REFUSED: this {platforms.get(args.platform, args.platform)} review needs its "
+              "own words as well as your summary.", file=sys.stderr)
+        print("Pass --title with the review title, or its first line if it has no title. "
+              "It is the only verbatim text the row keeps.", file=sys.stderr)
+        return 2
+
     customer_words = H.customer_side_terms(f"{args.summary} {args.title} {args.notes}")
     if customer_words and not args.mixed_post:
         print(f"REFUSED: this reads as customer-side - found {', '.join(customer_words)}.",
@@ -353,7 +367,12 @@ def log_one(args) -> int:
         "sentiment": sentiment,
         "themes": "|".join(themes),
         "rating_given": args.rating or "",
-        "engagement": "" if args.engagement is None else str(args.engagement),
+        # Blank meant two different things: "this platform has no engagement
+        # count" and "nobody recorded one". On X the second is a gap in the
+        # evidence for the public_escalation_risk trigger, so they have to look
+        # different.
+        "engagement": (str(args.engagement) if args.engagement is not None
+                       else ("" if H.engagement_applies(args.platform) else "n/a")),
         "names_individual": "yes" if args.names_individual else "no",
         "red_flag": "yes" if (args.flag or args.names_individual) else "no",
         "red_flag_reason": args.flag or ("names_individual" if args.names_individual else ""),

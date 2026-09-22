@@ -22,13 +22,13 @@ tell you if the schema drifted.
 | `url` | yes in practice | full URL | A row without a link cannot be verified by anyone else |
 | `post_date` | yes if known | `YYYY-MM-DD` | Date the item was posted. Cannot be in the future |
 | `author_type` | yes | `current_employee`, `ex_employee`, `candidate`, `intern`, `contractor`, `anonymous`, `unknown` | Stated or clearly implied only — never inferred |
-| `role_or_dept` | no | free text | Only if the post states it. Never narrow enough to identify a person |
-| `title_or_snippet` | no | free text | The review title or first line, as published |
+| `role_or_dept` | no | free text | Only if the page states it. Never narrow enough to identify a person. Asked by the guided prompt |
+| `title_or_snippet` | **yes on review sites** | free text | The review title or first line, **as published**. The one field in the row that is not an interpretation — a summary with nothing behind it cannot be checked in November. Required on AmbitionBox, Glassdoor, Indeed and Google Reviews |
 | `one_line_summary` | yes | one sentence | What the four executives read. See `docs/05-sentiment-and-themes.md` |
 | `sentiment` | yes once reviewed | `very_negative`…`very_positive` | Blank = untagged, and the digest says so |
 | `themes` | yes once reviewed | pipe-separated, from the fixed list | e.g. `appraisal\|management` |
 | `rating_given` | no | `1`–`5` | Stars the reviewer gave, where applicable |
-| `engagement` | no | integer | Likes + reposts + comments. Drives the virality trigger |
+| `engagement` | no | integer or `n/a` | Likes + reposts + comments. Drives the virality trigger. Auto-filled `n/a` on review sites, which publish none — so a blank on X or LinkedIn stands out as a gap rather than hiding in a column of blanks |
 | `names_individual` | yes | `yes` / `no` | Whether the post names a person |
 | `red_flag` | yes | `yes` / `no` | See `docs/04-red-flag-protocol.md` |
 | `red_flag_reason` | yes if flagged | one of the five triggers | `names_individual`, `harassment_or_safety`, `non_payment`, `legal_or_regulatory`, `public_escalation_risk` |
@@ -50,7 +50,7 @@ digest is a time series and a skipped week leaves a hole that never fills.
 | `entity`, `platform` | ids | `glassdoor` or `ambitionbox` |
 | `overall_rating` | decimal | As displayed, e.g. `3.4` |
 | `review_count` | integer | Total reviews on the page — the week-on-week difference is the new-review count |
-| `recommend_pct`, `ceo_approval_pct` | integer | Where the platform shows them |
+| `recommend_pct`, `ceo_approval_pct` | integer, `n/a` or `not shown` | `n/a` = the platform never prints it (AmbitionBox prints neither). `not shown` = it does, and this page did not — Glassdoor shows CEO approval only once a profile carries enough ratings. A blank means nobody recorded it, which is the only one worth chasing |
 | `work_life_balance`, `salary_benefits`, `job_security`, `career_growth`, `culture` | decimal | Sub-scores where shown; blank is fine |
 | `url`, `notes` | | |
 

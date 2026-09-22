@@ -373,8 +373,28 @@ def fields_in_sheet(tab: str, rows: list[list], cfg: dict) -> set[str]:
             if name is not None and key(name) in lookup}
 
 
+def fields_by_platform(tab: str, rows: list[list], cfg: dict) -> dict[str, set[str]]:
+    """The same question, asked per platform.
+
+    Rating_Tracker holds one column block per platform, and they are not the
+    same shape: Glassdoor has a CEO-approval column and AmbitionBox does not,
+    because AmbitionBox does not publish the figure. Merging the blocks made
+    every field look supplied for every platform, so an AmbitionBox row's
+    ceo_approval_pct was read as a cell somebody had deliberately cleared and
+    was wiped on every import.
+    """
+    spec = cfg["tabs"][tab]
+    header = [name for name in (rows[0] if rows else []) if name is not None]
+    out = {}
+    for platform_id, block in (spec.get("per_platform") or {}).items():
+        lookup = build_lookup(block)
+        out[platform_id] = {lookup[key(name)] for name in header if key(name) in lookup}
+    return out
+
+
 def carry_forward(path: str, fields: list[str], rows: list[dict],
-                  tab: str, supplied: set[str], notes: Notes) -> list[dict]:
+                  tab: str, supplied: set[str], notes: Notes,
+                  per_platform: dict[str, set[str]] | None = None) -> list[dict]:
     """Keep the values the sheet has no column for.
 
     write() replaces the CSV wholesale, because the sheet is the working
@@ -385,7 +405,9 @@ def carry_forward(path: str, fields: list[str], rows: list[dict],
     field the sheet cannot supply keeps its existing value.
 
     Fields the sheet DOES have a column for are left alone: clearing a cell
-    there is a deliberate edit and must survive the round trip.
+    there is a deliberate edit and must survive the round trip. On a tab with
+    one column block per platform, that question is asked per platform - a
+    column Glassdoor has does not mean AmbitionBox has it.
     """
     if not os.path.exists(path):
         return rows
@@ -396,8 +418,14 @@ def carry_forward(path: str, fields: list[str], rows: list[dict],
         old = previous.get(tuple(row.get(k, "") for k in keys))
         if not old:
             continue
+        has = supplied
+        if per_platform is not None:
+            block = per_platform.get(row.get("platform", ""))
+            # A platform with no column block of its own supplies nothing.
+            has = (supplied - set().union(*per_platform.values())
+                   if per_platform else supplied) | (block or set())
         for field in fields:
-            if field in supplied or field in keys:
+            if field in has or field in keys:
                 continue
             if not str(row.get(field, "")).strip() and str(old.get(field, "")).strip():
                 row[field] = old[field]
@@ -441,6 +469,7 @@ def main() -> int:
 
     results: dict[str, list[dict]] = {}
     supplied: dict[str, set[str]] = {}
+    per_platform: dict[str, dict[str, set[str]]] = {}
     for tab in wanted:
         if args.csv:
             rows = sheets[tab]
@@ -454,10 +483,12 @@ def main() -> int:
             rows = sheets[found]
         results[tab] = importers[tab](rows, cfg, notes)
         supplied[tab] = fields_in_sheet(tab, rows, cfg)
+        per_platform[tab] = fields_by_platform(tab, rows, cfg)
 
     for tab, rows in results.items():
         path, fields = TARGETS[tab]
-        rows = carry_forward(path, fields, rows, tab, supplied.get(tab, set()), notes)
+        rows = carry_forward(path, fields, rows, tab, supplied.get(tab, set()), notes,
+                             per_platform.get(tab) or None)
         print(f"  {tab}: {len(rows)} row(s)"
               f"{' (not written — dry run)' if args.dry_run else f' -> {os.path.relpath(path, H.ROOT)}'}")
         if not args.dry_run:

@@ -362,6 +362,27 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
                     "nothing, that is a valid empty week — say so in the digest.")
 
 
+def check_verbatim(report: Report, mentions: list[dict]) -> None:
+    """Review rows holding only somebody's paraphrase.
+
+    title_or_snippet is the one field in a mention that is not an
+    interpretation. It was optional, so none of the back-read rows carry one,
+    and a summary written in August has nothing behind it when somebody asks in
+    November what the review actually said. New rows are refused without it;
+    the ones already logged can only be fixed from the page.
+    """
+    missing = [m for m in mentions
+               if m.get("platform") in H.VERBATIM_REQUIRED
+               and not str(m.get("title_or_snippet") or "").strip()
+               and (m.get("status") or "") != "out_of_scope"]
+    if missing:
+        report.note(f"{len(missing)} review row(s) hold no verbatim text "
+                    f"({', '.join(m['mention_id'] for m in missing[:5])}"
+                    f"{', ...' if len(missing) > 5 else ''}). They were logged before it was "
+                    "required. Re-open the page and add the review's own title or first line "
+                    "if you want the summary to be checkable at the month-2 review.")
+
+
 def check_effort_log(report: Report, ratings: list[dict], week_of: dt.date | None) -> None:
     """Earlier weeks that were swept but never recorded.
 
@@ -407,6 +428,7 @@ def main() -> int:
     check_escalations(report, mentions, escalations)
     check_rating_continuity(report, ratings)
     check_coverage(report, mentions, ratings, week_of)
+    check_verbatim(report, mentions)
     check_effort_log(report, ratings, week_of)
 
     print(f"Checked {len(mentions)} mention(s), {len(ratings)} rating snapshot(s), "

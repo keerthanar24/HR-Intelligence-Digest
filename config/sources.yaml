@@ -16,6 +16,11 @@ platforms:
     cadence: weekly
     priority: 1
     captures: [reviews, ratings, interviews, salaries]
+    # Headline figures this platform actually prints. A field the platform
+    # never publishes is recorded as 'n/a', so it cannot be mistaken for a
+    # number the sweep failed to pick up. AmbitionBox shows neither a
+    # would-recommend percentage nor CEO approval.
+    publishes: [overall_rating, review_count, sub_scores]
     notes: >-
       Highest expected volume for India. Record the overall rating and review count
       into data/ratings.csv on every sweep, even when no new review appeared.
@@ -43,6 +48,10 @@ platforms:
     cadence: weekly
     priority: 1
     captures: [reviews, ratings, interviews, salaries]
+    # Glassdoor prints CEO approval only once a profile carries enough
+    # ratings; none of the four do today, so it records as 'not shown'
+    # rather than blank.
+    publishes: [overall_rating, review_count, sub_scores, recommend_pct, ceo_approval_pct]
     notes: Record rating + review count weekly into data/ratings.csv.
     urls:
       # Company identities confirmed by the programme owner, 2026-09-21.

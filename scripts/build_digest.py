@@ -125,6 +125,34 @@ def headline_rows(mentions_now, mentions_prev, entities, comparable=True):
     return rows
 
 
+def stars_text(mention) -> str:
+    """'2/5' for a review that carried a star rating, else an em dash.
+
+    Every review logged in the back-read had one and none of them reached the
+    email. A one-line summary without the star rating hides the gap between a
+    grumble filed at 4 stars and the same words filed at 1.
+    """
+    value = H.to_int(str(mention.get("rating_given") or "").strip(), 0)
+    return f"{value}/5" if 1 <= value <= 5 else "—"
+
+
+def author_text(mention) -> str:
+    """'Ex-employee', 'Candidate', 'Anonymous' - who the line came from."""
+    key = (mention.get("author_type") or "").strip().lower()
+    return H.AUTHOR_LABELS.get(key, "Unknown")
+
+
+def recommend_text(current, previous) -> str:
+    """'64%', or '64% (+3pp)' once there is a week to compare against."""
+    if current is None:
+        return "—"
+    shown = f"{current:.0f}%"
+    if previous is None:
+        return shown
+    move = delta_text(current, previous, suffix="pp")
+    return shown if move in ("n/a", "no change") else f"{shown} ({move})"
+
+
 def rating_rows(ratings, week_of, entities, platforms):
     """Latest snapshot in the week, compared with the most recent earlier one."""
     target = week_of.isoformat()
@@ -144,6 +172,11 @@ def rating_rows(ratings, week_of, entities, platforms):
         score_prev = H.to_float(prev.get("overall_rating")) if prev else None
         count_now = H.to_int(now.get("review_count"), 0)
         count_prev = H.to_int(prev.get("review_count"), 0) if prev else None
+        # Percent-recommend is collected on every Glassdoor sweep and was never
+        # shown. Westbury reads 0% on two reviews - the sharpest number in the
+        # set, and it was sitting in the sheet only.
+        rec_now = H.to_float(now.get("recommend_pct"))
+        rec_prev = H.to_float(prev.get("recommend_pct")) if prev else None
         rows.append(
             {
                 "entity": entities.get(entity_id, entity_id),
@@ -152,6 +185,10 @@ def rating_rows(ratings, week_of, entities, platforms):
                 "rating_delta": delta_text(score_now, score_prev, digits=2),
                 "reviews": count_now,
                 "reviews_delta": delta_text(count_now, count_prev),
+                # The change rides in the same cell: an eighth column does not
+                # fit an email table, and the figure is useless without it.
+                "recommend": recommend_text(rec_now, rec_prev),
+                "recommend_delta": delta_text(rec_now, rec_prev, suffix="pp"),
                 "since": prev.get("week_of") if prev else "first snapshot",
             }
         )
@@ -653,11 +690,11 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">2 · Rating Movement</h3>')
     if ratings:
         h.append(h_table(
-            ["Entity", "Platform", "Rating", "Change", "Reviews", "New"],
+            ["Entity", "Platform", "Rating", "Change", "Reviews", "New", "Recommend"],
             [[E(r["entity"]), E(r["platform"]), E(r["rating"]), E(r["rating_delta"]),
-              r["reviews"], E(r["reviews_delta"])] for r in ratings],
-            ["left", "left", "right", "right", "right", "right"],
-            ["26%", "17%", "13%", "16%", "13%", "15%"],
+              r["reviews"], E(r["reviews_delta"]), E(r["recommend"])] for r in ratings],
+            ["left", "left", "right", "right", "right", "right", "right"],
+            ["23%", "15%", "11%", "14%", "11%", "12%", "14%"],
         ))
     else:
         h.append('<p style="margin:0 0 8px;">No rating snapshot recorded for this week. '
@@ -690,12 +727,16 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 E(entities.get(m.get("entity"), m.get("entity", ""))),
                 E(platforms.get(m.get("platform"), m.get("platform", ""))),
                 E(m.get("post_date") or m.get("captured_at", "")),
+                E(stars_text(m)),
+                E(author_text(m)),
                 E(H.SENTIMENT_LABELS.get((m.get("sentiment") or "").lower(), "Untagged")),
                 cell,
             ])
-        # The summary is the column people read, so it gets half the width.
-        h.append(h_table(["Entity", "Platform", "Date", "Sentiment", "Summary"], rows,
-                         widths=["15%", "12%", "11%", "12%", "50%"]))
+        # The summary is still the column people read; the rest is context for it.
+        h.append(h_table(
+            ["Entity", "Platform", "Date", "Stars", "Who", "Sentiment", "Summary"], rows,
+            ["left", "left", "left", "right", "left", "left", "left"],
+            ["14%", "10%", "9%", "6%", "13%", "11%", "37%"]))
     else:
         h.append('<p style="margin:0 0 8px;">No new reviews or posts this week.</p>')
 
@@ -815,9 +856,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     t.append("")
     t.append("2. RATING MOVEMENT")
     t.append(t_table(
-        ["Entity", "Platform", "Rating", "Change", "Reviews", "New"],
-        [[r["entity"], r["platform"], r["rating"], r["rating_delta"], r["reviews"], r["reviews_delta"]]
-         for r in ratings],
+        ["Entity", "Platform", "Rating", "Change", "Reviews", "New", "Recommend"],
+        [[r["entity"], r["platform"], r["rating"], r["rating_delta"], r["reviews"],
+          r["reviews_delta"], r["recommend"]] for r in ratings],
     ) if ratings else "No rating snapshot recorded for this week.")
     if no_page:
         t.append("")
@@ -840,6 +881,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 f"- [{entities.get(m.get('entity'), m.get('entity',''))} / "
                 f"{platforms.get(m.get('platform'), m.get('platform',''))} / "
                 f"{m.get('post_date') or m.get('captured_at','')} / "
+                f"{stars_text(m)} / {author_text(m)} / "
                 f"{H.SENTIMENT_LABELS.get((m.get('sentiment') or '').lower(), 'Untagged')}] "
                 f"{truncate(m.get('one_line_summary') or m.get('title_or_snippet',''), summary_max)}"
             )

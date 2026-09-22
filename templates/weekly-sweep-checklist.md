@@ -64,13 +64,17 @@ last Friday**. Sort by newest, not relevance.
 Either paste it all to Claude and let it tag and log, or do it yourself:
 
 ```bash
-python3 scripts/log_rating.py -e <entity> -p <platform> -r <rating> -c <count>
+python3 scripts/log_rating.py -e <entity> -p <platform> -r <rating> -c <count> \
+    --recommend <pct>          # Glassdoor only; AmbitionBox does not print one
+    # add --ceo-approval <pct> if the Glassdoor page shows one
 python3 scripts/log_mention.py --vocab        # allowed values
 python3 scripts/log_mention.py -e … -p … -d … -s "…" --sentiment … --themes …
 ```
 
 - [ ] Every rating recorded — `python3 scripts/log_rating.py --status` shows 7/7
-- [ ] Every new review logged as a mention, with a one-line summary
+- [ ] Every new review logged as a mention, with **both** the review's own words
+      (its title or first line) and your one-line summary — the first is refused if missing
+- [ ] Star rating and department recorded where the page shows them
 - [ ] Customer/product items marked `out_of_scope` (kept, not deleted)
 
 ## 10:45 · Red flags — same day, not Friday afternoon (15 min)

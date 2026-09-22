@@ -134,6 +134,8 @@ def main() -> int:
     parser.add_argument("--pay", type=float, help="sub-score: compensation and benefits")
     parser.add_argument("--job-security", type=float, help="sub-score: job security")
     parser.add_argument("--recommend", type=int, help="percent who recommend")
+    parser.add_argument("--ceo-approval", type=int,
+                        help="percent who approve of the CEO (Glassdoor, when the page shows it)")
     parser.add_argument("--week", help="week_of Monday; defaults to the current week")
     parser.add_argument("--by", default="desk")
     parser.add_argument("--notes", default="")
@@ -186,7 +188,14 @@ def main() -> int:
         "platform": args.platform,
         "overall_rating": f"{args.rating:.2f}",
         "review_count": "" if args.reviews is None else str(args.reviews),
-        "recommend_pct": "" if args.recommend is None else str(args.recommend),
+        # A blank here used to mean either "the platform does not publish this"
+        # or "nobody recorded it", and only the second is a problem worth
+        # chasing. AmbitionBox prints neither figure; Glassdoor prints CEO
+        # approval only on profiles with enough ratings.
+        "recommend_pct": (str(args.recommend) if args.recommend is not None
+                          else H.absent_value(args.platform, "recommend_pct")),
+        "ceo_approval_pct": (str(args.ceo_approval) if args.ceo_approval is not None
+                             else H.absent_value(args.platform, "ceo_approval_pct")),
         "work_life_balance": "" if args.work_life is None else f"{args.work_life:.1f}",
         "salary_benefits": "" if args.pay is None else f"{args.pay:.1f}",
         "job_security": "" if args.job_security is None else f"{args.job_security:.1f}",

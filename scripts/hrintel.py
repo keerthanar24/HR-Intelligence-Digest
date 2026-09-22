@@ -85,6 +85,57 @@ SENTIMENT_LABELS = {
     "very_positive": "Very positive",
 }
 
+# How an author type reads in an email. "Who wrote it" changes what a line
+# means: the same sentence about pay is a retention signal from a current
+# employee and a hiring signal from a candidate.
+AUTHOR_LABELS = {
+    "current_employee": "Current employee",
+    "ex_employee": "Ex-employee",
+    "candidate": "Candidate",
+    "intern": "Intern",
+    "contractor": "Contractor",
+    "anonymous": "Anonymous",
+    "unknown": "Unknown",
+}
+
+# Platforms where a post carries public engagement (likes, reposts, replies).
+# A review site has none, so a blank engagement figure there is correct and a
+# blank one on X is a gap - which is only visible if the two look different.
+ENGAGEMENT_PLATFORMS = {"x", "linkedin", "reddit", "youtube", "quora", "news"}
+
+
+# Platforms where the post's own words are always visible on the page, so a
+# row has no excuse for holding only somebody's paraphrase of them.
+VERBATIM_REQUIRED = {"ambitionbox", "glassdoor", "indeed", "google_reviews"}
+
+
+def platform_publishes(platform_id: str, field: str) -> bool:
+    """Does this platform print this headline figure at all?
+
+    An empty cell answered two different questions - "the platform does not
+    publish this" and "the sweep did not pick it up" - and only the second is a
+    problem. config/sources.yaml now says which figures each platform prints.
+    """
+    for platform in load_yaml("sources").get("platforms", []):
+        if platform.get("id") == platform_id:
+            return field in (platform.get("publishes") or [])
+    return False
+
+
+def absent_value(platform_id: str, field: str) -> str:
+    """What to store when a figure was not recorded: 'n/a' or 'not shown'.
+
+    'n/a'       - the platform never prints it (AmbitionBox has no CEO approval)
+    'not shown' - the platform prints it sometimes, and this page did not
+    """
+    return "not shown" if platform_publishes(platform_id, field) else "n/a"
+
+
+def engagement_applies(platform_id: str) -> bool:
+    """Does this platform publish an engagement count at all?"""
+    return (platform_id or "").strip().lower() in ENGAGEMENT_PLATFORMS
+
+
 THEMES = [
     "compensation",
     "appraisal",

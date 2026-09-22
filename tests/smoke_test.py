@@ -35,6 +35,7 @@ import validate_data  # noqa: E402
 import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
 import alert_queries  # noqa: E402
+import log_mention  # noqa: E402
 
 # The reporting week runs Saturday to Friday and is reported on the Friday it
 # ends (config/settings.yaml).
@@ -776,6 +777,42 @@ def test_workbook_round_trip() -> None:
             "ratings": import_sheet.import_ratings(sheets["Rating_Tracker"], cfg, notes),
             "escalations": import_sheet.import_escalations(sheets["Escalations"], cfg, notes),
         }
+        # import_sheet.main() runs carry_forward over the imported rows, so a
+        # round trip that skips it tests a path nobody runs. It is also the
+        # only thing standing between a field the sheet has no column for and
+        # silent deletion, which is exactly what this test is for.
+        tabs = {"mentions": "Raw_Data_Log", "ratings": "Rating_Tracker",
+                "escalations": "Escalations"}
+        for tab, sheet_name in tabs.items():
+            csv_path = os.path.join(tmp, f"{tab}.csv")
+            import_sheet.write(csv_path, fields[tab], source[tab])
+            back[tab] = import_sheet.carry_forward(
+                csv_path, fields[tab], back[tab], tab,
+                import_sheet.fields_in_sheet(tab, sheets[sheet_name], cfg), notes,
+                import_sheet.fields_by_platform(tab, sheets[sheet_name], cfg) or None)
+
+        # Glassdoor has a CEO-approval column and AmbitionBox does not, because
+        # AmbitionBox does not publish the figure. Merging the two blocks made
+        # the field look supplied for both, so an AmbitionBox value was read as
+        # a cell somebody had cleared and was wiped on every import.
+        blocks = import_sheet.fields_by_platform("ratings", sheets["Rating_Tracker"], cfg)
+        check("Glassdoor supplies ceo_approval_pct",
+              "ceo_approval_pct" in blocks.get("glassdoor", set()))
+        check("AmbitionBox does not, and is not assumed to",
+              "ceo_approval_pct" not in blocks.get("ambitionbox", set()))
+
+        # And the old, merged behaviour really did delete it - otherwise this
+        # whole distinction is decoration.
+        naive = import_sheet.carry_forward(
+            os.path.join(tmp, "ratings.csv"), fields["ratings"],
+            import_sheet.import_ratings(sheets["Rating_Tracker"], cfg, notes), "ratings",
+            import_sheet.fields_in_sheet("ratings", sheets["Rating_Tracker"], cfg), notes)
+        lost = [r for r in naive if r.get("platform") == "ambitionbox"
+                and not str(r.get("ceo_approval_pct", "")).strip()]
+        kept = [r for r in back["ratings"] if r.get("platform") == "ambitionbox"
+                and str(r.get("ceo_approval_pct", "")).strip()]
+        check("merging the blocks would have wiped it", bool(lost), f"({naive})")
+        check("asking per platform keeps it", len(kept) == len(lost), f"({kept})")
 
     for tab, rows in source.items():
         check(f"{tab}: every row survives the trip", len(back[tab]) == len(rows),
@@ -993,8 +1030,12 @@ def test_interactive_saves_as_it_goes() -> None:
             _csv.DictWriter(fh, fieldnames=H.MENTION_FIELDS).writeheader()
 
         answers = iter([
-            "rk_world", "ambitionbox", "2026-09-10", "T", "A first summary",
-            "mixed", "culture", "unknown", "", "", "", "n", "y",
+            "rk_world", "ambitionbox", "2026-09-10",
+            "Good team, poor pay",          # the review's own words - now required
+            "A first summary",
+            "mixed", "culture", "unknown",
+            "Operations",                   # department or role
+            "", "", "", "n", "y",
         ])
         real_input, real_path = builtins.input, H.MENTIONS_CSV
         H.MENTIONS_CSV = path
@@ -1358,6 +1399,99 @@ def test_absent_profile_is_disclosed() -> None:
               "Robust Kommerce on AmbitionBox" in body)
 
 
+def test_fields_reach_the_email() -> None:
+    """Fields collected on every sweep that the digest was dropping.
+
+    Star rating, author type and percent-recommend were all in the CSV and in
+    the Google Sheet and none of them reached the email. Westbury's Glassdoor
+    page reads 0% recommend on two reviews - arguably the sharpest number in
+    the set - and it was visible only to somebody who opened the spreadsheet.
+    """
+    print("collected fields reach the email")
+
+    check("a star rating renders", build_digest.stars_text({"rating_given": "2"}) == "2/5")
+    check("a missing one does not invent a number",
+          build_digest.stars_text({"rating_given": ""}) == "—")
+    check("an out-of-range value is refused",
+          build_digest.stars_text({"rating_given": "9"}) == "—")
+    check("author type is spelled out",
+          build_digest.author_text({"author_type": "ex_employee"}) == "Ex-employee")
+    check("an untagged author is Unknown, not blank",
+          build_digest.author_text({}) == "Unknown")
+
+    check("percent-recommend shows on its own in week 1",
+          build_digest.recommend_text(64, None) == "64%")
+    check("and carries its movement once there is a week before it",
+          build_digest.recommend_text(64, 61) == "64% (+3pp)")
+    check("zero percent is a number, not a blank",
+          build_digest.recommend_text(0, None) == "0%")
+    check("a platform that does not publish it reads as a dash",
+          build_digest.recommend_text(None, None) == "—")
+
+    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    check("the html What's New has a Stars column", "<th" in html and "Stars" in html)
+    check("the html What's New says who wrote it", "Who" in html)
+    check("section 2 carries percent-recommend in html", "Recommend" in html)
+    # The plain-text section 3 is a bullet list, so the values ride inline.
+    check("the text digest shows the star rating", "/5" in text, f"({text[:0]})")
+    check("the text digest names the author type",
+          any(label in text for label in H.AUTHOR_LABELS.values()))
+    check("section 2 carries percent-recommend in text", "Recommend" in text)
+
+
+def test_absent_values_are_named() -> None:
+    """A blank cell answered two different questions.
+
+    "The platform does not publish this" and "the sweep did not pick it up"
+    looked identical, and only the second is worth chasing. AmbitionBox prints
+    neither a would-recommend figure nor CEO approval; a review site has no
+    engagement count at all.
+    """
+    print("absent values are named")
+    check("AmbitionBox never publishes CEO approval",
+          H.absent_value("ambitionbox", "ceo_approval_pct") == "n/a")
+    check("Glassdoor does, so a missing one is 'not shown'",
+          H.absent_value("glassdoor", "ceo_approval_pct") == "not shown")
+    check("AmbitionBox has no percent-recommend either",
+          H.absent_value("ambitionbox", "recommend_pct") == "n/a")
+
+    check("a review site carries no engagement count",
+          not H.engagement_applies("ambitionbox") and not H.engagement_applies("glassdoor"))
+    check("X, LinkedIn and Reddit do",
+          all(H.engagement_applies(p) for p in ("x", "linkedin", "reddit")))
+
+    # The review's own words: the one field in the row that is not an opinion.
+    check("review sites must carry the verbatim line",
+          {"ambitionbox", "glassdoor"} <= H.VERBATIM_REQUIRED)
+    check("a post from a feed is not held to it", "reddit" not in H.VERBATIM_REQUIRED)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "mentions.csv")
+        import_sheet.write(path, H.MENTION_FIELDS, [])
+        saved = H.MENTIONS_CSV
+        H.MENTIONS_CSV = path
+        try:
+            def log(**over):
+                args = dict(entity="rk_world", platform="ambitionbox", date="2026-09-10",
+                            summary="A summary", sentiment="mixed", themes="culture",
+                            author="unknown", url="", title="Good team, poor pay", role="",
+                            rating="3", engagement=None, names_individual=False, flag=None,
+                            notes="", mixed_post=False, by="desk")
+                args.update(over)
+                return log_mention.log_one(argparse.Namespace(**args))
+
+            check("a review with no verbatim line is refused", log(title="") == 2)
+            check("one that carries it is accepted", log() == 0)
+            rows = H.read_csv(path)
+            check("engagement reads n/a on a review site",
+                  rows and rows[0]["engagement"] == "n/a", f"({rows})")
+            check("the department is kept when the page shows one",
+                  log(platform="glassdoor", role="Operations", url="") == 0
+                  and H.read_csv(path)[-1]["role_or_dept"] == "Operations")
+        finally:
+            H.MENTIONS_CSV = saved
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1574,7 +1708,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
