@@ -1037,6 +1037,31 @@ def test_prompt_accepts_real_typing() -> None:
           answer("", H.AUTHOR_TYPES) == "")
 
 
+def test_source_link_falls_back_to_the_page() -> None:
+    """A row with no permalink must still give the reader somewhere to go.
+
+    Most AmbitionBox reviews have no link of their own, so section 3 was
+    handing readers a summary with nothing to check it against. The review
+    page is the right place to look; the label has to say "page" so nobody
+    expects to land on the review itself.
+    """
+    print("source link falls back to the page")
+    own = build_digest.source_link(
+        {"entity": "rk_group", "platform": "ambitionbox", "url": "https://x.invalid/r/1"})
+    check("a real permalink is used as-is", own == ("https://x.invalid/r/1", "link"))
+
+    page, label = build_digest.source_link(
+        {"entity": "rk_group", "platform": "ambitionbox", "url": ""})
+    check("no permalink falls back to the review page", "ambitionbox.com" in page,
+          f"(got {page})")
+    check("and says it is the page, not the review", label == "page")
+
+    none = build_digest.source_link(
+        {"entity": "robust_kommerce", "platform": "ambitionbox", "url": ""})
+    check("a platform with no page for that entity offers nothing",
+          none == ("", ""), f"(got {none})")
+
+
 def test_marketplace_complaints_are_out_of_scope() -> None:
     """Seller-conduct wording must be refused, not just customer-service wording.
 
@@ -1283,7 +1308,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

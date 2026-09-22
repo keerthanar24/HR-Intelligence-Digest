@@ -46,9 +46,17 @@ SCOPED_URL_MARKERS = ["/locations/", "-location", "/departments/", "-department"
 
 
 class Report:
+    """Three levels, because two were not enough.
+
+    A warning nobody can act on is worse than silence: it trains people to
+    skim past the list, and the one that mattered goes with it. Notes are for
+    things that are working as intended and worth stating once.
+    """
+
     def __init__(self) -> None:
         self.errors: list[str] = []
         self.warnings: list[str] = []
+        self.notes: list[str] = []
 
     def error(self, message: str) -> None:
         self.errors.append(message)
@@ -56,15 +64,22 @@ class Report:
     def warn(self, message: str) -> None:
         self.warnings.append(message)
 
+    def note(self, message: str) -> None:
+        self.notes.append(message)
+
     def emit(self) -> int:
         for message in self.errors:
             print(f"ERROR   {message}")
         for message in self.warnings:
             print(f"WARNING {message}")
+        for message in self.notes:
+            print(f"note    {message}")
         if not self.errors and not self.warnings:
-            print("All checks passed.")
+            print("All checks passed." if not self.notes
+                  else f"All checks passed, with {len(self.notes)} note(s).")
         else:
-            print(f"\n{len(self.errors)} error(s), {len(self.warnings)} warning(s).")
+            print(f"\n{len(self.errors)} error(s), {len(self.warnings)} warning(s)"
+                  + (f", {len(self.notes)} note(s)." if self.notes else "."))
         return 1 if self.errors else 0
 
 
@@ -182,7 +197,17 @@ def check_mentions(report: Report, rows: list[dict], week_of: dt.date | None) ->
             else:
                 seen_urls[canonical] = row.get("mention_id", "?")
         else:
-            report.warn(f"{where}: no source URL — the digest cannot link to it.")
+            page = H.profile_url(row.get("entity", ""), row.get("platform", ""))
+            if page:
+                # Not worth a warning on its own: most AmbitionBox reviews have
+                # no permalink, so this would fire on nearly every row forever
+                # and train people to ignore the validator.
+                report.note(f"{where}: no permalink; the digest will link to the "
+                            f"{H.platform_names().get(row.get('platform',''), 'platform')} "
+                            "page instead.")
+            else:
+                report.warn(f"{where}: no source URL and no page for this "
+                            "entity/platform — the digest cannot link to it at all.")
 
         status = (row.get("status") or "").strip()
         if status and status not in H.STATUSES:

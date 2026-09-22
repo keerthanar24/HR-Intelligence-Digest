@@ -468,6 +468,21 @@ def unrated_entities(entities, profiles=None):
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 
+def source_link(mention):
+    """(url, label) for a mention: its own link, or the page it came from.
+
+    Most AmbitionBox reviews have no permalink, so the row carries no URL and
+    the reader is handed a summary with nothing to check it against. Falling
+    back to the review page is honest as long as the label says so - "page"
+    rather than "link", because it lands on the listing, not the review.
+    """
+    own = (mention.get("url") or "").strip()
+    if own:
+        return own, "link"
+    page = H.profile_url(mention.get("entity", ""), mention.get("platform", ""))
+    return (page, "page") if page else ("", "")
+
+
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
@@ -596,11 +611,11 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if now:
         rows = []
         for m in sorted(now, key=lambda x: (x.get("post_date") or "", x.get("entity") or "")):
-            link = m.get("url", "")
+            link, label = source_link(m)
             summary = truncate(m.get("one_line_summary") or m.get("title_or_snippet", ""), summary_max)
             cell = E(summary)
             if link:
-                cell += f' <a href="{E(link)}" style="color:#2b6cb0;">link</a>'
+                cell += f' <a href="{E(link)}" style="color:#2b6cb0;">{label}</a>'
             rows.append([
                 E(entities.get(m.get("entity"), m.get("entity", ""))),
                 E(platforms.get(m.get("platform"), m.get("platform", ""))),
@@ -748,8 +763,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 f"{H.SENTIMENT_LABELS.get((m.get('sentiment') or '').lower(), 'Untagged')}] "
                 f"{truncate(m.get('one_line_summary') or m.get('title_or_snippet',''), summary_max)}"
             )
-            if m.get("url"):
-                t.append(f"  {m['url']}")
+            link, label = source_link(m)
+            if link:
+                t.append(f"  {link}" + ("   (page, not the review itself)"
+                                        if label == "page" else ""))
     else:
         t.append("No new reviews or posts this week.")
     if swept:

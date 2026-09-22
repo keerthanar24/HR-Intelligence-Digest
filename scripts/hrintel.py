@@ -147,6 +147,22 @@ def rated_profiles() -> list[tuple[str, str]]:
     return sorted(pairs)
 
 
+def profile_url(entity_id: str, platform_id: str) -> str:
+    """The review page for one entity on one platform, or "".
+
+    Most AmbitionBox reviews have no permalink of their own, so a row logged
+    from one carries no URL and the digest can offer the reader nothing to
+    click. The page the review sits on is the next best thing: it is the
+    right place to go looking, and it is already in config.
+    """
+    for platform in load_yaml("sources").get("platforms", []):
+        if platform.get("id") != platform_id:
+            continue
+        url = str((platform.get("urls") or {}).get(entity_id, "")).strip()
+        return "" if url.lower() == "none" or is_todo(url) else url
+    return ""
+
+
 def platform_names() -> dict[str, str]:
     cfg = load_yaml("sources")
     return {p["id"]: p["name"] for p in cfg.get("platforms", [])}
