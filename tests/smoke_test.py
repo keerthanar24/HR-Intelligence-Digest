@@ -927,6 +927,36 @@ def test_unrated_entity_is_named() -> None:
               "not evidence of a quiet week" in body)
 
 
+def test_marketplace_complaints_are_out_of_scope() -> None:
+    """Seller-conduct wording must be refused, not just customer-service wording.
+
+    The first real back-read turned this up on AmbitionBox: "It's a thief
+    company, fraud seller, they had done fraud selling on Amazon". Posted on
+    an employer review site, but about how the company sells, not about
+    working there - and the out-of-scope list did not catch it, because it
+    only covered refunds, couriers and warranties.
+    """
+    print("marketplace complaints are out of scope")
+    out = [
+        "It's a theif company, fraud seller, they had done fraud selling on Amazon",
+        "Sells fake products on Flipkart, customers cheated",
+        "Counterfeit goods in their amazon listing",
+    ]
+    for text in out:
+        check(f"refused: {text[:44]!r}", bool(H.customer_side_terms(text)))
+
+    # And employment commentary must still pass, including where it is angry.
+    keep = [
+        "Appraisal delayed two quarters and manager unsupportive",
+        "Good team but salary below market",
+        "Full-and-final settlement pending for two months",
+        "Toxic management, people quit within months",
+    ]
+    for text in keep:
+        check(f"kept: {text[:44]!r}", not H.customer_side_terms(text),
+              f"(flagged {H.customer_side_terms(text)})")
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1143,7 +1173,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

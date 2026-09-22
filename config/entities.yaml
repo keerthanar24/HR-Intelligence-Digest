@@ -210,3 +210,21 @@ out_of_scope_terms:
   - product quality
   - customer care
   - shipment
+  # Marketplace-conduct wording, which the first real back-read turned up on
+  # AmbitionBox: "It's a thief company, fraud seller, they had done fraud
+  # selling on Amazon". Posted on an employer review site, but about how the
+  # company sells, not about working there - and the list did not catch it.
+  - fraud seller
+  - fraud selling
+  - fraudulent seller
+  - fake product
+  - fake products
+  - counterfeit
+  - duplicate product
+  - marketplace
+  - amazon listing
+  - flipkart
+  - seller rating
+  - buyer
+  - customers cheated
+  - cheated customers
