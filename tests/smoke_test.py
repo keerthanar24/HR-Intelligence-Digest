@@ -927,6 +927,37 @@ def test_unrated_entity_is_named() -> None:
               "not evidence of a quiet week" in body)
 
 
+def test_prompt_accepts_real_typing() -> None:
+    """The guided prompt must not bounce an answer that plainly means the value.
+
+    Found while logging the first real review: "Current_employee" was
+    rejected because the vocabulary is lowercase. The person had read the
+    list and typed the right thing; being fussy about the shift key only
+    teaches them the tool is unpleasant.
+    """
+    print("prompt accepts real typing")
+    import builtins, log_mention
+
+    def answer(typed, allowed, multi=False):
+        real = builtins.input
+        builtins.input = lambda _prompt: typed
+        try:
+            return log_mention.ask("x", allowed=allowed, multi=multi)
+        finally:
+            builtins.input = real
+
+    for typed in ("current_employee", "Current_employee", "CURRENT EMPLOYEE",
+                  "current employee", "current-employee"):
+        check(f"{typed!r} means current_employee",
+              answer(typed, H.AUTHOR_TYPES) == "current_employee")
+
+    check("multi-value answers are normalised too",
+          answer("Compensation, Growth_Learning", H.THEMES, multi=True)
+          == "compensation|growth_learning")
+    check("a genuinely wrong value is still refused",
+          answer("", H.AUTHOR_TYPES) == "")
+
+
 def test_marketplace_complaints_are_out_of_scope() -> None:
     """Seller-conduct wording must be refused, not just customer-service wording.
 
@@ -1173,7 +1204,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

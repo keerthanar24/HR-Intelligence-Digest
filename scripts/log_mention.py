@@ -106,11 +106,21 @@ def ask(prompt, *, allowed=None, default="", required=False, multi=False):
         if allowed and raw:
             values = [v.strip() for v in raw.replace(",", "|").split("|") if v.strip()] \
                 if multi else [raw]
-            bad = [v for v in values if v not in allowed]
+            # Accept any capitalisation and a space where the value has an
+            # underscore. "Current_employee" and "current employee" both
+            # plainly mean current_employee, and bouncing them teaches nothing
+            # except that the tool is fussy.
+            lookup = {a.lower(): a for a in allowed}
+            lookup.update({a.lower().replace("_", " "): a for a in allowed})
+            lookup.update({a.lower().replace("_", "-"): a for a in allowed})
+            fixed, bad = [], []
+            for value in values:
+                match = lookup.get(value.lower())
+                (fixed if match else bad).append(match or value)
             if bad:
                 print(f"    not on the list: {', '.join(bad)}")
                 continue
-            return "|".join(values) if multi else raw
+            return "|".join(fixed) if multi else fixed[0]
         return raw
 
 
