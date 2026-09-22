@@ -12,6 +12,7 @@ No network, no writes outside a temporary directory.
 
 from __future__ import annotations
 
+import argparse
 import datetime as dt
 import os
 import shutil
@@ -927,6 +928,49 @@ def test_unrated_entity_is_named() -> None:
               "not evidence of a quiet week" in body)
 
 
+def test_interactive_saves_as_it_goes() -> None:
+    """Each review must be on disk before the next one is asked for.
+
+    The first version queued them and wrote at the end of the loop, so a
+    Ctrl-C - to check the list, or by accident - threw away everything logged
+    so far. On a sixty-day back-read that is an hour of reading gone, and the
+    person has no way to know which reviews they had already done.
+    """
+    print("interactive saves as it goes")
+    import builtins, log_mention
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "mentions.csv")
+        import csv as _csv
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            _csv.DictWriter(fh, fieldnames=H.MENTION_FIELDS).writeheader()
+
+        answers = iter([
+            "rk_world", "ambitionbox", "2026-09-10", "T", "A first summary",
+            "mixed", "culture", "unknown", "", "", "", "n", "y",
+        ])
+        real_input, real_path = builtins.input, H.MENTIONS_CSV
+        H.MENTIONS_CSV = path
+        builtins.input = lambda _p: next(answers)
+        try:
+            # Runs out of answers partway through the SECOND review, which is
+            # exactly the Ctrl-C case.
+            try:
+                log_mention.interactive(argparse.Namespace(
+                    entity=None, platform=None, by="desk"))
+            except (StopIteration, RuntimeError):
+                pass
+            rows = H.read_csv(path)
+        finally:
+            builtins.input, H.MENTIONS_CSV = real_input, real_path
+
+    check("the finished review survives the interruption", len(rows) == 1,
+          f"(got {len(rows)})")
+    check("and it is the one that was completed",
+          rows and rows[0]["one_line_summary"] == "A first summary",
+          f"(got {rows[0]['one_line_summary'] if rows else None!r})")
+
+
 def test_prompt_accepts_real_typing() -> None:
     """The guided prompt must not bounce an answer that plainly means the value.
 
@@ -1204,7 +1248,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

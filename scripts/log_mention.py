@@ -133,7 +133,7 @@ def interactive(defaults) -> list[argparse.Namespace]:
     """
     entities, platforms = H.entity_names(), H.platform_names()
     print("\nLogging reviews one at a time. Blank answer = the value in [brackets].")
-    print("Ctrl-C when the page is done.\n")
+    print("Each review is saved as you finish it, so Ctrl-C is safe.\n")
     collected, last = [], dict(entity=defaults.entity or "", platform=defaults.platform or "")
     while True:
         print("-" * 68)
@@ -151,14 +151,21 @@ def interactive(defaults) -> list[argparse.Namespace]:
         flag = ask("red-flag trigger, blank if none", allowed=H.RED_FLAG_REASONS)
         names = ask("does it name an individual? y/N", default="n").lower().startswith("y")
 
-        collected.append(argparse.Namespace(
+        one = argparse.Namespace(
             entity=entity, platform=platform, date=date, summary=summary,
             sentiment=sentiment, themes=themes, author=author, url=url, title=title,
             role="", rating=stars, engagement=None, names_individual=names,
             flag=flag or None, notes="", mixed_post=False, by=defaults.by,
-            vocab=False, list=False, week=None))
+            vocab=False, list=False, week=None, all=False, remove=None,
+            interactive=False)
+        # Written now, not at the end of the session. Queuing until the loop
+        # closed meant one Ctrl-C - to check the list, or by accident - threw
+        # away everything logged so far, which on a sixty-day back-read is an
+        # hour of reading.
+        if log_one(one) == 0:
+            collected.append(one)
         last = {"entity": entity, "platform": platform}
-        print(f"  queued ({len(collected)} so far)")
+        print(f"  {len(collected)} logged this session")
         if not ask("another from this page? Y/n", default="y").lower().startswith("y"):
             return collected
 
@@ -247,16 +254,12 @@ def main() -> int:
         return show_week(H.week_start_of(week))
     if args.interactive:
         try:
-            queued = interactive(args)
+            done = interactive(args)
         except (KeyboardInterrupt, EOFError):
-            print("\n  stopped; nothing from this session was written.")
+            print("\n  stopped. Everything logged before this point is saved.")
             return 0
-        failed = 0
-        for one in queued:
-            if log_one(one) != 0:
-                failed += 1
-        print(f"\n{len(queued) - failed} logged, {failed} rejected.")
-        return 1 if failed else 0
+        print(f"\n{len(done)} logged this session.")
+        return 0
 
     return log_one(args)
 
