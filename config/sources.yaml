@@ -84,7 +84,12 @@ platforms:
     # and were in the source map in name only. This searches POSTS for the
     # company name, which is public commentary about an employer - not the
     # same thing as opening someone's profile, which stays out of scope.
-    search_url: "https://www.linkedin.com/search/results/content/?keywords={query}&sortBy=%22date_posted%22"
+    # datePosted=past-week matches the Saturday-Friday reporting week closely
+    # enough, and is what stops the sweep re-reading the same posts every week:
+    # without it LinkedIn sorts by relevance, and relevance does not change.
+    # Needs a logged-in session - LinkedIn content search is not public, so
+    # this can never be automated and always needs a person.
+    search_url: "https://www.linkedin.com/search/results/content/?keywords={query}&datePosted=%22past-week%22&sortBy=%22date_posted%22"
     notes: >-
       Company page activity and public post search only. Do not browse or compile
       individual personal profiles — see the boundary in docs/00-brief.md section 4.
