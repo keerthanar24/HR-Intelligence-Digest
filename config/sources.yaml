@@ -95,6 +95,16 @@ platforms:
     cadence: fortnightly
     priority: 2
     captures: [reviews, interviews]
+    # Swept 2026-09-22 (trial week 1): NO Indeed employer page exists for any
+    # of the four entities. Not "a page with no reviews" - no profile at all,
+    # so there is nothing to sort by newest and nothing to return every
+    # fortnight. Recorded in data/sweeps.csv rather than left as folklore.
+    #
+    # Kept in the source map, not deleted: a profile can be created at any
+    # time, usually by a candidate or by Indeed itself once a job is posted,
+    # and google_alerts_indeed is the standing cover for exactly that. Confirm
+    # once more in week 3; if it is still absent, the fortnightly manual look
+    # has nothing to look at and the alert should carry the channel alone.
     urls: {}
 
   - id: x

@@ -96,6 +96,13 @@ look and the collector does not tick the box on Indeed's behalf.
 Indeed has no public API — the Publisher API was closed years ago and automated collection is
 blocked — so this alert is the only automation available for it.
 
+> **Swept 2026-09-22 (trial week 1): no Indeed employer page exists for any of the four
+> entities.** Not "a page with no reviews" — no profile at all. Recorded in
+> `data/sweeps.csv`. Confirm once more in week 3; if it is still absent, the fortnightly
+> manual look has nothing to look at and `google_alerts_indeed` should carry the channel on
+> its own. A profile can appear at any time — usually created by a candidate, or by Indeed
+> once a job is posted — which is what the alert is standing cover for.
+
 > **What "fortnightly" means.** Trial weeks 1, 3, 5, 7 — counted from `programme.trial_start`
 > in `config/settings.yaml`, so the rotation cannot drift. The cadence in `config/sources.yaml`
 > is now evaluated rather than left to the desk: `make sweep` marks each fortnightly channel
