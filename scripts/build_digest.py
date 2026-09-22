@@ -74,13 +74,17 @@ def plural(count: int, word: str) -> str:
     return f"{count} {word}" if count == 1 else f"{count} {word}s"
 
 
-def headline_rows(mentions_now, mentions_prev, entities):
+def headline_rows(mentions_now, mentions_prev, entities, comparable=True):
     """Per-entity counts and sentiment, with a group total row at the end.
 
     RK Group is the parent and the other four are its subsidiaries, so the four
     executives read this as one group first and a breakdown second. The parent
     keeps its own row - it is an employer in its own right - and the total
     spans every entity including it.
+
+    comparable=False for the week 1 baseline: nothing precedes it, so a delta
+    against an empty previous period would read "+3" as though three reviews
+    had arrived in a week, when they arrived across sixty days.
     """
     rows = []
     for entity_id, name in entities.items():
@@ -93,10 +97,10 @@ def headline_rows(mentions_now, mentions_prev, entities):
                 "entity": name,
                 "count": len(now),
                 "count_prev": len(prev),
-                "count_delta": delta_text(len(now), len(prev)),
+                "count_delta": delta_text(len(now), len(prev)) if comparable else "n/a",
                 "net": sentiment_text(net_now),
                 "net_prev": sentiment_text(net_prev),
-                "net_delta": delta_text(net_now, net_prev, digits=2),
+                "net_delta": delta_text(net_now, net_prev, digits=2) if comparable else "n/a",
                 "untagged": sum(1 for m in now if H.sentiment_score(m) is None),
                 "is_total": False,
             }
@@ -108,10 +112,12 @@ def headline_rows(mentions_now, mentions_prev, entities):
             "entity": "Group total",
             "count": len(mentions_now),
             "count_prev": len(mentions_prev),
-            "count_delta": delta_text(len(mentions_now), len(mentions_prev)),
+            "count_delta": (delta_text(len(mentions_now), len(mentions_prev))
+                            if comparable else "n/a"),
             "net": sentiment_text(net_now),
             "net_prev": sentiment_text(net_prev),
-            "net_delta": delta_text(net_now, net_prev, digits=2),
+            "net_delta": (delta_text(net_now, net_prev, digits=2)
+                          if comparable else "n/a"),
             "untagged": sum(1 for m in mentions_now if H.sentiment_score(m) is None),
             "is_total": True,
         }
@@ -483,6 +489,35 @@ def source_link(mention):
     return (page, "page") if page else ("", "")
 
 
+def baseline_window(week_of, settings):
+    """(first_day, last_day, days) for week 1, or None for an ordinary week.
+
+    The brief makes week 1 a sixty-day baseline, but every digest reported a
+    strict seven days. The back-read then landed in the weeks the reviews were
+    actually posted - August and early September - and the week 1 digest
+    reported zero mentions with the whole baseline sitting in the file,
+    invisible. A digest that says "no new reviews" the week you read sixty
+    days of them is worse than no digest.
+    """
+    start = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
+    if not start or H.week_start_of(start) != week_of:
+        return None
+    days = int(settings.get("digest", {}).get("baseline_days", 60))
+    last = week_of + dt.timedelta(days=6)
+    return last - dt.timedelta(days=days - 1), last, days
+
+
+def mentions_in(all_mentions, first, last):
+    """Every mention posted between two dates, inclusive."""
+    kept = []
+    for mention in all_mentions:
+        posted = H.parse_date(mention.get("post_date", "")) or \
+            H.parse_date(mention.get("captured_at", ""))
+        if posted and first <= posted <= last:
+            kept.append(mention)
+    return kept
+
+
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
@@ -495,12 +530,22 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     escalations = H.read_csv(H.ESCALATIONS_CSV)
 
     prev_week = week_of - dt.timedelta(days=7)
-    now = [m for m in H.mentions_for_week(all_mentions, week_of)
-           if (m.get("status") or "") != "out_of_scope"]
-    prev = [m for m in H.mentions_for_week(all_mentions, prev_week)
-            if (m.get("status") or "") != "out_of_scope"]
+    baseline = baseline_window(week_of, settings)
+    if baseline:
+        first, last, baseline_days = baseline
+        now = [m for m in mentions_in(all_mentions, first, last)
+               if (m.get("status") or "") != "out_of_scope"]
+        # Nothing precedes a baseline, so there is no previous period to
+        # compare against and every "vs last week" column reads n/a.
+        prev = []
+    else:
+        baseline_days = 0
+        now = [m for m in H.mentions_for_week(all_mentions, week_of)
+               if (m.get("status") or "") != "out_of_scope"]
+        prev = [m for m in H.mentions_for_week(all_mentions, prev_week)
+                if (m.get("status") or "") != "out_of_scope"]
 
-    heads = headline_rows(now, prev, entities)
+    heads = headline_rows(now, prev, entities, comparable=not baseline)
     ratings = rating_rows(all_ratings, week_of, entities, platforms)
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
@@ -519,7 +564,18 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     untagged = sum(1 for m in now if H.sentiment_score(m) is None)
     data_link = digest_cfg.get("data_link", "")
     holdings = sheet_contents(now, all_ratings, flags, week_of)
+    compare = "n/a" if baseline else None
+
+    def vs_previous(value, previous, digits=0):
+        """The 'vs previous week' figure, or n/a when nothing precedes it."""
+        return compare or delta_text(value, previous, digits=digits)
+
     week_label = H.fmt_week(week_of)
+    if baseline:
+        # Say what the period actually is. "Week of 19-25 Sep" over sixty days
+        # of findings would misdate every row in section 3.
+        week_label = (f"{baseline_days}-day baseline, {H.day_month(baseline[0])} to "
+                      f"{H.day_month(baseline[1], year=True)}")
 
     # A week built before it has ended covers fewer than seven days. Say so:
     # three days read as seven would understate the week and distort every
@@ -550,9 +606,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     )
     h.append('<h2 style="margin:0 0 4px;font-size:20px;">HR Intelligence Digest</h2>')
     h.append(
-        f'<p style="margin:0 0 16px;color:#52606d;font-size:13px;">Week of {E(week_label)} '
+        f'<p style="margin:0 0 16px;color:#52606d;font-size:13px;">{"" if baseline else "Week of "}{E(week_label)} '
         f'· {E(plural(total, "mention"))} '
-        f'({delta_text(total, total_prev)} vs previous week) '
+        f'({vs_previous(total, total_prev)} vs previous week) '
         f'· net sentiment {E(sentiment_text(net_now))} '
         f'({E(delta_text(net_now, net_prev, digits=2))})</p>'
     )
@@ -716,11 +772,11 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     # ---------- plain text ----------
     t: list[str] = []
     t.append("HR INTELLIGENCE DIGEST")
-    t.append(f"Week of {week_label}")
+    t.append(week_label if baseline else f"Week of {week_label}")
     t.append(
-        f"{plural(total, 'mention')} ({delta_text(total, total_prev)} vs previous week) · "
+        f"{plural(total, 'mention')} ({vs_previous(total, total_prev)} vs previous week) · "
         f"net sentiment {sentiment_text(net_now)} "
-        f"({delta_text(net_now, net_prev, digits=2)} vs previous week)"
+        f"({vs_previous(net_now, net_prev, digits=2)} vs previous week)"
     )
     if partial:
         t.append(f"PARTIAL WEEK - covers {days_elapsed} of 7 days, to "

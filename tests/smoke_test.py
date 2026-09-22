@@ -1037,6 +1037,51 @@ def test_prompt_accepts_real_typing() -> None:
           answer("", H.AUTHOR_TYPES) == "")
 
 
+def test_week_one_reports_the_baseline() -> None:
+    """Week 1 covers sixty days, not seven.
+
+    The brief makes week 1 a sixty-day baseline, but every digest reported a
+    strict week. The first real back-read then landed in the weeks the reviews
+    were posted - August and early September - and the week 1 digest reported
+    zero mentions with the whole baseline sitting in the file, invisible.
+    """
+    print("week one reports the baseline")
+    settings = H.load_yaml("settings")
+    start = H.parse_date(settings["programme"]["trial_start"])
+    week_one = H.week_start_of(start)
+
+    window = build_digest.baseline_window(week_one, settings)
+    check("week 1 is a baseline", window is not None)
+    check("it is sixty days long", window and (window[1] - window[0]).days == 59,
+          f"(got {window})")
+    check("it ends when week 1 ends", window and window[1] == week_one + dt.timedelta(days=6))
+    check("week 2 is an ordinary week",
+          build_digest.baseline_window(week_one + dt.timedelta(days=7), settings) is None)
+
+    # A mention posted five weeks before the trial belongs to the baseline.
+    old = [{f: "" for f in H.MENTION_FIELDS} | {
+        "mention_id": "M-1", "entity": "rk_world", "platform": "ambitionbox",
+        "post_date": (week_one - dt.timedelta(days=35)).isoformat(),
+        "sentiment": "negative", "one_line_summary": "old but inside sixty days"}]
+    inside = build_digest.mentions_in(old, window[0], window[1])
+    check("a review from five weeks before the trial is in the baseline",
+          len(inside) == 1, f"(got {inside})")
+
+    far = [{f: "" for f in H.MENTION_FIELDS} | {
+        "mention_id": "M-2", "post_date": (window[0] - dt.timedelta(days=1)).isoformat()}]
+    check("a review one day older is not",
+          build_digest.mentions_in(far, window[0], window[1]) == [])
+
+    # Nothing precedes a baseline, so every comparison must read n/a rather
+    # than "+3", which would claim three reviews arrived in a week.
+    rows = build_digest.headline_rows(old, [], H.entity_names(), comparable=False)
+    check("baseline deltas read n/a, not +3",
+          all(r["count_delta"] == "n/a" for r in rows),
+          f"(got {[r['count_delta'] for r in rows]})")
+    check("and so does the group total",
+          rows[-1]["is_total"] and rows[-1]["net_delta"] == "n/a")
+
+
 def test_source_link_falls_back_to_the_page() -> None:
     """A row with no permalink must still give the reader somewhere to go.
 
@@ -1308,7 +1353,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
