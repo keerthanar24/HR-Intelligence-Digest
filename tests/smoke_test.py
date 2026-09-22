@@ -440,14 +440,25 @@ def test_digest() -> None:
     check("no partial notice on a finished week",
           "PARTIAL WEEK" not in body_text and "Partial week" not in body_html)
     running = H.week_start_of(dt.date.today())
-    _, part_html, part_text, part_stats = build_digest.build(running, settings)
+    part_subject, part_html, part_text, part_stats = build_digest.build(running, settings)
     if part_stats["days_elapsed"] < 7:
         check("a running week is marked partial", part_stats["partial"])
-        check("the notice names how many days", "of 7 days" in part_text)
-        check("the subject warns too",
-              "PARTIAL" in build_digest.build(running, settings)[0])
-        check("the notice is in both bodies",
-              "Partial week" in part_html and "PARTIAL WEEK" in part_text)
+        # The baseline week gets its own wording: "4 of 7 days" is the wrong
+        # frame for a period that is sixty days long.
+        if build_digest.baseline_window(running, settings):
+            check("an open baseline says so, not 'partial week'",
+                  "BASELINE STILL OPEN" in part_text and "Baseline still open" in part_html)
+            check("and names the day it closes",
+                  "It closes" in part_text and "It closes" in part_html)
+            check("the subject says it is in progress", "IN PROGRESS" in part_subject,
+                  f"(got {part_subject})")
+            check("the subject does not read 'week of 60-day baseline'",
+                  "week of 60-day" not in part_subject, f"(got {part_subject})")
+        else:
+            check("the notice names how many days", "of 7 days" in part_text)
+            check("the subject warns too", "PARTIAL" in part_subject)
+            check("the notice is in both bodies",
+                  "Partial week" in part_html and "PARTIAL WEEK" in part_text)
 
     # Appraisal appears twice this week and must surface as a recurring theme.
     check("recurring theme surfaced", "Appraisal" in body_html)
