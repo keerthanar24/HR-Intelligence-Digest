@@ -1639,6 +1639,41 @@ def test_linkedin_is_fully_reachable() -> None:
     check("one under it is not", "M-2" not in found, f"({found})")
 
 
+def test_same_day_promise_is_qualified() -> None:
+    """Section 5 promises same-day escalation. Say where that holds.
+
+    The SLA columns measure from the moment a flag is FOUND, and nothing
+    measured how long it took to be found. On a channel a person opens once a
+    week, a complaint posted on Saturday waits six days before the clock even
+    starts - so the promise was true of the measurement and not of the world.
+    """
+    print("same-day promise is qualified")
+    platforms = H.platform_names()
+
+    check("a review site has a daily route - the review count",
+          H.same_day_cover("ambitionbox") == "count"
+          and H.same_day_cover("glassdoor") == "count")
+    check("a fed channel has one too - the collector runs daily",
+          H.same_day_cover("reddit") == "feed" and H.same_day_cover("news") == "feed")
+    check("the Quora alert gives Quora one", H.same_day_cover("quora") == "feed")
+    check("LinkedIn has none - it blocks automated checking",
+          H.same_day_cover("linkedin") == "")
+    check("nor does X while its feeds are disabled", H.same_day_cover("x") == "")
+
+    lagging = build_digest.same_day_note(platforms)
+    check("the digest names exactly those",
+          set(lagging) == {"LinkedIn", "X", "YouTube", "Google Reviews"},
+          f"(got {lagging})")
+
+    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    for name, body in (("html", html), ("text", text)):
+        check(f"the {name} digest says so under Red Flags",
+              "only read on the weekly sweep" in body)
+        check(f"the {name} digest names LinkedIn as lagging", "LinkedIn" in body)
+    check("and does not blame the process for it",
+          "limit of the sources" in text)
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1855,7 +1890,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

@@ -103,6 +103,12 @@ python3 scripts/log_mention.py -e … -p … -d … -s "…" --sentiment … --t
 
 ## 10:45 · Red flags — same day, not Friday afternoon (15 min)
 
+> Same-day cover reaches AmbitionBox, Glassdoor (daily count check), Reddit, news, Quora and
+> Indeed (daily collector). **LinkedIn, X, YouTube and Google Reviews are only read here, on
+> the weekly sweep** — anything on them can be up to six days old. See
+> `docs/04-red-flag-protocol.md` for the two things that narrow that, neither of which is code.
+
+
 ```bash
 python3 scripts/red_flags.py --scan
 ```

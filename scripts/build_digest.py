@@ -511,6 +511,20 @@ def unrated_entities(entities, profiles=None):
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 
+def same_day_note(platforms):
+    """The channels where a red flag cannot surface until the weekly sweep.
+
+    Section 5 promises immediate, same-day escalation, and the SLA columns
+    measure it from the moment a flag is FOUND. Nothing measured how long it
+    took to be found - and on the channels a person only opens on Friday, a
+    complaint posted on Saturday waits six days before the clock even starts.
+    The promise is real for the rest; saying which is which is the difference
+    between a safeguard and an assurance.
+    """
+    names = [platforms.get(p, p.replace("_", " ").title()) for p in H.no_same_day_cover()]
+    return sorted(names)
+
+
 def channel_coverage(week_of, settings, platforms, swept):
     """(also_swept, not_swept) for the channels that carry no review count.
 
@@ -608,6 +622,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms,
                                 baseline=is_baseline)
     also_swept, not_swept = channel_coverage(week_of, settings, platforms, swept)
+    lagging = same_day_note(platforms)
     swept = sorted(set(swept) | set(also_swept))
     rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
     rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
@@ -833,6 +848,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         ))
     else:
         h.append('<p style="margin:0 0 8px;">None this week.</p>')
+    if lagging:
+        h.append('<p style="margin:0 0 8px;font-size:12px;color:#8a6d3b;">'
+                 'Same-day escalation covers the channels checked daily. '
+                 f'<strong>{E(", ".join(lagging))}</strong> '
+                 f'{"is" if len(lagging) == 1 else "are"} only read on the weekly sweep, '
+                 'so something posted there can be up to a week old before it is seen. '
+                 'The platforms block automated checking, so this is a limit of the '
+                 'sources, not of the process.</p>')
 
     # 6. Data link
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">6 · Data</h3>')
@@ -968,6 +991,13 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 t.append(f"  {r['url']}")
     else:
         t.append("None this week.")
+    if lagging:
+        t.append("")
+        t.append(f"Same-day escalation covers the channels checked daily. "
+                 f"{', '.join(lagging)} {'is' if len(lagging) == 1 else 'are'} only read on "
+                 "the weekly sweep, so something posted there can be up to a week old "
+                 "before it is seen. The platforms block automated checking, so this is a "
+                 "limit of the sources, not of the process.")
     t.append("")
     t.append("6. DATA")
     if data_link and not H.is_todo(data_link):

@@ -141,6 +141,34 @@ def unverified_channels(week_of: dt.date, settings: dict | None = None) -> list[
     return sorted(out)
 
 
+def same_day_cover(platform_id: str) -> str:
+    """How a new item on this platform could be spotted the same day, if at all.
+
+    The brief promises immediate, same-day escalation for red flags. Two things
+    deliver that between weekly sweeps: the collector, which runs daily against
+    the feeds, and daily_check.py, which compares a review count. Everything
+    else is only seen when a person sweeps it, which is once a week - so a
+    complaint posted on Saturday waits until Friday.
+
+    Returns 'feed', 'count', or '' for no same-day route at all.
+    """
+    sources = load_yaml("sources")
+    fed = {f.get("platform") for f in sources.get("feeds", [])
+           if f.get("enabled") and f.get("platform")}
+    if platform_id in fed:
+        return "feed"
+    for platform in sources.get("platforms", []):
+        if platform.get("id") == platform_id:
+            return "count" if "ratings" in (platform.get("captures") or []) else ""
+    return ""
+
+
+def no_same_day_cover() -> list[str]:
+    """Platform ids where a red flag can only surface on the weekly sweep."""
+    return sorted(p["id"] for p in load_yaml("sources").get("platforms", [])
+                  if not same_day_cover(p["id"]))
+
+
 def channels_checked(week_of: dt.date) -> set[str]:
     """Platform ids somebody recorded checking in this week."""
     return {r.get("platform") for r in read_csv(SWEEPS_CSV)

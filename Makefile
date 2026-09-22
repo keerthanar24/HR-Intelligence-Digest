@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek checkurls test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -24,6 +24,7 @@ help:
 	@echo "  make auto      collect + validate + digest (what the scheduler runs)"
 	@echo "  make send      dry-run the email send (add --send to really send)"
 	@echo "  make logsweep  tick off the channels you checked (LinkedIn, X, Quora, ...)"
+	@echo "  make checkurls open every configured page and report dead links (one-off)"
 	@echo "  make logweek   record the hours and what was new (do it the same Friday)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
@@ -79,6 +80,10 @@ weekly: scan validate digest
 
 send:
 	$(PY) scripts/send_digest.py --week $(WEEK)
+
+# One-off, after editing config/sources.yaml. Touches real sites, so not scheduled.
+checkurls:
+	$(PY) scripts/check_urls.py
 
 # The channels with no review count: only a person can say they were opened.
 logsweep:
