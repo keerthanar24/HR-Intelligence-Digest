@@ -46,7 +46,10 @@ last Friday**. Sort by newest, not relevance.
 
 **LinkedIn** — company page posts and their comments, plus a public post search
 
-- [ ] RK Group · [ ] RK World Infocom *(page URL still needed)* · [ ] Robust Kommerce · [ ] Westbury Kommerce
+- [ ] RK Group · [ ] RK World Infocom · [ ] Robust Kommerce · [ ] Westbury Kommerce
+
+> Open each page's **Posts** tab and read the **comments** under them — that is where employment
+> chatter sits, not in the company's own posts. Do not open individual people's profiles.
 
 **Every week, no fixed page**
 
