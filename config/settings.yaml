@@ -23,7 +23,11 @@ digest:
   send_window: "15:00-17:00"
   subject_template: "HR Intelligence Digest — week of {week_of} ({mention_count} mentions)"
   # The shared spreadsheet the digest links to in section 6.
-  data_link: "https://docs.google.com/spreadsheets/d/155xO1Ui6aIL7KLh9qMEhbxAtnTe6b6eAnl3kO36pRGg/edit"
+  # Replaced 2026-09-22. The original sheet was never populated; this one was
+  # created by uploading the generated workbook to Drive. The gid and fragment
+  # from the address bar are dropped so the link opens on the first tab rather
+  # than wherever the person who copied it happened to be looking.
+  data_link: "https://docs.google.com/spreadsheets/d/1qjXDaHco0C64WydD2j_CfRshGGdAEVQ_/edit"
   # Show at most this many themes in section 4.
   max_themes: 4
   # Section 4 also reports themes recurring across this many weeks. A complaint

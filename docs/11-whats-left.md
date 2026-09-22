@@ -141,7 +141,14 @@ None of these block the build or the sweep; they block only the send.
 
 ---
 
-## 6. Upload the workbook to the Google Sheet
+## 6. ~~Upload the workbook to the Google Sheet~~ — DONE 2026-09-22
+
+The original sheet was never populated, so the workbook was uploaded to Drive as a new file and
+`digest.data_link` now points at it. **This repeats every week**: export, upload, replace — it is
+the one step nothing here can do, because writing to Google Sheets needs credentials this
+project does not have.
+
+## Superseded — the original entry
 
 `templates/HR_Intelligence_Master_Tracker.xlsx` now carries every field the schema holds
 (22 / 26 / 15 columns) and the rating baseline. The Google Sheet behind the data link still has
