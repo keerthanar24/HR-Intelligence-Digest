@@ -546,8 +546,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         h.append(
             '<p style="margin:0 0 16px;padding:8px 10px;background:#FBF0D9;border-radius:4px;'
             f'font-size:13px;color:#8a6d3b;"><strong>Partial week</strong> \u2014 covers '
-            f'{days_elapsed} of 7 days, to {today.strftime("%-d %b")}. The week closes '
-            f'{week_end.strftime("%-d %b")}; counts and comparisons here are incomplete.</p>'
+            f'{days_elapsed} of 7 days, to {H.day_month(today)}. The week closes '
+            f'{H.day_month(week_end)}; counts and comparisons here are incomplete.</p>'
         )
 
     # 1. Headline
@@ -709,7 +709,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     )
     if partial:
         t.append(f"PARTIAL WEEK - covers {days_elapsed} of 7 days, to "
-                 f"{today.strftime('%-d %b')}. The week closes {week_end.strftime('%-d %b')}; "
+                 f"{H.day_month(today)}. The week closes {H.day_month(week_end)}; "
                  "counts and comparisons here are incomplete.")
     t.append("")
     t.append("1. HEADLINE")

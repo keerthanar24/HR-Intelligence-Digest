@@ -229,11 +229,23 @@ def week_range(week_of: dt.date) -> tuple[dt.date, dt.date]:
     return week_of, week_of + dt.timedelta(days=6)
 
 
+def day_month(day: dt.date, year: bool = False) -> str:
+    """'14 Aug', or '14 Aug 2026'. Day number unpadded, on every platform.
+
+    The %-d directive is a glibc extension: it strips the leading zero on Linux
+    and macOS and raises ValueError on Windows. It crashed the first real
+    logging session on a Windows machine, after the row had been written -
+    so the review was saved and the confirmation line was the thing that
+    failed. Formatting the integer ourselves has no platform opinion.
+    """
+    return f"{day.day} {day.strftime('%b')}" + (f" {day.year}" if year else "")
+
+
 def fmt_week(week_of: dt.date) -> str:
     start, end = week_range(week_of)
     if start.month == end.month:
-        return f"{start.strftime('%-d')}–{end.strftime('%-d %b %Y')}"
-    return f"{start.strftime('%-d %b')} – {end.strftime('%-d %b %Y')}"
+        return f"{start.day}–{day_month(end, year=True)}"
+    return f"{day_month(start)} – {day_month(end, year=True)}"
 
 
 # --- Text matching -----------------------------------------------------------

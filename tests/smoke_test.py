@@ -928,6 +928,41 @@ def test_unrated_entity_is_named() -> None:
               "not evidence of a quiet week" in body)
 
 
+def test_no_platform_specific_date_formats() -> None:
+    """No glibc-only strftime directives anywhere in the source.
+
+    '%-d' strips the leading zero on Linux and macOS and raises ValueError on
+    Windows. It crashed the first real logging session on a Windows machine,
+    one line after the row had been written - so the review was saved and the
+    confirmation was what blew up, which is a confusing way to meet a bug.
+    H.day_month() formats the integer instead and has no platform opinion.
+    """
+    print("no platform-specific date formats")
+    import glob
+    import re
+
+    pattern = re.compile(r"""strftime\(\s*["'][^"']*%[-#]""")
+    offenders = []
+    for path in (glob.glob(os.path.join(ROOT, "scripts", "*.py"))
+                 + glob.glob(os.path.join(ROOT, "tools", "*.py"))):
+        with open(path, encoding="utf-8") as fh:
+            for number, line in enumerate(fh, start=1):
+                if pattern.search(line):
+                    offenders.append(f"{os.path.basename(path)}:{number}")
+    check("no strftime uses %- or %#", not offenders, f"({', '.join(offenders)})")
+
+    check("day_month drops the leading zero",
+          H.day_month(dt.date(2026, 8, 2)) == "2 Aug")
+    check("day_month can carry the year",
+          H.day_month(dt.date(2026, 8, 2), year=True) == "2 Aug 2026")
+    check("a week inside one month reads naturally",
+          H.fmt_week(dt.date(2026, 9, 19)) == "19\u201325 Sep 2026",
+          f"(got {H.fmt_week(dt.date(2026, 9, 19))})")
+    check("a week spanning two months names both",
+          H.fmt_week(dt.date(2026, 8, 29)) == "29 Aug \u2013 4 Sep 2026",
+          f"(got {H.fmt_week(dt.date(2026, 8, 29))})")
+
+
 def test_interactive_saves_as_it_goes() -> None:
     """Each review must be on disk before the next one is asked for.
 
@@ -1248,7 +1283,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
