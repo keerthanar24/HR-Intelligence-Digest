@@ -33,6 +33,7 @@ import xml.etree.ElementTree as ET
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import hrintel as H  # noqa: E402
+import log_sweep  # noqa: E402
 
 NS = {
     "atom": "http://www.w3.org/2005/Atom",
@@ -431,6 +432,8 @@ def main() -> int:
     new_rows: list[dict] = []
     skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0,
                "out_of_scope_hint": 0, "personal_profile": 0}
+    # platform id -> items kept, for the channels this run actually reached.
+    fetched: dict[str, int] = {}
 
     x_token = os.environ.get(X_TOKEN_ENV, "").strip()
     x_context = X_CONTEXT
@@ -485,10 +488,21 @@ def main() -> int:
             )
             new_rows.append(row)
         kept = len(rows)
+        # This feed answered, so its channel is covered for the week. A feed
+        # that failed above has already hit `continue` and never gets here -
+        # which is the point: a channel is covered by a fetch that worked, not
+        # by a feed that is merely configured.
+        if feed.get("platform"):
+            fetched[feed["platform"]] = fetched.get(feed["platform"], 0) + kept
 
         print(f"  {feed['id']}: {len(items)} items, {kept} new")
         if index < len(feeds) - 1:
             time.sleep(delay)
+
+    if fetched and not args.dry_run:
+        log_sweep.record(week_of, sorted(fetched), "collector",
+                         found={p: str(n) for p, n in fetched.items()})
+        print(f"\nRecorded as swept: {', '.join(sorted(fetched))}.")
 
     print(
         "\nSkipped — no entity match: {no_entity}, no employment context: {no_context}, "

@@ -1493,33 +1493,39 @@ def test_absent_values_are_named() -> None:
 
 
 def test_unverified_channels_are_named() -> None:
-    """A channel nobody opened must not read as a channel that was empty.
+    """A channel nobody reached must not read as a channel that was empty.
 
-    A review site proves its own coverage through the review count. LinkedIn,
-    X, Indeed, Quora, YouTube and Google Reviews carry no count, so the digest
-    said "Swept this week: AmbitionBox, Glassdoor" and stayed silent about the
-    rest - an inventory of what produced data, not a checklist of what was due.
-    At month 2 the difference between an empty channel and an unchecked one is
-    the whole question.
+    The digest said "Swept this week: AmbitionBox, Glassdoor" and stayed silent
+    about the rest - an inventory of what produced data, not a checklist of
+    what was due. At month 2 the difference between an empty channel and an
+    unchecked one is the whole question.
+
+    A configured feed does not excuse a channel either. Three of four Reddit
+    queries 403'd on the first real run and the digest still reported an empty
+    week, so coverage has to come from a fetch that worked, not from a feed
+    that exists in the config.
     """
     print("unverified channels are named")
     import log_sweep
 
     settings = H.load_yaml("settings")
     week_one = H.week_start_of(H.parse_date(settings["programme"]["trial_start"]))
+    week_two = week_one + dt.timedelta(days=7)
     platforms = H.platform_names()
 
     expected = H.unverified_channels(week_one, settings)
-    check("the six manual channels are expected in week 1",
-          set(expected) == {"linkedin", "x", "indeed", "quora", "youtube", "google_reviews"},
+    check("every channel without a review count must prove itself",
+          set(expected) == {"linkedin", "x", "indeed", "quora", "youtube",
+                            "google_reviews", "reddit", "news"},
           f"(got {expected})")
-    check("a review site is not in the list - its review count proves it",
+    check("a review site is exempt - its review count proves it",
           not {"ambitionbox", "glassdoor"} & set(expected))
-    check("a feed-collected channel is not either - the collector logs its run",
-          "reddit" not in expected and "news" not in expected)
-    check("week 2 drops the fortnightly ones",
-          set(H.unverified_channels(week_one + dt.timedelta(days=7), settings))
-          == {"linkedin", "x", "quora"})
+    check("a feed-collected channel is NOT exempt",
+          {"reddit", "news"} <= set(expected))
+    check("week 2 drops the fortnightly ones, keeps the weekly ones",
+          set(H.unverified_channels(week_two, settings))
+          == {"linkedin", "x", "quora", "reddit", "news"},
+          f"(got {H.unverified_channels(week_two, settings)})")
 
     with tempfile.TemporaryDirectory() as tmp:
         saved = H.SWEEPS_CSV
@@ -1528,7 +1534,7 @@ def test_unverified_channels_are_named() -> None:
             _also, missing = build_digest.channel_coverage(
                 week_one, settings, platforms, ["AmbitionBox", "Glassdoor"])
             check("with nothing recorded, every channel is named as not swept",
-                  len(missing) == 6, f"(got {missing})")
+                  len(missing) == len(expected), f"(got {missing})")
 
             log_sweep.record(week_one, ["quora", "youtube"], "desk",
                              found={"quora": "0", "youtube": "0"})
@@ -1537,10 +1543,18 @@ def test_unverified_channels_are_named() -> None:
             check("a channel checked and empty counts as swept",
                   set(also) == {"Quora", "YouTube"}, f"(got {also})")
             check("and drops out of the not-swept list",
-                  set(missing) == {"LinkedIn", "X", "Indeed", "Google Reviews"},
-                  f"(got {missing})")
+                  "Quora" not in missing and "YouTube" not in missing, f"(got {missing})")
 
-            # Recording the same week twice must not double the rows.
+            # What the collector writes when a fetch succeeds.
+            log_sweep.record(week_one, ["reddit"], "collector", found={"reddit": "3"})
+            _also, missing = build_digest.channel_coverage(
+                week_one, settings, platforms, ["AmbitionBox", "Glassdoor"])
+            check("a feed that answered covers its channel",
+                  "Reddit" not in missing, f"(got {missing})")
+            check("a feed that did not answer leaves its channel uncovered",
+                  "News / web" in missing, f"(got {missing})")
+
+            # Re-recording a week must not double the rows.
             log_sweep.record(week_one, ["quora"], "desk", found={"quora": "2"})
             rows = [r for r in H.read_csv(H.SWEEPS_CSV) if r["platform"] == "quora"]
             check("re-recording a channel replaces it", len(rows) == 1, f"(got {rows})")

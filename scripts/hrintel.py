@@ -120,20 +120,20 @@ def unverified_channels(week_of: dt.date, settings: dict | None = None) -> list[
     """Channels due this week that can only prove coverage by being recorded.
 
     A review site proves it was swept: the rating snapshot carries the review
-    count, and the change in that count is checkable arithmetic. LinkedIn, X,
-    Indeed, Quora, YouTube and Google Reviews carry no count, and Reddit and
-    news are pulled by the collector, which logs its own run. What is left is
-    the set where "checked and empty" and "never opened" are indistinguishable
-    unless somebody says which it was.
+    count, and the change in that count is checkable arithmetic. Every other
+    channel has no count, so "checked and empty" and "never opened" look alike
+    unless something says which it was.
+
+    An automated feed does NOT excuse a channel from this. The first draft let
+    a configured feed stand in for coverage, and a feed that 403s or 429s every
+    week would then have silently counted as cover - which is how three of four
+    Reddit queries failed on the first real run while the digest reported an
+    empty week. The collector now records the channels it actually fetched, so
+    a feed proves coverage by succeeding, not by existing.
     """
-    sources = load_yaml("sources")
-    fed = {f.get("platform") for f in sources.get("feeds", [])
-           if f.get("enabled") and f.get("platform")}
     out = []
-    for platform in sources.get("platforms", []):
+    for platform in load_yaml("sources").get("platforms", []):
         if "ratings" in (platform.get("captures") or []):
-            continue
-        if platform["id"] in fed:
             continue
         if not cadence_due(platform.get("cadence", "weekly"), week_of, settings):
             continue

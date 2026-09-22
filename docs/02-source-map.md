@@ -96,8 +96,11 @@ Company reviews and interview experiences.
 
 ## Priority 3
 
-### Quora — weekly, alert-assisted
-"What is it like to work at…" style answers. A standing Google Alert usually catches these.
+### Quora — weekly, alert-collected
+"What is it like to work at…" style answers. A site-restricted Google Alert covering all four
+entities feeds the collector (`google_alerts_quora`), so Quora no longer needs a weekly manual
+search. The alert catches what Google **newly** indexes, so it is standing cover from the day
+it was created — the back catalogue still needs one manual look.
 
 ### YouTube — fortnightly, manual
 Comments on videos about the group. **Employment-related comments only** — skip the customer

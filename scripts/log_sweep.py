@@ -29,7 +29,15 @@ import hrintel as H  # noqa: E402
 
 
 def due(week: dt.date, settings: dict) -> list[str]:
-    return H.unverified_channels(week, settings)
+    """The channels this prompt should ask about.
+
+    Reddit and news are fetched by the collector, which records them itself on
+    a successful run - so they are not asked here, but they are still on the
+    digest's list, and a failed fetch still shows up as not swept.
+    """
+    fed = {f.get("platform") for f in H.load_yaml("sources").get("feeds", [])
+           if f.get("enabled") and f.get("platform")}
+    return [p for p in H.unverified_channels(week, settings) if p not in fed]
 
 
 def ask(prompt: str, *, default: str = "") -> str:
