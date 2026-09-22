@@ -593,6 +593,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         "untagged": untagged,
         "red_flags": len(flags),
         "week_label": week_label,
+        "baseline": bool(baseline),
+        "week_end": week_end,
         "coverage_gaps": len(gaps),
         "coverage_detail": gaps,
         "rolling_themes": len(rolling),
@@ -959,7 +961,13 @@ def main() -> int:
     print(f"Text body : {text_path}")
     print(f"Mentions {stats['total']} · red flags {stats['red_flags']} · untagged {stats['untagged']}")
     if stats["partial"]:
-        print(f"PARTIAL WEEK — {stats['days_elapsed']} of 7 days. Fine for a mid-week look; "
+        # The console said "PARTIAL WEEK - 4 of 7 days" while the email above
+        # it said the baseline was still open. Two frames for one state is how
+        # an operator stops believing either.
+        print(f"BASELINE STILL OPEN — it closes {H.day_month(stats['week_end'])}. "
+              "Fine to review now; send it once the baseline closes."
+              if stats.get("baseline") else
+              f"PARTIAL WEEK — {stats['days_elapsed']} of 7 days. Fine for a mid-week look; "
               "do not send it as the weekly digest.")
 
     recipients = H.load_yaml("recipients").get("digest", [])
