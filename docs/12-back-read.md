@@ -92,6 +92,72 @@ python3 scripts/red_flags.py --raise M-20260919-003 --reason non_payment
 
 ---
 
+## What counts: the decision card
+
+Keep this open beside the browser. Three questions per review, in order.
+
+### 1. Is it about working there?
+
+**LOG IT** if the review touches any of these:
+
+| | |
+|---|---|
+| pay, CTC, hikes, bonus, incentives | appraisals, promotions, ratings |
+| salary or PF delays, FnF, gratuity | managers, seniors, favouritism |
+| culture, politics, team, colleagues | hours, shifts, overtime, WFH |
+| workload, targets, pressure | training, learning, career growth |
+| resignations, exits, notice period | layoffs, terminations |
+| interviews, offers, onboarding | job security, facilities, transport |
+| harassment, safety, discrimination | transparency, broken promises |
+
+**SKIP IT** if it is about buying from them or selling with them:
+
+- orders, refunds, delivery, courier, returns
+- product quality, defects, warranty
+- marketplace or seller conduct — *"fraud seller"*, *"fake products on Amazon"*
+- anything from a named individual's personal social account
+
+A seller complaint posted on an employer review site is still a seller complaint. The tool
+refuses these, but knowing the rule saves you typing one out first.
+
+**Mixed post?** If a review complains about products *and* about working there, log it with
+`--mixed-post` and summarise only the employment half.
+
+### 2. Is there anything to summarise?
+
+Skip a review that is only a star rating with no written text — there is nothing to put in the
+one-line summary, and a row with no substance adds a number to section 1 without telling anyone
+anything.
+
+Skip an exact duplicate of one already logged. The validator catches these by URL, but only if
+the URL was captured.
+
+### 3. Does it trip a red flag?
+
+Set the trigger, and escalate the same day — even if the review is eight weeks old:
+
+| Trigger | What it looks like |
+|---|---|
+| `names_individual` | any person named, praised or criticised |
+| `harassment_or_safety` | harassment, discrimination, unsafe conditions, POSH |
+| `non_payment` | salary or FnF unpaid, PF not deposited, gratuity withheld |
+| `legal_or_regulatory` | labour court, legal notice, tribunal, labour commissioner |
+| `public_escalation_risk` | threatening to go public, tagging media, high engagement |
+
+Everything else: leave the trigger blank.
+
+### Log the good ones too
+
+A digest built only from complaints misrepresents the week. Section 1 averages sentiment, and
+that average only means anything if the praise is in there as well. Positive and mixed reviews
+are not optional.
+
+### The one people get wrong
+
+Real praise **and** a real complaint in the same review is `mixed`, not `negative` — even when
+the complaint is the louder half. "Great team, terrible pay" is mixed. Tagging it negative
+quietly makes the week look worse than the evidence supports.
+
 ## Fixing a mistake
 
 A row logged with the wrong sentiment, or a typo in the summary, comes out with:
