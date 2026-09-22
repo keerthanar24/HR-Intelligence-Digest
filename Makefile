@@ -42,7 +42,7 @@ daily:
 	$(PY) scripts/daily_check.py
 
 sweep:
-	$(PY) scripts/alert_queries.py --format sweep
+	$(PY) scripts/alert_queries.py --format sweep --week $(WEEK)
 	@$(PY) scripts/log_rating.py --status
 
 BOOK ?= HR_Intelligence_Master_Tracker.xlsx

@@ -89,7 +89,17 @@ def main() -> int:
                     "(python3 scripts/log_rating.py --status)")
     if untagged:
         todo.append(f"Tag {len(untagged)} collected mention(s): summary, sentiment, themes")
-    todo.append("Sweep LinkedIn, and the fortnightly channels if due (make sweep)")
+    # "the fortnightly channels if due" left the desk to work out which
+    # fortnight it was, so they were swept every week or never. Name them.
+    settings = H.load_yaml("settings")
+    rotation = [p["name"] for p in H.load_yaml("sources").get("platforms", [])
+                if str(p.get("cadence", "")).lower() == "fortnightly"
+                and H.cadence_due(p.get("cadence"), week, settings)]
+    if rotation:
+        todo.append(f"Sweep LinkedIn, plus this week's rotation: {', '.join(rotation)} "
+                    "(make sweep)")
+    else:
+        todo.append("Sweep LinkedIn (make sweep). No fortnightly channel is due this week.")
     todo.append("Upload the refreshed workbook to the Google Sheet behind the data link, "
                 "or re-run step 3 after logging anything by hand")
     todo.append("Confirm any red flags and send them same-day "

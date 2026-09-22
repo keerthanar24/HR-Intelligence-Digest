@@ -158,6 +158,52 @@ def rated_profiles() -> list[tuple[str, str]]:
     return sorted(pairs)
 
 
+def absent_profiles() -> list[tuple[str, str]]:
+    """(entity_id, platform_id) pairs where the page is confirmed not to exist.
+
+    The opposite of rated_profiles(): a URL written as 'none' means somebody
+    looked and there is no page, which is a fact the digest owes the reader.
+    Section 2 promises a line per entity per platform, and Robust Kommerce has
+    no AmbitionBox profile - so its row is simply missing, and a missing row
+    reads as a quiet week rather than as a platform that cannot see it.
+    """
+    pairs = []
+    for platform in load_yaml("sources").get("platforms", []):
+        if "ratings" not in (platform.get("captures") or []):
+            continue
+        for entity_id, url in (platform.get("urls") or {}).items():
+            if str(url or "").strip().lower() == "none":
+                pairs.append((entity_id, platform["id"]))
+    return sorted(pairs)
+
+
+def weeks_into_trial(week_of: dt.date, settings: dict | None = None) -> int | None:
+    """0 for the trial's first week, 1 for the second, None before it starts."""
+    settings = load_yaml("settings") if settings is None else settings
+    start = parse_date(str(settings.get("programme", {}).get("trial_start", "")))
+    if not start:
+        return None
+    offset = (week_of - week_start_of(start)).days
+    return offset // 7 if offset >= 0 else None
+
+
+def cadence_due(cadence: str, week_of: dt.date, settings: dict | None = None) -> bool:
+    """Is a channel on this cadence due in this week?
+
+    config/sources.yaml calls Indeed, YouTube and Google Reviews 'fortnightly',
+    but nothing worked out which fortnight, so the checklist asked the desk
+    'due this week?' and the runner said 'if due'. A cadence nobody can
+    evaluate is swept every week or never, and both answers make the source map
+    fiction. Fortnightly means weeks 1, 3, 5, 7 of the trial - counted from the
+    trial start, so it does not drift.
+    """
+    cadence = (cadence or "weekly").strip().lower()
+    if cadence != "fortnightly":
+        return True
+    week = weeks_into_trial(week_of, settings)
+    return True if week is None else week % 2 == 0
+
+
 def profile_url(entity_id: str, platform_id: str) -> str:
     """The review page for one entity on one platform, or "".
 

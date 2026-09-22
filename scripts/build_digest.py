@@ -474,6 +474,26 @@ def unrated_entities(entities, profiles=None):
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 
+def missing_profiles(entities, platforms, absent=None, unrated=()):
+    """'Robust Kommerce on AmbitionBox' for each page confirmed not to exist.
+
+    Section 2 promises a rating line per entity per platform. Robust Kommerce
+    has no AmbitionBox page, so its row is simply absent - and an absent row
+    looks like a week with no movement, not like a platform that cannot see the
+    company at all. Entities with no review page anywhere are left out here:
+    they already get their own, stronger sentence.
+    """
+    named = set(unrated)
+    pairs = H.absent_profiles() if absent is None else absent
+    out = []
+    for entity_id, platform_id in pairs:
+        name = entities.get(entity_id)
+        if not name or name in named:
+            continue
+        out.append(f"{name} on {platforms.get(platform_id, platform_id.title())}")
+    return out
+
+
 def source_link(mention):
     """(url, label) for a mention: its own link, or the page it came from.
 
@@ -528,6 +548,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
     unrated = unrated_entities(entities)
+    no_page = missing_profiles(entities, platforms, unrated=unrated)
     trial_start = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
     is_baseline = bool(trial_start) and H.week_start_of(trial_start) == week_of
     swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms,
@@ -641,6 +662,12 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     else:
         h.append('<p style="margin:0 0 8px;">No rating snapshot recorded for this week. '
                  'Glassdoor and AmbitionBox scores are captured on the manual sweep.</p>')
+    if no_page:
+        h.append('<p style="margin:0 0 8px;font-size:12px;color:#52606d;">'
+                 f'No page exists for <strong>{E("; ".join(no_page))}</strong>, so '
+                 f'{"that line" if len(no_page) == 1 else "those lines"} can never appear '
+                 'above. The other review site is the only one covering '
+                 f'{"it" if len(no_page) == 1 else "them"}.</p>')
     if unrated:
         h.append('<p style="margin:0 0 8px;font-size:12px;color:#52606d;">'
                  f'<strong>{E(", ".join(unrated))}</strong> '
@@ -792,6 +819,12 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         [[r["entity"], r["platform"], r["rating"], r["rating_delta"], r["reviews"], r["reviews_delta"]]
          for r in ratings],
     ) if ratings else "No rating snapshot recorded for this week.")
+    if no_page:
+        t.append("")
+        t.append(f"No page exists for {'; '.join(no_page)}, so "
+                 f"{'that line' if len(no_page) == 1 else 'those lines'} can never appear "
+                 "above. The other review site is the only one covering "
+                 f"{'it' if len(no_page) == 1 else 'them'}.")
     if unrated:
         t.append("")
         t.append(f"{', '.join(unrated)} {'has' if len(unrated) == 1 else 'have'} no Glassdoor "

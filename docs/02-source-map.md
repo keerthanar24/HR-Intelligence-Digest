@@ -89,6 +89,11 @@ Do not treat a quiet Reddit feed as a quiet Reddit.
 ### Indeed — fortnightly, manual
 Company reviews and interview experiences.
 
+> **What "fortnightly" means.** Trial weeks 1, 3, 5, 7 — counted from `programme.trial_start`
+> in `config/settings.yaml`, so the rotation cannot drift. The cadence in `config/sources.yaml`
+> is now evaluated rather than left to the desk: `make sweep` marks each fortnightly channel
+> DUE or NOT due for the week being swept, and `scripts/weekly_run.py` names the ones due.
+
 ## Priority 3
 
 ### Quora — weekly, alert-assisted

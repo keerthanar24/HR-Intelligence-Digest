@@ -43,7 +43,12 @@ Work the platform list in `docs/02-source-map.md`, priority 1 first. For each en
 - [ ] LinkedIn — company page posts and comments; public post search on the aliases
 - [ ] X — logged-out search per alias; note engagement counts
 - [ ] Reddit — check the subs the feed tends to miss
-- [ ] Indeed / Quora / YouTube / Google Reviews — on their fortnightly rotation
+- [ ] Quora — weekly, alert-assisted
+- [ ] Indeed / YouTube / Google Reviews — fortnightly: **trial weeks 1, 3, 5, 7**
+
+Don't work the rotation from memory. `make sweep` prints the worksheet for the week and marks
+each fortnightly channel **DUE this week** or **NOT due this week**, counted from the trial
+start so it cannot drift. Indeed carries interview experiences as well as reviews.
 
 Search strings for each platform: `python3 scripts/alert_queries.py --format manual`.
 

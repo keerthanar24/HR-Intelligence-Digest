@@ -24,7 +24,7 @@ last Friday**. Sort by newest, not relevance.
 |---|---|---|
 | RK Group | ☐ | ☐ |
 | RK World Infocom | ☐ | ☐ |
-| Robust Kommerce | — *no page on this platform* | — |
+| Robust Kommerce | — *no page on this platform; the digest says so in section 2* | — |
 | Westbury Kommerce | ☐ | ☐ |
 
 **Glassdoor**
@@ -48,9 +48,16 @@ last Friday**. Sort by newest, not relevance.
 
 - [ ] RK Group · [ ] RK World Infocom *(page URL still needed)* · [ ] Robust Kommerce · [ ] Westbury Kommerce
 
-**Fortnightly rotation — due this week?** ☐ yes ☐ no
-- [ ] Indeed · [ ] Quora · [ ] YouTube comments · [ ] Google Reviews *(employment only)*
+**Every week, no fixed page**
+
+- [ ] X — logged-out search, unless the API token is set
+- [ ] Quora — answers naming the group
 - [ ] Reddit — check the subs by hand; the feed sees posts, not comments
+
+**Fortnightly rotation — trial weeks 1, 3, 5, 7.** Don't guess: `make sweep` prints
+**DUE this week** or **NOT due this week** beside each one, counted from the trial start.
+
+- [ ] Indeed *(reviews and interview experiences)* · [ ] YouTube comments · [ ] Google Reviews *(employment only — skip customer and product reviews)*
 
 ## 10:15 · Log what you found (30 min)
 

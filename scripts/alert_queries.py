@@ -83,12 +83,26 @@ def boolean_query(entity: dict) -> str:
     return f"({aliases}) AND ({context})"
 
 
+# One short line per hand-searched platform. The LIST of platforms is derived
+# from config/sources.yaml - only the wording lives here, so a platform added
+# to the source map cannot go missing from the worksheet for want of a hint.
+SWEEP_HINTS = {
+    "x": "if no API plan; logged-out search",
+    "quora": "answers naming the group",
+    "youtube": "comments on videos about the group; employment only",
+    "google_reviews": "employment only - skip customer and product reviews",
+    "indeed": "reviews and interview experiences",
+}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--entity", help="limit to one entity id")
     parser.add_argument("--format",
                         choices=["all", "google", "manual", "matrix", "sweep"],
                         default="all")
+    parser.add_argument("--week", help="week_of for the sweep worksheet; "
+                                       "decides which fortnightly channels are due")
     args = parser.parse_args()
 
     cfg = H.load_yaml("entities")
@@ -101,37 +115,80 @@ def main() -> int:
 
     if args.format == "sweep":
         sources = H.load_yaml("sources")
-        by_id = {p["id"]: p for p in sources.get("platforms", [])}
+        settings = H.load_yaml("settings")
+        platforms = sources.get("platforms", [])
         names = {e["id"]: e["name"] for e in cfg.get("entities", [])}
-        order = [p["id"] for p in sorted(
-            (p for p in sources.get("platforms", []) if p.get("urls")),
-            key=lambda p: p.get("priority", 9))]
+
+        week = H.parse_date(args.week) if args.week else H.last_complete_week()
+        if week is None:
+            print(f"Could not read --week {args.week!r}", file=sys.stderr)
+            return 2
+        week = H.week_start_of(week)
+        week_no = H.weeks_into_trial(week, settings)
+
+        # Which platforms carry a working feed, so the collector covers them.
+        fed = {f.get("platform") for f in sources.get("feeds", [])
+               if f.get("enabled") and f.get("platform")}
+
+        def due(platform):
+            return H.cadence_due(platform.get("cadence", "weekly"), week, settings)
+
+        pages = sorted((p for p in platforms if p.get("urls")),
+                       key=lambda p: (p.get("priority", 9), p["id"]))
+        feeds = sorted((p for p in platforms if not p.get("urls") and p["id"] in fed),
+                       key=lambda p: (p.get("priority", 9), p["id"]))
+        # Everything left is a hand search. Derived, never typed: Indeed sat in
+        # sources.yaml and in the paper checklist but had been left out of this
+        # list, so the worksheet the desk actually works from never named it.
+        hand = sorted((p for p in platforms if not p.get("urls") and p["id"] not in fed),
+                      key=lambda p: (p.get("priority", 9), p["id"]))
 
         print("=" * 72)
-        print("WEEKLY SWEEP WORKSHEET")
+        print(f"WEEKLY SWEEP WORKSHEET  -  {H.fmt_week(week)}"
+              + (f"  (trial week {week_no + 1})" if week_no is not None else ""))
         print("=" * 72)
         print("Work top to bottom. Sort each page by NEWEST, not relevance.")
         print()
-        for platform_id in order:
-            platform = by_id[platform_id]
-            print(f"--- {platform['name']} ---")
-            if platform_id in ("ambitionbox", "glassdoor"):
+        for platform in pages:
+            print(f"--- {platform['name']}{'' if due(platform) else '  (fortnightly - NOT due this week)'} ---")
+            if not due(platform):
+                print()
+                continue
+            if "ratings" in (platform.get("captures") or []):
                 print("    Record the rating AND the review count, even if nothing is new:")
                 print("      python3 scripts/log_rating.py -e <entity> -p %s -r <rating> -c <count>"
-                      % platform_id)
+                      % platform["id"])
             for entity_id, url in (platform.get("urls") or {}).items():
                 if entity_id not in names:
                     continue
+                text = str(url or "").strip()
+                if text.lower() == "none":
+                    note = "(no page on this platform - nothing to open)"
+                elif H.is_todo(text) or not text:
+                    note = "(no page - write none in config if there is none)"
+                else:
+                    note = text
                 print(f"  [ ] {names[entity_id]}")
-                print(f"      {'(no page - write none in config)' if H.is_todo(url) else url}")
+                print(f"      {note}")
             print()
 
-        print("--- Feed-collected, no page to open ---")
-        print("  [ ] python3 scripts/collect_feeds.py      (Reddit, news; X if a token is set)")
-        print()
+        if feeds:
+            print("--- Feed-collected, no page to open ---")
+            print("  [ ] python3 scripts/collect_feeds.py"
+                  f"      ({', '.join(p['name'] for p in feeds)})")
+            print("  [ ] Reddit comments - the feed only sees posts")
+            print()
+
         print("--- Search by hand, no fixed page ---")
-        for label in ("X (if no API plan)", "Reddit comments - the feed only sees posts",
-                      "Quora", "YouTube comments", "Google Reviews (employment only)"):
+        for platform in hand:
+            cadence = str(platform.get("cadence", "weekly")).lower()
+            hint = SWEEP_HINTS.get(platform["id"], "")
+            if not due(platform):
+                print(f"  [ ] {platform['name']}  -  fortnightly, NOT due this week (skip)")
+                continue
+            label = platform["name"] + (f" - {hint}" if hint else "")
+            if cadence == "fortnightly":
+                label += "   [fortnightly, DUE this week]"
             print(f"  [ ] {label}")
         print()
         print("Search strings: python3 scripts/alert_queries.py --format manual")

@@ -34,6 +34,7 @@ import collect_feeds  # noqa: E402
 import validate_data  # noqa: E402
 import import_sheet  # noqa: E402
 import red_flags  # noqa: E402
+import alert_queries  # noqa: E402
 
 # The reporting week runs Saturday to Friday and is reported on the Friday it
 # ends (config/settings.yaml).
@@ -1267,6 +1268,96 @@ def test_weekly_effort_log() -> None:
 
 
 
+def test_sweep_worksheet_covers_every_platform() -> None:
+    """Every platform in the source map must reach the worksheet.
+
+    The hand-search list was typed out rather than derived, and Indeed - named
+    in the project scope and present in config/sources.yaml - had been left out
+    of it. The paper checklist had it; the sheet the desk actually works from
+    did not, so following the worksheet meant never sweeping Indeed at all.
+    """
+    print("sweep worksheet")
+    import contextlib
+    import io
+
+    settings = H.load_yaml("settings")
+    week_one = H.week_start_of(H.parse_date(settings["programme"]["trial_start"]))
+    platforms = H.load_yaml("sources").get("platforms", [])
+
+    def worksheet(week):
+        out = io.StringIO()
+        argv = sys.argv
+        sys.argv = ["alert_queries.py", "--format", "sweep", "--week", week.isoformat()]
+        try:
+            with contextlib.redirect_stdout(out):
+                alert_queries.main()
+        finally:
+            sys.argv = argv
+        return out.getvalue()
+
+    week1 = worksheet(week_one)
+    missing = [p["name"] for p in platforms if p["name"] not in week1]
+    check("every platform in sources.yaml appears in the worksheet",
+          not missing, f"(missing {missing})")
+    check("Indeed is named", "Indeed" in week1)
+    check("the page with no profile says so, rather than going blank",
+          "no page on this platform" in week1)
+
+    # Fortnightly used to be "due this week? yes/no" for the desk to guess.
+    fortnightly = [p["name"] for p in platforms
+                   if str(p.get("cadence", "")).lower() == "fortnightly"]
+    check("there are fortnightly channels to schedule", bool(fortnightly))
+    week2 = worksheet(week_one + dt.timedelta(days=7))
+    check("week 1 calls the rotation due", "DUE this week" in week1)
+    check("week 2 calls it not due", "NOT due this week" in week2)
+    check("a weekly channel is never skipped",
+          "Quora" in week1 and "Quora" in week2)
+    for name in fortnightly:
+        check(f"{name} is scheduled, not guessed at",
+              name in week1 and name in week2)
+
+    check("week 1 of the trial is a due week",
+          H.cadence_due("fortnightly", week_one, settings))
+    check("week 2 is not",
+          not H.cadence_due("fortnightly", week_one + dt.timedelta(days=7), settings))
+    check("week 3 is",
+          H.cadence_due("fortnightly", week_one + dt.timedelta(days=14), settings))
+    check("weekly is always due",
+          H.cadence_due("weekly", week_one + dt.timedelta(days=7), settings))
+
+
+def test_absent_profile_is_disclosed() -> None:
+    """Section 2 promises a line per entity per platform.
+
+    Robust Kommerce has no AmbitionBox page, so its row was simply missing -
+    and a missing row reads as a week with no movement, not as a platform that
+    cannot see the company at all.
+    """
+    print("absent profile is disclosed")
+    entities = {"robust_kommerce": "Robust Kommerce", "rk_group": "RK Group"}
+    platforms = {"ambitionbox": "AmbitionBox", "glassdoor": "Glassdoor"}
+
+    said = build_digest.missing_profiles(entities, platforms,
+                                         absent=[("robust_kommerce", "ambitionbox")])
+    check("the missing page is named with its platform",
+          said == ["Robust Kommerce on AmbitionBox"], f"(got {said})")
+
+    # An entity with no page anywhere already gets its own, stronger sentence.
+    quiet = build_digest.missing_profiles(
+        entities, platforms, absent=[("robust_kommerce", "ambitionbox")],
+        unrated=["Robust Kommerce"])
+    check("an entity with no page at all is not said twice", quiet == [], f"(got {quiet})")
+
+    check("an entity with a page on both platforms is not named",
+          build_digest.missing_profiles(entities, platforms, absent=[]) == [])
+
+    # And it has to reach the reader, in both renderings.
+    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    for name, body in (("html", html), ("text", text)):
+        check(f"the {name} digest discloses it",
+              "Robust Kommerce on AmbitionBox" in body)
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1483,7 +1574,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
