@@ -86,8 +86,15 @@ why the manual check stays in the weekly SOP: look through `r/india`, `r/develop
 `r/IndianWorkplace`, `r/jobs` and the relevant city subs for threads the feed cannot see.
 Do not treat a quiet Reddit feed as a quiet Reddit.
 
-### Indeed — fortnightly, manual
-Company reviews and interview experiences.
+### Indeed — fortnightly, manual, alert-assisted
+Company reviews and interview experiences. A site-restricted Google Alert
+(`google_alerts_indeed`) feeds the collector, but Indeed stays **manual**: its company pages
+are indexed and individual reviews often are not, and an alert only fires on what Google
+newly indexes. The alert is partial cover, so `log_sweep.py` still asks for the fortnightly
+look and the collector does not tick the box on Indeed's behalf.
+
+Indeed has no public API — the Publisher API was closed years ago and automated collection is
+blocked — so this alert is the only automation available for it.
 
 > **What "fortnightly" means.** Trial weeks 1, 3, 5, 7 — counted from `programme.trial_start`
 > in `config/settings.yaml`, so the rotation cannot drift. The cadence in `config/sources.yaml`

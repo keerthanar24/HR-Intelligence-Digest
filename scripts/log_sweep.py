@@ -31,13 +31,24 @@ import hrintel as H  # noqa: E402
 def due(week: dt.date, settings: dict) -> list[str]:
     """The channels this prompt should ask about.
 
-    Reddit and news are fetched by the collector, which records them itself on
-    a successful run - so they are not asked here, but they are still on the
-    digest's list, and a failed fetch still shows up as not swept.
+    A channel the collector genuinely covers - Reddit, news, Quora - is not
+    asked about here; the collector records it on a successful run, and a
+    failed run still leaves it on the digest's not-swept list.
+
+    A feed is not always cover, though. Indeed has an alert AND stays on the
+    manual rotation: its company pages are indexed but individual reviews
+    often are not, and an alert only fires on what Google newly indexes. That
+    distinction is already in sources.yaml as `collection:` - manual means a
+    person still has to open it, whatever feeds point at it - so this reads
+    that rather than inferring cover from the existence of a feed.
     """
-    fed = {f.get("platform") for f in H.load_yaml("sources").get("feeds", [])
+    sources = H.load_yaml("sources")
+    fed = {f.get("platform") for f in sources.get("feeds", [])
            if f.get("enabled") and f.get("platform")}
-    return [p for p in H.unverified_channels(week, settings) if p not in fed]
+    collection = {p["id"]: str(p.get("collection", "manual")).lower()
+                  for p in sources.get("platforms", [])}
+    return [p for p in H.unverified_channels(week, settings)
+            if not (collection.get(p, "manual") != "manual" and p in fed)]
 
 
 def ask(prompt: str, *, default: str = "") -> str:

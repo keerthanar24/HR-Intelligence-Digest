@@ -1545,6 +1545,22 @@ def test_unverified_channels_are_named() -> None:
             check("and drops out of the not-swept list",
                   "Quora" not in missing and "YouTube" not in missing, f"(got {missing})")
 
+            # A feed is not always cover. Indeed has an alert and is still
+            # collection: manual, because its company pages are indexed but
+            # individual reviews often are not - so the alert must not tick
+            # the box for the manual look it cannot replace.
+            sources = H.load_yaml("sources")
+            fed = {f.get("platform") for f in sources.get("feeds", [])
+                   if f.get("enabled") and f.get("platform")}
+            check("Indeed has an alert feeding it", "indeed" in fed)
+            check("and is still asked about by the prompt",
+                  "indeed" in log_sweep.due(week_one, settings),
+                  f"(got {log_sweep.due(week_one, settings)})")
+            check("while Quora, collected by alert, is not",
+                  "quora" not in log_sweep.due(week_one, settings))
+            check("and X, whose feeds are disabled, still is",
+                  "x" in log_sweep.due(week_one, settings))
+
             # What the collector writes when a fetch succeeds.
             log_sweep.record(week_one, ["reddit"], "collector", found={"reddit": "3"})
             _also, missing = build_digest.channel_coverage(

@@ -434,6 +434,8 @@ def main() -> int:
                "out_of_scope_hint": 0, "personal_profile": 0}
     # platform id -> items kept, for the channels this run actually reached.
     fetched: dict[str, int] = {}
+    collection_of = {p["id"]: str(p.get("collection", "manual")).lower()
+                     for p in sources.get("platforms", [])}
 
     x_token = os.environ.get(X_TOKEN_ENV, "").strip()
     x_context = X_CONTEXT
@@ -490,10 +492,18 @@ def main() -> int:
         kept = len(rows)
         # This feed answered, so its channel is covered for the week. A feed
         # that failed above has already hit `continue` and never gets here -
-        # which is the point: a channel is covered by a fetch that worked, not
-        # by a feed that is merely configured.
-        if feed.get("platform"):
-            fetched[feed["platform"]] = fetched.get(feed["platform"], 0) + kept
+        # a channel is covered by a fetch that worked, not by a feed that is
+        # merely configured.
+        #
+        # Except where the platform is collection: manual. Indeed has an alert
+        # and still needs a person: its company pages are indexed but
+        # individual reviews often are not, so the alert is partial cover. If
+        # a partial feed could tick the box, the manual look it cannot replace
+        # would stop being asked for - which is how a gap closes on paper and
+        # stays open in fact.
+        platform_id = feed.get("platform")
+        if platform_id and collection_of.get(platform_id, "manual") != "manual":
+            fetched[platform_id] = fetched.get(platform_id, 0) + kept
 
         print(f"  {feed['id']}: {len(items)} items, {kept} new")
         if index < len(feeds) - 1:

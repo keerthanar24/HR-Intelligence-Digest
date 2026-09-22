@@ -204,6 +204,16 @@ feeds:
     enabled: true
     url: "https://www.google.com/alerts/feeds/06869919047613217312/6189939704157504110"
 
+  # Indeed has no API and blocks automated collection, so this alert is the
+  # only automation available for it. It stays on the MANUAL rotation as well:
+  # Indeed's company pages are indexed but individual reviews often are not,
+  # and an alert only fires on what Google newly indexes. Partial cover, not
+  # cover - which is why sources.yaml still calls Indeed collection: manual.
+  - id: google_alerts_indeed
+    platform: indeed
+    enabled: true
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/7799003522757902966"
+
   - id: reddit_search_rk_world
     platform: reddit
     entity: rk_world
