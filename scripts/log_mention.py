@@ -18,6 +18,7 @@ from - so capturing ratings alone leaves those sections empty.
 from __future__ import annotations
 
 import argparse
+import csv
 import datetime as dt
 import os
 import sys
@@ -35,6 +36,36 @@ def show_vocab() -> int:
     print("flag reason:", ", ".join(H.RED_FLAG_REASONS))
     print("entities   :", ", ".join(H.entity_names()))
     print("platforms  :", ", ".join(H.platform_names()))
+    return 0
+
+
+def show_all() -> int:
+    """Everything logged, grouped by page.
+
+    A back-read covers sixty days, which is nine reporting weeks, so listing
+    one week at a time cannot answer the only question that matters while
+    doing it: which pages have I finished? Grouping by entity and platform
+    does.
+    """
+    rows = H.read_csv(H.MENTIONS_CSV)
+    entities, platforms = H.entity_names(), H.platform_names()
+    if not rows:
+        print("Nothing logged yet.")
+        return 0
+    by_page: dict[tuple[str, str], list[dict]] = {}
+    for row in rows:
+        by_page.setdefault((row.get("entity", ""), row.get("platform", "")), []).append(row)
+    print(f"{len(rows)} mention(s) logged, across {len(by_page)} page(s)\n")
+    for (entity, platform), group in sorted(by_page.items()):
+        dates = sorted(r.get("post_date", "") for r in group if r.get("post_date"))
+        span = f"{dates[0]} to {dates[-1]}" if dates else "no dates"
+        flags = sum(1 for r in group if H.is_yes(r.get("red_flag")))
+        print(f"  {entities.get(entity, entity):<18} {platforms.get(platform, platform):<13} "
+              f"{len(group):>3} review(s)   {span}"
+              f"{f'   {flags} RED FLAG' if flags else ''}")
+    untagged = [r for r in rows if not (r.get("sentiment") or "").strip()]
+    if untagged:
+        print(f"\n{len(untagged)} still untagged - excluded from net sentiment until tagged.")
     return 0
 
 
@@ -122,6 +153,44 @@ def interactive(defaults) -> list[argparse.Namespace]:
             return collected
 
 
+def remove(mention_id: str) -> int:
+    """Delete one logged mention.
+
+    A back-read is done in one long sitting, and a mis-tagged row noticed three
+    reviews later had no way out except editing the CSV by hand - which is how
+    a header gets mangled or a comma-bearing summary gets split. Refuses when
+    an escalation points at the row, because deleting it would leave the
+    restricted log referring to a mention that no longer exists.
+    """
+    rows = H.read_csv(H.MENTIONS_CSV)
+    target = [r for r in rows if r.get("mention_id") == mention_id]
+    if not target:
+        print(f"No mention {mention_id!r}. "
+              f"List them with: python3 scripts/log_mention.py --list", file=sys.stderr)
+        return 2
+
+    linked = [e for e in H.read_csv(H.ESCALATIONS_CSV)
+              if e.get("mention_id") == mention_id]
+    if linked:
+        print(f"{mention_id} is referenced by escalation "
+              f"{linked[0].get('escalation_id')}. Close or correct the escalation first - "
+              "deleting the mention would leave the restricted log pointing at nothing.",
+              file=sys.stderr)
+        return 3
+
+    row = target[0]
+    keep = [r for r in rows if r.get("mention_id") != mention_id]
+    with open(H.MENTIONS_CSV, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=H.MENTION_FIELDS)
+        writer.writeheader()
+        writer.writerows(keep)
+    print(f"Removed {mention_id}  {row.get('entity')} / {row.get('platform')} / "
+          f"{row.get('post_date')}")
+    print(f"  {row.get('one_line_summary', '')[:90]}")
+    print(f"  {len(keep)} mention(s) left.")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -147,7 +216,11 @@ def main() -> int:
     p.add_argument("--by", default="desk")
     p.add_argument("--vocab", action="store_true", help="print the allowed values")
     p.add_argument("--list", action="store_true", help="show what is logged for a week")
+    p.add_argument("--remove", metavar="MENTION_ID",
+                   help="delete a mention logged by mistake")
     p.add_argument("--week", help="with --list, the week to show")
+    p.add_argument("--all", action="store_true",
+                   help="with --list, every week grouped by page - the back-read view")
     p.add_argument("-i", "--interactive", action="store_true",
                    help="prompt for each field instead of composing a command line; "
                         "the way to do a back-read")
@@ -155,7 +228,11 @@ def main() -> int:
 
     if args.vocab:
         return show_vocab()
+    if args.remove:
+        return remove(args.remove)
     if args.list:
+        if args.all:
+            return show_all()
         week = H.parse_date(args.week) if args.week else H.last_complete_week()
         return show_week(H.week_start_of(week))
     if args.interactive:

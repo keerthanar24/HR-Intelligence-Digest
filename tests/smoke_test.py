@@ -927,6 +927,56 @@ def test_unrated_entity_is_named() -> None:
               "not evidence of a quiet week" in body)
 
 
+def test_remove_mention() -> None:
+    """A row logged by mistake must be removable without editing the CSV.
+
+    A back-read is one long sitting and mistakes are noticed a few reviews
+    later. Hand-editing the file is how a header gets mangled or a summary
+    containing a comma gets split across columns.
+    """
+    print("removing a mis-logged mention")
+    import log_mention
+
+    with tempfile.TemporaryDirectory() as tmp:
+        mentions = os.path.join(tmp, "mentions.csv")
+        escalations = os.path.join(tmp, "escalations.csv")
+        rows = [
+            {f: "" for f in H.MENTION_FIELDS} | {
+                "mention_id": "M-1", "entity": "rk_world", "platform": "ambitionbox",
+                "post_date": "2026-08-14", "one_line_summary": "first"},
+            {f: "" for f in H.MENTION_FIELDS} | {
+                "mention_id": "M-2", "entity": "rk_group", "platform": "glassdoor",
+                "post_date": "2026-08-15", "one_line_summary": "second"},
+        ]
+        import csv as _csv
+        for path, fields, data in ((mentions, H.MENTION_FIELDS, rows),
+                                   (escalations, H.ESCALATION_FIELDS, [])):
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                w = _csv.DictWriter(fh, fieldnames=fields)
+                w.writeheader()
+                w.writerows(data)
+
+        real_m, real_e = H.MENTIONS_CSV, H.ESCALATIONS_CSV
+        H.MENTIONS_CSV, H.ESCALATIONS_CSV = mentions, escalations
+        try:
+            check("removing an unknown id fails loudly", log_mention.remove("M-NOPE") == 2)
+            check("removing a real one succeeds", log_mention.remove("M-1") == 0)
+            left = [r["mention_id"] for r in H.read_csv(mentions)]
+            check("only that row goes", left == ["M-2"], f"(left {left})")
+
+            # An escalation pointing at a mention must block the delete, or the
+            # restricted log ends up referring to a row that no longer exists.
+            with open(escalations, "w", newline="", encoding="utf-8") as fh:
+                w = _csv.DictWriter(fh, fieldnames=H.ESCALATION_FIELDS)
+                w.writeheader()
+                w.writerow({f: "" for f in H.ESCALATION_FIELDS} |
+                           {"escalation_id": "E-2026-001", "mention_id": "M-2"})
+            check("an escalated mention cannot be deleted", log_mention.remove("M-2") == 3)
+            check("and it is still there", len(H.read_csv(mentions)) == 1)
+        finally:
+            H.MENTIONS_CSV, H.ESCALATIONS_CSV = real_m, real_e
+
+
 def test_coverage_gate() -> None:
     """An incomplete sweep must not be sendable.
 
@@ -1093,7 +1143,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

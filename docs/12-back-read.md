@@ -92,12 +92,42 @@ python3 scripts/red_flags.py --raise M-20260919-003 --reason non_payment
 
 ---
 
+## Fixing a mistake
+
+A row logged with the wrong sentiment, or a typo in the summary, comes out with:
+
+```bash
+python3 scripts/log_mention.py --remove M-20260808-001
+```
+
+Then log it again. Do not edit `data/mentions.csv` by hand — a summary containing a comma
+splits across columns and the damage is not obvious until the digest looks wrong.
+
+A mention an escalation points at will not delete; correct the escalation first, so the
+restricted log never refers to a row that no longer exists.
+
+**The mention id comes from the review's own date, not today's.** A review posted on 14 August
+is logged as `M-20260808-001` — the week that review falls in. That is deliberate: it is how the
+row reaches the right week in the digest.
+
 ## Knowing when it is done
 
 ```bash
-python3 scripts/log_mention.py --list --week 2026-09-19   # what is logged
-python3 scripts/log_rating.py --status                    # ratings for the week
-python3 scripts/build_digest.py                           # refuses while reviews are unread
+python3 scripts/log_mention.py --list --all   # every page, with how many and the date span
+python3 scripts/log_rating.py --status        # ratings for the week
+python3 scripts/build_digest.py               # refuses while reviews are unread
+```
+
+`--list --all` is the one to use during a back-read. Sixty days is nine reporting weeks, so
+listing a single week cannot answer the only question that matters while you are working:
+which pages have I finished?
+
+```
+7 mention(s) logged, across 3 page(s)
+
+  RK Group           AmbitionBox     3 review(s)   2026-08-02 to 2026-09-11
+  RK World Infocom   AmbitionBox     3 review(s)   2026-07-28 to 2026-09-14   1 RED FLAG
+  Westbury Kommerce  Glassdoor       1 review(s)   2026-08-30 to 2026-08-30
 ```
 
 From week 2 onward the build compares the review-count delta against the rows logged and
