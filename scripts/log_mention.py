@@ -63,6 +63,14 @@ def show_all() -> int:
         print(f"  {entities.get(entity, entity):<18} {platforms.get(platform, platform):<13} "
               f"{len(group):>3} review(s)   {span}"
               f"{f'   {flags} RED FLAG' if flags else ''}")
+        # The summary is the line that reaches the email, so this is where it
+        # gets checked. Counts alone cannot tell a rewritten row from the one
+        # it replaced.
+        for row in sorted(group, key=lambda r: r.get("post_date", "")):
+            tag = row.get("sentiment") or "UNTAGGED"
+            print(f"      {row['mention_id']}  {row.get('post_date',''):<11} {tag:<14} "
+                  f"{(row.get('themes') or '').replace('|', ', ')}")
+            print(f"        {(row.get('one_line_summary') or '')[:96]}")
     untagged = [r for r in rows if not (r.get("sentiment") or "").strip()]
     if untagged:
         print(f"\n{len(untagged)} still untagged - excluded from net sentiment until tagged.")
