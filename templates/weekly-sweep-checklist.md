@@ -59,6 +59,22 @@ last Friday**. Sort by newest, not relevance.
 
 - [ ] Indeed *(reviews and interview experiences)* · [ ] YouTube comments · [ ] Google Reviews *(employment only — skip customer and product reviews)*
 
+## 10:10 · Tick off what you checked (2 min)
+
+```bash
+python3 scripts/log_sweep.py
+```
+
+The review sites prove their own coverage — the review count says how many reviews a page
+gained, and the digest checks it against what you logged. **LinkedIn, X, Indeed, Quora,
+YouTube and Google Reviews have no such count.** If you don't record that you opened them,
+the digest cannot tell an empty channel from one nobody looked at, and says so:
+
+> **Not swept this week: LinkedIn, Quora, X, YouTube.** Nothing was found there because
+> nobody looked — not because there was nothing to find.
+
+Finding nothing is a real answer. Answer `0` and it counts as swept.
+
 ## 10:15 · Log what you found (30 min)
 
 Either paste it all to Claude and let it tag and log, or do it yourself:

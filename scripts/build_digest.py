@@ -511,6 +511,23 @@ def unrated_entities(entities, profiles=None):
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 
+def channel_coverage(week_of, settings, platforms, swept):
+    """(also_swept, not_swept) for the channels that carry no review count.
+
+    "Swept this week: AmbitionBox, Glassdoor" is an inventory of what produced
+    data, not a checklist of what was due. So a week where nobody opened
+    YouTube read exactly like a week where it was checked and was empty - and
+    at month 2 that difference is the whole question, because an empty channel
+    is a finding and an unchecked one is not.
+    """
+    expected = H.unverified_channels(week_of, settings)
+    checked = H.channels_checked(week_of)
+    name = lambda p: platforms.get(p, p.replace("_", " ").title())  # noqa: E731
+    also = [name(p) for p in expected if p in checked and name(p) not in swept]
+    missing = [name(p) for p in expected if p not in checked and name(p) not in swept]
+    return also, sorted(missing)
+
+
 def missing_profiles(entities, platforms, absent=None, unrated=()):
     """'Robust Kommerce on AmbitionBox' for each page confirmed not to exist.
 
@@ -590,6 +607,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     is_baseline = bool(trial_start) and H.week_start_of(trial_start) == week_of
     swept, gaps = coverage_rows(now, all_ratings, week_of, entities, platforms,
                                 baseline=is_baseline)
+    also_swept, not_swept = channel_coverage(week_of, settings, platforms, swept)
+    swept = sorted(set(swept) | set(also_swept))
     rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
     rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
 
@@ -743,6 +762,11 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if swept:
         h.append(f'<p style="margin:0 0 4px;font-size:12px;color:#52606d;">Swept this week: '
                  f'{E(", ".join(swept))}.</p>')
+    if not_swept:
+        h.append('<p style="margin:0 0 8px;font-size:12px;color:#8a6d3b;">'
+                 f'<strong>Not swept this week: {E(", ".join(not_swept))}.</strong> '
+                 'Nothing was found there because nobody looked — not because '
+                 'there was nothing to find.</p>')
 
     # 4. Themes
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">4 · Themes</h3>')
@@ -894,6 +918,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if swept:
         t.append("")
         t.append(f"Swept this week: {', '.join(swept)}.")
+    if not_swept:
+        t.append("")
+        t.append(f"NOT swept this week: {', '.join(not_swept)}. Nothing was found there "
+                 "because nobody looked - not because there was nothing to find.")
     t.append("")
     t.append("4. THEMES")
     if themes:

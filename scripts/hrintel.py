@@ -31,6 +31,7 @@ MENTIONS_CSV = os.path.join(DATA_DIR, "mentions.csv")
 RATINGS_CSV = os.path.join(DATA_DIR, "ratings.csv")
 ESCALATIONS_CSV = os.path.join(DATA_DIR, "escalations.csv")
 WEEKLY_LOG_CSV = os.path.join(DATA_DIR, "weekly_log.csv")
+SWEEPS_CSV = os.path.join(DATA_DIR, "sweeps.csv")
 
 MENTION_FIELDS = [
     "mention_id", "week_of", "captured_at", "captured_by", "entity", "platform",
@@ -51,6 +52,12 @@ RATING_FIELDS = [
 # derived; these are the three things only the person who did the sweep knows.
 # docs/07-phase3-review.md asks for effort and signal quality at the month-2
 # review, and neither can be reconstructed eight weeks later from memory.
+# One row per channel per week, written when somebody checks it. The review
+# sites prove their own coverage through the review count; these channels have
+# no count, so a morning spent on YouTube finding nothing leaves no trace and
+# reads at month 2 exactly like a channel nobody opened.
+SWEEP_FIELDS = ["week_of", "platform", "checked_at", "checked_by", "found", "notes"]
+
 WEEKLY_LOG_FIELDS = [
     "week_of", "logged_at", "swept_by", "minutes_spent", "new_to_recipients",
     "acted_on_elsewhere", "mentions", "red_flags", "out_of_scope",
@@ -107,6 +114,37 @@ ENGAGEMENT_PLATFORMS = {"x", "linkedin", "reddit", "youtube", "quora", "news"}
 # Platforms where the post's own words are always visible on the page, so a
 # row has no excuse for holding only somebody's paraphrase of them.
 VERBATIM_REQUIRED = {"ambitionbox", "glassdoor", "indeed", "google_reviews"}
+
+
+def unverified_channels(week_of: dt.date, settings: dict | None = None) -> list[str]:
+    """Channels due this week that can only prove coverage by being recorded.
+
+    A review site proves it was swept: the rating snapshot carries the review
+    count, and the change in that count is checkable arithmetic. LinkedIn, X,
+    Indeed, Quora, YouTube and Google Reviews carry no count, and Reddit and
+    news are pulled by the collector, which logs its own run. What is left is
+    the set where "checked and empty" and "never opened" are indistinguishable
+    unless somebody says which it was.
+    """
+    sources = load_yaml("sources")
+    fed = {f.get("platform") for f in sources.get("feeds", [])
+           if f.get("enabled") and f.get("platform")}
+    out = []
+    for platform in sources.get("platforms", []):
+        if "ratings" in (platform.get("captures") or []):
+            continue
+        if platform["id"] in fed:
+            continue
+        if not cadence_due(platform.get("cadence", "weekly"), week_of, settings):
+            continue
+        out.append(platform["id"])
+    return sorted(out)
+
+
+def channels_checked(week_of: dt.date) -> set[str]:
+    """Platform ids somebody recorded checking in this week."""
+    return {r.get("platform") for r in read_csv(SWEEPS_CSV)
+            if r.get("week_of") == week_of.isoformat() and r.get("platform")}
 
 
 def platform_publishes(platform_id: str, field: str) -> bool:
@@ -537,6 +575,18 @@ def append_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
     ensure_csv(path, fields)
     with open(path, "a", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        for row in rows:
+            writer.writerow({k: row.get(k, "") for k in fields})
+    return len(rows)
+
+
+def write_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
+    """Replace a CSV wholesale. Callers that only add rows want append_csv."""
+    rows = list(rows)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+        writer.writeheader()
         for row in rows:
             writer.writerow({k: row.get(k, "") for k in fields})
     return len(rows)

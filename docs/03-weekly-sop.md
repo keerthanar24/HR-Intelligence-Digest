@@ -52,6 +52,16 @@ Don't work the rotation from memory. `make sweep` prints the worksheet for the w
 each fortnightly channel **DUE this week** or **NOT due this week**, counted from the trial
 start so it cannot drift. Indeed carries interview experiences as well as reviews.
 
+Then record which of them you actually opened:
+
+```bash
+python3 scripts/log_sweep.py
+```
+
+Only the review sites can prove their own coverage, through the review count. The six
+channels above carry no count, so an unrecorded one is reported in the digest as **not
+swept** rather than quietly counted as empty. Finding nothing is a real answer — enter `0`.
+
 Search strings for each platform: `python3 scripts/alert_queries.py --format manual`.
 
 For every new item, log a mention — either by typing a row into the sheet's `Raw_Data_Log`

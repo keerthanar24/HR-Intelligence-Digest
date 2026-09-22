@@ -1492,6 +1492,63 @@ def test_absent_values_are_named() -> None:
             H.MENTIONS_CSV = saved
 
 
+def test_unverified_channels_are_named() -> None:
+    """A channel nobody opened must not read as a channel that was empty.
+
+    A review site proves its own coverage through the review count. LinkedIn,
+    X, Indeed, Quora, YouTube and Google Reviews carry no count, so the digest
+    said "Swept this week: AmbitionBox, Glassdoor" and stayed silent about the
+    rest - an inventory of what produced data, not a checklist of what was due.
+    At month 2 the difference between an empty channel and an unchecked one is
+    the whole question.
+    """
+    print("unverified channels are named")
+    import log_sweep
+
+    settings = H.load_yaml("settings")
+    week_one = H.week_start_of(H.parse_date(settings["programme"]["trial_start"]))
+    platforms = H.platform_names()
+
+    expected = H.unverified_channels(week_one, settings)
+    check("the six manual channels are expected in week 1",
+          set(expected) == {"linkedin", "x", "indeed", "quora", "youtube", "google_reviews"},
+          f"(got {expected})")
+    check("a review site is not in the list - its review count proves it",
+          not {"ambitionbox", "glassdoor"} & set(expected))
+    check("a feed-collected channel is not either - the collector logs its run",
+          "reddit" not in expected and "news" not in expected)
+    check("week 2 drops the fortnightly ones",
+          set(H.unverified_channels(week_one + dt.timedelta(days=7), settings))
+          == {"linkedin", "x", "quora"})
+
+    with tempfile.TemporaryDirectory() as tmp:
+        saved = H.SWEEPS_CSV
+        H.SWEEPS_CSV = os.path.join(tmp, "sweeps.csv")
+        try:
+            _also, missing = build_digest.channel_coverage(
+                week_one, settings, platforms, ["AmbitionBox", "Glassdoor"])
+            check("with nothing recorded, every channel is named as not swept",
+                  len(missing) == 6, f"(got {missing})")
+
+            log_sweep.record(week_one, ["quora", "youtube"], "desk",
+                             found={"quora": "0", "youtube": "0"})
+            also, missing = build_digest.channel_coverage(
+                week_one, settings, platforms, ["AmbitionBox", "Glassdoor"])
+            check("a channel checked and empty counts as swept",
+                  set(also) == {"Quora", "YouTube"}, f"(got {also})")
+            check("and drops out of the not-swept list",
+                  set(missing) == {"LinkedIn", "X", "Indeed", "Google Reviews"},
+                  f"(got {missing})")
+
+            # Recording the same week twice must not double the rows.
+            log_sweep.record(week_one, ["quora"], "desk", found={"quora": "2"})
+            rows = [r for r in H.read_csv(H.SWEEPS_CSV) if r["platform"] == "quora"]
+            check("re-recording a channel replaces it", len(rows) == 1, f"(got {rows})")
+            check("and keeps the new count", rows and rows[0]["found"] == "2")
+        finally:
+            H.SWEEPS_CSV = saved
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1708,7 +1765,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
