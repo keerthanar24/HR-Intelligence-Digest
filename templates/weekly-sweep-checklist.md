@@ -51,6 +51,11 @@ last Friday**. Sort by newest, not relevance.
 > Open each page's **Posts** tab and read the **comments** under them — that is where employment
 > chatter sits, not in the company's own posts. Do not open individual people's profiles.
 
+- [ ] **Posts by people about the company** — these never appear on a company page.
+      `make sweep` prints a dated content-search link per entity. Sort by latest.
+      Record **reactions + comments + reposts** on anything with traction: at
+      `virality_engagement_threshold` (100) it is auto-suggested as a red flag.
+
 **Every week, no fixed page**
 
 - [ ] X — logged-out search, unless the API token is set

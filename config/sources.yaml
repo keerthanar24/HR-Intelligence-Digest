@@ -78,6 +78,13 @@ platforms:
     cadence: weekly
     priority: 1
     captures: [company_page_activity, employee_posts, comments, exit_updates]
+    # The company pages below cover two of those four. Employee posts and
+    # ex-employee updates are written by individuals and do not appear on the
+    # company page at all, so without a content search they had no entry point
+    # and were in the source map in name only. This searches POSTS for the
+    # company name, which is public commentary about an employer - not the
+    # same thing as opening someone's profile, which stays out of scope.
+    search_url: "https://www.linkedin.com/search/results/content/?keywords={query}&sortBy=%22date_posted%22"
     notes: >-
       Company page activity and public post search only. Do not browse or compile
       individual personal profiles — see the boundary in docs/00-brief.md section 4.

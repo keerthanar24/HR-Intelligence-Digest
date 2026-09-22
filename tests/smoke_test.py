@@ -1579,6 +1579,66 @@ def test_unverified_channels_are_named() -> None:
             H.SWEEPS_CSV = saved
 
 
+def test_linkedin_is_fully_reachable() -> None:
+    """LinkedIn's half-covered corners: people's posts, and engagement.
+
+    The scope asks for company page activity, employee posts, comments and
+    ex-employee updates. The four company pages cover the first and third;
+    the other two are written by individuals and never appear on a company
+    page, so without a content search they were in the source map in name
+    only.
+
+    And settings.yaml treats engagement at or above a threshold as
+    public_escalation_risk, but the guided prompt never asked for a number -
+    so on LinkedIn and X, the two places a complaint can gather momentum, the
+    trigger could not fire at all. A red flag that cannot be raised is not a
+    safeguard.
+    """
+    print("linkedin is fully reachable")
+    linkedin = next(p for p in H.load_yaml("sources")["platforms"]
+                    if p["id"] == "linkedin")
+
+    check("all four company pages are configured",
+          len(linkedin.get("urls") or {}) == 4 and
+          not any(H.is_todo(u) for u in linkedin["urls"].values()),
+          f"({linkedin.get('urls')})")
+    check("there is a content search for posts by people",
+          "{query}" in str(linkedin.get("search_url") or ""))
+
+    # The guardrail the search must not cross.
+    check("a personal profile is still refused",
+          H.personal_profile_reason("https://www.linkedin.com/in/someone-1234/"))
+    check("a company page is not",
+          not H.personal_profile_reason("https://www.linkedin.com/company/rk-groupp/"))
+    check("nor is one specific public post",
+          not H.personal_profile_reason(
+              "https://www.linkedin.com/feed/update/urn:li:activity:7123456789/"))
+
+    threshold = int(H.load_yaml("settings")["red_flags"]["virality_engagement_threshold"])
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "mentions.csv")
+        viral = {f: "" for f in H.MENTION_FIELDS} | {
+            "mention_id": "M-1", "entity": "rk_group", "platform": "linkedin",
+            "post_date": "2026-09-21", "sentiment": "negative",
+            # Deliberately flat wording: this pair isolates the engagement
+            # threshold, so the text must not trip a pattern of its own.
+            "one_line_summary": "a post about working hours",
+            "url": "https://www.linkedin.com/feed/update/urn:li:activity:7123/",
+            "engagement": str(threshold + 40), "status": "needs_review"}
+        quiet = dict(viral) | {"mention_id": "M-2", "engagement": str(threshold - 40)}
+        import_sheet.write(path, H.MENTION_FIELDS, [viral, quiet])
+        found = {m["mention_id"]: r for m, r in
+                 red_flags.suggestions(H.read_csv(path), H.load_yaml("settings"))}
+
+    check("engagement is recorded on a platform that publishes one",
+          H.engagement_applies("linkedin") and H.engagement_applies("x"))
+    check("a review site publishes none, so a blank there is not a gap",
+          not H.engagement_applies("glassdoor") and not H.engagement_applies("ambitionbox"))
+    check("a post over the threshold is raised as public_escalation_risk",
+          "public_escalation_risk" in found.get("M-1", []), f"({found})")
+    check("one under it is not", "M-2" not in found, f"({found})")
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1795,7 +1855,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

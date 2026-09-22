@@ -137,6 +137,28 @@ def draft_alert(row: dict, settings: dict, recipients: dict) -> str:
     return "\n".join(lines)
 
 
+def suggestions(mentions: list[dict], settings: dict) -> list[tuple[dict, list[str]]]:
+    """Rows that look like a trigger. A person decides; this only points.
+
+    Two kinds: wording that matches a trigger pattern, and reach. Reach is the
+    only one the text cannot show - settings.yaml treats engagement at or above
+    virality_engagement_threshold as public_escalation_risk, which is how a
+    complaint that is spreading gets caught before the words themselves look
+    alarming.
+    """
+    threshold = int(settings.get("red_flags", {}).get("virality_engagement_threshold", 100))
+    found = []
+    for mention in mentions:
+        if H.is_yes(mention.get("red_flag")):
+            continue
+        reasons = matches_pattern(mention_text(mention))
+        if H.to_int(mention.get("engagement"), 0) >= threshold:
+            reasons.append("public_escalation_risk")
+        if reasons:
+            found.append((mention, sorted(set(reasons))))
+    return found
+
+
 def next_escalation_id(existing: list[dict]) -> str:
     year = dt.date.today().year
     prefix = f"E-{year}-"
@@ -307,21 +329,12 @@ def main() -> int:
         return 0
 
     if args.scan:
-        suggestions = []
-        for m in mentions:
-            if H.is_yes(m.get("red_flag")):
-                continue
-            reasons = matches_pattern(mention_text(m))
-            threshold = int(settings.get("red_flags", {}).get("virality_engagement_threshold", 100))
-            if H.to_int(m.get("engagement"), 0) >= threshold:
-                reasons.append("public_escalation_risk")
-            if reasons:
-                suggestions.append((m, sorted(set(reasons))))
-        if not suggestions:
+        found = suggestions(mentions, settings)
+        if not found:
             print("Scan found nothing that looks like a trigger.")
             return 0
-        print(f"{len(suggestions)} row(s) worth a second look — a human decides, not the script:\n")
-        for m, reasons in suggestions:
+        print(f"{len(found)} row(s) worth a second look — a human decides, not the script:\n")
+        for m, reasons in found:
             print(f"  {m.get('mention_id','?')} [{m.get('entity')}/{m.get('platform')}] "
                   f"-> {', '.join(reasons)}")
             print(f"      {(m.get('one_line_summary') or m.get('title_or_snippet',''))[:110]}")

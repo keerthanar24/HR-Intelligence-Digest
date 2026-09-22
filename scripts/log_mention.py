@@ -149,7 +149,7 @@ def interactive(defaults) -> list[argparse.Namespace]:
         platform = ask("platform", allowed=list(platforms), default=last["platform"],
                        required=True)
         date = ask("date the review was posted (YYYY-MM-DD)", required=True)
-        title = ask("the review's own words - its title, or its first line",
+        title = ask("the post's own words - its title, or its first line",
                     required=platform in H.VERBATIM_REQUIRED)
         summary = ask("one factual sentence - no names, no interpretation", required=True)
         sentiment = ask("sentiment", allowed=list(H.SENTIMENT_SCORES), required=True)
@@ -157,6 +157,14 @@ def interactive(defaults) -> list[argparse.Namespace]:
         author = ask("who wrote it", allowed=H.AUTHOR_TYPES, default="unknown")
         role = ask("department or role, if the page shows one (optional)")
         stars = ask("stars the reviewer gave, 1-5 (optional)")
+        # Only where the platform publishes one. settings.yaml treats
+        # engagement >= virality_engagement_threshold as public_escalation_risk,
+        # and this prompt never asked for it - so on LinkedIn and X, the two
+        # places a complaint can actually gather momentum, the trigger could
+        # not fire. A red flag that cannot be raised is not a safeguard.
+        reach = ""
+        if H.engagement_applies(platform):
+            reach = ask("reactions + comments + reposts, roughly (optional)")
         url = ask("link to the review (optional)")
         flag = ask("red-flag trigger, blank if none", allowed=H.RED_FLAG_REASONS)
         names = ask("does it name an individual? y/N", default="n").lower().startswith("y")
@@ -164,7 +172,9 @@ def interactive(defaults) -> list[argparse.Namespace]:
         one = argparse.Namespace(
             entity=entity, platform=platform, date=date, summary=summary,
             sentiment=sentiment, themes=themes, author=author, url=url, title=title,
-            role=role, rating=stars, engagement=None, names_individual=names,
+            role=role, rating=stars,
+            engagement=int(reach) if reach.isdigit() else None,
+            names_individual=names,
             flag=flag or None, notes="", mixed_post=False, by=defaults.by,
             vocab=False, list=False, week=None, all=False, remove=None,
             interactive=False)

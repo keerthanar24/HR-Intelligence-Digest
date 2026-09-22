@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import urllib.parse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -170,6 +171,17 @@ def main() -> int:
                     note = text
                 print(f"  [ ] {names[entity_id]}")
                 print(f"      {note}")
+            # A company page shows what the company posts. Anything an employee
+            # or leaver writes lives in the platform's own content search, and
+            # without a link to it that half of the source map is decorative.
+            template = str(platform.get("search_url") or "").strip()
+            if template:
+                print("    Posts BY people about the company - the company page "
+                      "does not show these:")
+                for entity in entities:
+                    query = urllib.parse.quote_plus('"%s"' % entity["aliases"][0])
+                    print(f"  [ ] {entity['name']}")
+                    print("      " + template.replace("{query}", query))
             print()
 
         if feeds:
