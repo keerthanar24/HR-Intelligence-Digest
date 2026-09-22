@@ -50,7 +50,30 @@ product reviews and anything from an individual's personal social account are ou
 
 ---
 
-## 2. RK Group's all-locations figures — do before week 2
+## 2. ~~RK Group's all-locations figures~~ — DONE 2026-09-22
+
+Both baselines were the city-filtered view, and the correction was large:
+
+| | Was (city view) | Is (all locations) |
+|---|---|---|
+| AmbitionBox | 2.70 / 27 reviews | **3.30 / 151** |
+| Glassdoor | 3.60 / 16, 56% recommend | **3.70 / 30, 64% recommend** |
+
+AmbitionBox's location dropdown settled it: Bengaluru shows exactly 27, the number that had
+been recorded as the whole company. Left uncorrected, the first week-on-week comparison would
+have reported around +124 new AmbitionBox reviews that had been there for months, and the
+completeness gate would have demanded somebody read and log all of them.
+
+**The mistake revealed something worth keeping.** Bengaluru rates RK Group 2.70 against 3.30
+company-wide, and Bangalore 3.60 against 3.70 — the same city is the weaker half on both
+platforms. The location split is New Delhi 39, Bengaluru 27, Mumbai 6, Ahmedabad 5, Hyderabad 4,
+Lucknow 4, Daman & Diu 3. If the programme is ever extended, a location-level view for RK Group
+looks like it would carry real signal.
+
+The AmbitionBox sub-scores were cleared: they were read off the Bengaluru view, and beside an
+all-locations headline they would have read as company-wide figures.
+
+## Superseded — the original entry
 
 Both RK Group baselines are **Bengaluru-filtered**, not the whole company:
 
