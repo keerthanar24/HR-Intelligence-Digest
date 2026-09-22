@@ -30,6 +30,7 @@ OUT_DIR = os.path.join(ROOT, "out")
 MENTIONS_CSV = os.path.join(DATA_DIR, "mentions.csv")
 RATINGS_CSV = os.path.join(DATA_DIR, "ratings.csv")
 ESCALATIONS_CSV = os.path.join(DATA_DIR, "escalations.csv")
+WEEKLY_LOG_CSV = os.path.join(DATA_DIR, "weekly_log.csv")
 
 MENTION_FIELDS = [
     "mention_id", "week_of", "captured_at", "captured_by", "entity", "platform",
@@ -44,6 +45,16 @@ RATING_FIELDS = [
     "overall_rating", "review_count", "recommend_pct", "ceo_approval_pct",
     "work_life_balance", "salary_benefits", "job_security", "career_growth",
     "culture", "url", "notes",
+]
+
+# One row per week, written when the digest goes out. Everything derivable is
+# derived; these are the three things only the person who did the sweep knows.
+# docs/07-phase3-review.md asks for effort and signal quality at the month-2
+# review, and neither can be reconstructed eight weeks later from memory.
+WEEKLY_LOG_FIELDS = [
+    "week_of", "logged_at", "swept_by", "minutes_spent", "new_to_recipients",
+    "acted_on_elsewhere", "mentions", "red_flags", "out_of_scope",
+    "platforms_swept", "notes",
 ]
 
 ESCALATION_FIELDS = [
@@ -447,6 +458,35 @@ def mentions_for_week(rows: list[dict], week_of: dt.date) -> list[dict]:
             if posted and monday_of(posted) == week_of:
                 picked.append(row)
     return picked
+
+
+def baseline_window(week_of: dt.date, settings: dict):
+    """(first_day, last_day, days) for week 1, or None for an ordinary week.
+
+    The brief makes week 1 a sixty-day baseline, but every digest reported a
+    strict seven days. The back-read then landed in the weeks the reviews were
+    actually posted - August and early September - and the week 1 digest
+    reported zero mentions with the whole baseline sitting in the file,
+    invisible. A digest that says "no new reviews" the week you read sixty
+    days of them is worse than no digest.
+    """
+    start = parse_date(str(settings.get("programme", {}).get("trial_start", "")))
+    if not start or week_start_of(start) != week_of:
+        return None
+    days = int(settings.get("digest", {}).get("baseline_days", 60))
+    last = week_of + dt.timedelta(days=6)
+    return last - dt.timedelta(days=days - 1), last, days
+
+
+def mentions_in(all_mentions: list[dict], first: dt.date, last: dt.date) -> list[dict]:
+    """Every mention posted between two dates, inclusive."""
+    kept = []
+    for mention in all_mentions:
+        posted = parse_date(mention.get("post_date", "")) or \
+            parse_date(mention.get("captured_at", ""))
+        if posted and first <= posted <= last:
+            kept.append(mention)
+    return kept
 
 
 def split_themes(value: str) -> list[str]:

@@ -1148,6 +1148,125 @@ def test_marketplace_complaints_are_out_of_scope() -> None:
               f"(flagged {H.customer_side_terms(text)})")
 
 
+def test_weekly_effort_log() -> None:
+    """The effort log must count the week the digest actually reported.
+
+    docs/07-phase3-review.md decides at week 8 on hours-per-week and on how
+    much of the digest was news, and neither is anywhere in the data. The
+    first build of this counted a strict seven days, so week 1 - the sixty-day
+    baseline - asked how many of nought mentions were new on the very week the
+    digest carried the whole back-read. An effort log that disagrees with the
+    digest it is logging is worse than no log.
+    """
+    print("weekly effort log")
+    import log_week
+
+    settings = H.load_yaml("settings")
+    week_one = H.week_start_of(H.parse_date(settings["programme"]["trial_start"]))
+    ordinary = week_one + dt.timedelta(days=7)
+
+    def mention(mid, posted, **extra):
+        return {f: "" for f in H.MENTION_FIELDS} | {
+            "mention_id": mid, "entity": "rk_world", "platform": "ambitionbox",
+            "post_date": posted.isoformat(), "sentiment": "negative",
+            "one_line_summary": mid} | extra
+
+    rows = [
+        mention("M-old", week_one - dt.timedelta(days=40)),        # baseline only
+        mention("M-week1", week_one + dt.timedelta(days=2)),       # baseline + week 1
+        mention("M-week2", ordinary + dt.timedelta(days=1)),       # week 2 only
+        mention("M-scope", week_one + dt.timedelta(days=3),
+                status="out_of_scope", platform="glassdoor"),
+        mention("M-ancient", week_one - dt.timedelta(days=400)),   # outside everything
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        mentions = os.path.join(tmp, "mentions.csv")
+        log = os.path.join(tmp, "weekly_log.csv")
+        import_sheet.write(mentions, H.MENTION_FIELDS, rows)
+        saved = (H.MENTIONS_CSV, H.WEEKLY_LOG_CSV)
+        H.MENTIONS_CSV, H.WEEKLY_LOG_CSV = mentions, log
+        try:
+            base = log_week.derived(week_one, settings)
+            check("week 1 counts the sixty-day baseline, not seven days",
+                  base["mentions"] == 2, f"(got {base['mentions']})")
+            check("the out-of-scope review is counted apart",
+                  base["out_of_scope"] == 1, f"(got {base['out_of_scope']})")
+            check("a review older than the baseline is left out",
+                  base["mentions"] + base["out_of_scope"] == 3)
+
+            week2 = log_week.derived(ordinary, settings)
+            check("an ordinary week counts its own seven days",
+                  week2["mentions"] == 1, f"(got {week2['mentions']})")
+
+            # What the log records must survive a read-back.
+            H.append_csv(H.WEEKLY_LOG_CSV, H.WEEKLY_LOG_FIELDS, [{
+                "week_of": week_one.isoformat(), "logged_at": "2026-09-25",
+                "swept_by": "desk", "minutes_spent": "150",
+                "new_to_recipients": "2", "acted_on_elsewhere": "",
+                "notes": "back-read", **base}])
+            back = H.read_csv(H.WEEKLY_LOG_CSV)
+            check("the week reads back with every field",
+                  len(back) == 1 and set(back[0]) == set(H.WEEKLY_LOG_FIELDS),
+                  f"(got {sorted(set(H.WEEKLY_LOG_FIELDS) - set(back[0] if back else []))})")
+            check("the minutes survive as a number",
+                  H.to_int(back[0]["minutes_spent"]) == 150)
+            check("the platforms swept are recorded",
+                  "ambitionbox" in back[0]["platforms_swept"])
+        finally:
+            H.MENTIONS_CSV, H.WEEKLY_LOG_CSV = saved
+
+    # "New to them" cannot exceed the mentions there were - the first run of
+    # this recorded "1 of 0 new", which is not a number anyone can use.
+    answers = iter(["9", "2"])
+    real_input = __builtins__["input"] if isinstance(__builtins__, dict) \
+        else __builtins__.input
+    try:
+        if isinstance(__builtins__, dict):
+            __builtins__["input"] = lambda _prompt="": next(answers)
+        else:
+            __builtins__.input = lambda _prompt="": next(answers)
+        got = log_week.ask("how many were new?", numeric=True, most=3)
+    finally:
+        if isinstance(__builtins__, dict):
+            __builtins__["input"] = real_input
+        else:
+            __builtins__.input = real_input
+    check("more new mentions than mentions is refused", got == "2", f"(got {got!r})")
+
+    # The validator judged coverage on a strict week too, so week 1 - the week
+    # of the back-read - came back "no mentions recorded at all".
+    report = validate_data.Report()
+    with tempfile.TemporaryDirectory() as tmp:
+        mentions = os.path.join(tmp, "mentions.csv")
+        import_sheet.write(mentions, H.MENTION_FIELDS, rows)
+        validate_data.check_coverage(report, H.read_csv(mentions),
+                                     H.read_csv(H.RATINGS_CSV), week_one)
+    empty = [m for m in report.warnings if "no mentions recorded at all" in m]
+    check("the validator does not call the baseline week empty", not empty, f"({empty})")
+
+    # A week that was swept but never logged is unrecoverable by week 8.
+    with tempfile.TemporaryDirectory() as tmp:
+        log = os.path.join(tmp, "weekly_log.csv")
+        saved_log = H.WEEKLY_LOG_CSV
+        H.WEEKLY_LOG_CSV = log
+        try:
+            ratings = [{"week_of": week_one.isoformat()}, {"week_of": ordinary.isoformat()}]
+            report = validate_data.Report()
+            validate_data.check_effort_log(report, ratings, ordinary)
+            check("an earlier unlogged week is flagged",
+                  any("effort log" in n for n in report.notes), f"({report.notes})")
+
+            H.append_csv(H.WEEKLY_LOG_CSV, H.WEEKLY_LOG_FIELDS,
+                         [{"week_of": week_one.isoformat(), "minutes_spent": "150"}])
+            report = validate_data.Report()
+            validate_data.check_effort_log(report, ratings, ordinary)
+            check("once logged it stays quiet", not report.notes, f"({report.notes})")
+        finally:
+            H.WEEKLY_LOG_CSV = saved_log
+
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1364,7 +1483,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

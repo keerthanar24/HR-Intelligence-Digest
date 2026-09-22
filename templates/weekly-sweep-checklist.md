@@ -40,8 +40,9 @@ last Friday**. Sort by newest, not relevance.
 > by the programme owner on 2026-09-21. It has **no AmbitionBox page**, so Glassdoor is its only
 > review-site cover.
 
-> RK Group is currently recorded from the **Bengaluru-filtered** view on both platforms.
-> Use the all-locations page and tell the desk, so the series switches scope once, knowingly.
+> RK Group's baseline was corrected on 2026-09-22 to the **all-locations** view on both
+> platforms (3.30/151 on AmbitionBox, 3.70/30 on Glassdoor). Every week from here reads the
+> same all-locations page — if a location filter is ever applied, the series breaks.
 
 **LinkedIn** — company page posts and their comments, plus a public post search
 
@@ -92,8 +93,18 @@ python3 scripts/build_digest.py --stdout
 
 - [ ] Paste the HTML body into the email — **body only, no attachments**
 - [ ] To: Mahendra, Sonal, Ramesh, Akshay
+- [ ] Record the week — **while it is fresh**, not at week 8:
+
+  ```bash
+  python3 scripts/log_week.py
+  ```
+
+  It asks two things nothing else records: the minutes the whole cycle took, and how many of
+  this week's mentions were genuinely **new** to the four. Both are Phase 3 questions
+  (`docs/07-phase3-review.md`); everything else it stores it counts from the data.
+
 - [ ] `git add data/ && git commit && git push`
-- [ ] Hours logged above — over budget two weeks running is a Phase 3 finding
+- [ ] Over budget two weeks running is a Phase 3 finding — `python3 scripts/log_week.py --show`
 
 Notes / anything odd this week:
 

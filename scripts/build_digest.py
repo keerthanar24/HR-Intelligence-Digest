@@ -489,33 +489,11 @@ def source_link(mention):
     return (page, "page") if page else ("", "")
 
 
-def baseline_window(week_of, settings):
-    """(first_day, last_day, days) for week 1, or None for an ordinary week.
-
-    The brief makes week 1 a sixty-day baseline, but every digest reported a
-    strict seven days. The back-read then landed in the weeks the reviews were
-    actually posted - August and early September - and the week 1 digest
-    reported zero mentions with the whole baseline sitting in the file,
-    invisible. A digest that says "no new reviews" the week you read sixty
-    days of them is worse than no digest.
-    """
-    start = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
-    if not start or H.week_start_of(start) != week_of:
-        return None
-    days = int(settings.get("digest", {}).get("baseline_days", 60))
-    last = week_of + dt.timedelta(days=6)
-    return last - dt.timedelta(days=days - 1), last, days
-
-
-def mentions_in(all_mentions, first, last):
-    """Every mention posted between two dates, inclusive."""
-    kept = []
-    for mention in all_mentions:
-        posted = H.parse_date(mention.get("post_date", "")) or \
-            H.parse_date(mention.get("captured_at", ""))
-        if posted and first <= posted <= last:
-            kept.append(mention)
-    return kept
+# Week 1 is a sixty-day baseline, not seven days. It lives in hrintel because
+# the digest is not the only thing that has to agree with it: the validator and
+# the effort log each got this wrong independently before it was shared.
+baseline_window = H.baseline_window
+mentions_in = H.mentions_in
 
 
 def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:

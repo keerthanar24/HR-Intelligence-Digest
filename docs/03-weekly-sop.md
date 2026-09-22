@@ -213,11 +213,27 @@ Writes `out/digest-<week>.html` and `out/digest-<week>.txt`.
    - The build exited 0. A non-zero exit means reviews are still unread; the digest is not
      finished, whatever it looks like on screen.
 
-## Step 6 — Commit (5 min)
+## Step 6 — Record the week, then commit (5 min)
 
 ```bash
+python3 scripts/log_week.py
 git add data/ && git commit -m "Week of <date>: <n> mentions, <n> red flags" && git push
 ```
+
+`log_week.py` asks two questions the data cannot answer for itself:
+
+- **How many minutes the whole cycle took.** The brief budgets 3–4 hours a week. Whether that
+  held is the first thing Phase 3 asks, and by week 8 nobody remembers.
+- **How many of this week's mentions were genuinely new to the four.** A digest that only
+  repeats what the four already knew through normal channels is costing four hours a week to
+  tell them nothing — which is a finding, but only if it was written down at the time.
+
+Everything else in the row — mentions, red flags, out-of-scope, platforms swept — it counts
+from the data. Week 1 is counted over the sixty-day baseline window, the same window the
+week 1 digest reported, so the two agree.
+
+Answer it the same Friday. `python3 scripts/log_week.py --show` prints the running average
+against the budget; it refuses to record the same week twice.
 
 The `out/` directory is gitignored — the data is the record, the email is a rendering of it.
 

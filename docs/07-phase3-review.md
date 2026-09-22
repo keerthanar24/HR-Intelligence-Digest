@@ -30,6 +30,14 @@ Produce these from the tracking data before the meeting:
 3. **Effort.** Actual hours per week against the 3–4 hour budget. Where did the time go?
 4. **Signal quality.** How many mentions were genuinely new information to the four, versus
    already known through normal channels?
+
+   > Items 3 and 4 are the only two on this list that cannot be counted from the tracking
+   > data, so they are recorded every Friday instead, at the end of the sweep:
+   > `python3 scripts/log_week.py`, stored in `data/weekly_log.csv`. Bring
+   > `python3 scripts/log_week.py --show` to the meeting rather than reconstructing eight
+   > weeks from memory — a trial that is evaluated on recollection gets renewed on
+   > recollection.
+
 5. **Noise.** How many items were logged as `out_of_scope`? A high ratio means the keyword
    list or the platform mix needs work, not that the programme failed.
 6. **Rating movement.** Did Glassdoor/AmbitionBox scores move at all in 8 weeks? On what

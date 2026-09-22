@@ -1,10 +1,10 @@
 # Weekly operating loop for the HR Intelligence Digest.
-# WEEK defaults to the most recently completed week (Monday-start).
+# WEEK defaults to the most recently completed week (Saturday-start, per config/settings.yaml).
 
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logweek test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -23,6 +23,7 @@ help:
 	@echo "  make weekly    scan + validate + digest, in order"
 	@echo "  make auto      collect + validate + digest (what the scheduler runs)"
 	@echo "  make send      dry-run the email send (add --send to really send)"
+	@echo "  make logweek   record the hours and what was new (do it the same Friday)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
 	@echo "Override the week:  make digest WEEK=2026-09-07"
@@ -77,6 +78,10 @@ weekly: scan validate digest
 
 send:
 	$(PY) scripts/send_digest.py --week $(WEEK)
+
+# The two Phase 3 questions the data cannot answer for itself.
+logweek:
+	$(PY) scripts/log_week.py --week $(WEEK)
 
 test:
 	$(PY) tests/smoke_test.py

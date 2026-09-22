@@ -325,13 +325,23 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
     if week_of is None:
         return
     entities = H.entity_names()
-    week_mentions = H.mentions_for_week(mentions, week_of)
+    settings = H.load_yaml("settings")
+    window = H.baseline_window(week_of, settings)
+    if window:
+        # Week 1 reports sixty days. Judging its coverage on seven would call
+        # the week of the back-read an empty week.
+        first, last, days = window
+        week_mentions = H.mentions_in(mentions, first, last)
+        span = f"the {days}-day baseline to {last}"
+    else:
+        week_mentions = H.mentions_for_week(mentions, week_of)
+        span = f"week {week_of}"
     week_ratings = [r for r in ratings if r.get("week_of") == week_of.isoformat()]
 
     untagged = [m for m in week_mentions if not (m.get("sentiment") or "").strip()
                 and (m.get("status") or "") != "out_of_scope"]
     if untagged:
-        report.warn(f"week {week_of}: {len(untagged)} mention(s) still untagged; "
+        report.warn(f"{span}: {len(untagged)} mention(s) still untagged; "
                     "they will be excluded from net sentiment.")
 
     sources = H.load_yaml("sources")
@@ -348,8 +358,29 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
                         f"{', '.join(missing)} — section 2 will be incomplete.")
 
     if not week_mentions:
-        report.warn(f"week {week_of}: no mentions recorded at all. If the sweep ran and found "
+        report.warn(f"{span}: no mentions recorded at all. If the sweep ran and found "
                     "nothing, that is a valid empty week — say so in the digest.")
+
+
+def check_effort_log(report: Report, ratings: list[dict], week_of: dt.date | None) -> None:
+    """Earlier weeks that were swept but never recorded.
+
+    Hours-per-week and how much was genuinely new are the two Phase 3 questions
+    (docs/07-phase3-review.md) that cannot be counted from the data afterwards.
+    A week that goes unlogged is not recoverable - by week 8 it is whatever the
+    person answering already believes - so say so while the week is still
+    recent enough to reconstruct.
+    """
+    if week_of is None:
+        return
+    swept = {r.get("week_of") for r in ratings if r.get("week_of")}
+    logged = {r.get("week_of") for r in H.read_csv(H.WEEKLY_LOG_CSV)}
+    missing = sorted(w for w in swept - logged if w and w < week_of.isoformat())
+    if missing:
+        report.note(f"{len(missing)} earlier week(s) swept but never recorded in the effort "
+                    f"log ({', '.join(missing)}). Catch up with "
+                    f"`python3 scripts/log_week.py --week {missing[0]}` - the hours and what "
+                    "was new to the four cannot be counted from the data later.")
 
 
 def main() -> int:
@@ -376,6 +407,7 @@ def main() -> int:
     check_escalations(report, mentions, escalations)
     check_rating_continuity(report, ratings)
     check_coverage(report, mentions, ratings, week_of)
+    check_effort_log(report, ratings, week_of)
 
     print(f"Checked {len(mentions)} mention(s), {len(ratings)} rating snapshot(s), "
           f"{len(escalations)} escalation(s).\n")

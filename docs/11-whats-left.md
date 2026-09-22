@@ -1,6 +1,6 @@
 # What is left to do
 
-State as of 2026-09-21 (Google Alerts now connected — see section 4). Everything here is an **input only a person can supply** — none of it is
+State as of 2026-09-22 (the 60-day back-read is done — see section 1). Everything here is an **input only a person can supply** — none of it is
 blocked on code. Ordered by what unblocks the most.
 
 Re-check this list any time with:
@@ -12,7 +12,30 @@ python3 scripts/log_rating.py --status # this week's sweep progress
 
 ---
 
-## 1. The 60-day review back-read — BLOCKING, and the big one
+## 1. ~~The 60-day review back-read~~ — DONE 2026-09-22
+
+All seven pages were read back sixty days and logged by the programme owner. The week 1 digest
+now reports the baseline window (28 Jul – 25 Sep), not a strict seven days.
+
+**The result is itself the finding, and it is the most important early input to the Month 2
+decision:**
+
+| | |
+|---|---|
+| Reviews inside 60 days, across all seven pages | **3** |
+| Pages with nothing at all in 60 days | **4 of 7** |
+| Red flags | **0** |
+| Out of scope (a marketplace/seller complaint, correctly refused) | 1 |
+
+Three reviews in two months is roughly one every three weeks across the whole group. Most weeks
+will therefore be genuinely empty — that is the real velocity, not a gap in the sweep. Whether
+3–4 hours a week is worth spending on it is exactly the question `docs/07-phase3-review.md`
+asks at week 8, and "Stop" is a live answer. The effort log (`python3 scripts/log_week.py`)
+records the hours each week so that answer rests on numbers rather than recollection.
+
+---
+
+## Superseded — the original entry
 
 **Why it matters.** `data/mentions.csv` has **0 rows**. Sections 1, 3, 4 and 5 of the digest are
 built entirely from mentions, so until reviews are logged every digest is empty no matter what
