@@ -514,6 +514,35 @@ def unrated_entities(entities, profiles=None):
     return [name for entity_id, name in entities.items() if entity_id not in covered]
 
 
+TRIGGER_WORDS = {
+    "names_individual": "names an individual",
+    "harassment_or_safety": "alleges harassment or a safety issue",
+    "non_payment": "alleges non-payment",
+    "legal_or_regulatory": "involves a legal or regulatory body",
+    "public_escalation_risk": "is gathering public traction",
+}
+
+
+def quiet_week_note(checked):
+    """What section 5 says when nothing tripped a trigger.
+
+    "None this week" plus a paragraph on what the escalation does NOT cover
+    was the whole of section 5 on a quiet week: a limitation with nothing to
+    limit. The sentence explaining that escalation is immediate and separate
+    from this digest only appeared when a flag existed - so the protocol was
+    invisible in precisely the weeks when nothing else stood in for it, and a
+    reader could reasonably conclude nothing was watching.
+    """
+    triggers = "; ".join(TRIGGER_WORDS[r] for r in H.RED_FLAG_REASONS
+                         if r in TRIGGER_WORDS)
+    return (f"{plural(checked, 'mention')} checked against the triggers - "
+            f"anything that {triggers}. None tripped one. A scan also runs daily "
+            "between sweeps, so a flag does not wait for a Friday. When one is "
+            "confirmed it is escalated the same day, directly to the four, and "
+            "does not wait for this digest either; the names of individuals are "
+            "held in the restricted escalation log, never in here.")
+
+
 def same_day_note(platforms):
     """The channels where a red flag cannot surface until the weekly sweep.
 
@@ -850,7 +879,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             widths=["12%", "13%", "10%", "10%", "14%", "16%", "25%"],
         ))
     else:
-        h.append('<p style="margin:0 0 8px;">None this week.</p>')
+        h.append('<p style="margin:0 0 4px;"><strong>None this week.</strong></p>')
+        h.append('<p style="margin:0 0 8px;font-size:12px;color:#52606d;">'
+                 f'{E(quiet_week_note(len(now)))}</p>')
     if lagging:
         h.append('<p style="margin:0 0 8px;font-size:12px;color:#8a6d3b;">'
                  'Same-day escalation covers the channels checked daily. '
@@ -994,6 +1025,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 t.append(f"  {r['url']}")
     else:
         t.append("None this week.")
+        t.append(quiet_week_note(len(now)))
     if lagging:
         t.append("")
         t.append(f"Same-day escalation covers the channels checked daily. "

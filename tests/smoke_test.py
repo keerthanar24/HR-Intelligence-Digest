@@ -1793,6 +1793,43 @@ def test_partial_feed_run_is_not_coverage() -> None:
           not complete and not partial, f"({complete}, {partial})")
 
 
+def test_quiet_red_flag_week_states_the_protocol() -> None:
+    """Section 5 must say what the safeguard IS, not only what it misses.
+
+    On a week with no flags, section 5 read "None this week" followed by a
+    paragraph on the channels same-day escalation does not reach - a
+    limitation with nothing to limit. The sentence explaining that escalation
+    is immediate and separate from the digest lived inside the branch that
+    only runs when a flag exists, so the protocol was invisible in exactly the
+    weeks when nothing else stood in for it.
+    """
+    print("a quiet red-flag week states the protocol")
+    note = build_digest.quiet_week_note(3)
+
+    check("it says how many were checked", "3 mentions checked" in note, f"({note})")
+    check("it names the triggers, not just the absence",
+          all(word in note for word in ("names an individual", "non-payment",
+                                        "harassment", "public traction")))
+    check("every trigger in the vocabulary has wording",
+          set(H.RED_FLAG_REASONS) <= set(build_digest.TRIGGER_WORDS),
+          f"(missing {set(H.RED_FLAG_REASONS) - set(build_digest.TRIGGER_WORDS)})")
+    check("it says the daily scan runs between sweeps", "daily" in note)
+    check("it says escalation does not wait for the digest",
+          "does not wait for this digest" in note)
+    check("it repeats the boundary on naming people",
+          "restricted escalation log" in note)
+    check("one mention reads as singular", "1 mention checked" in
+          build_digest.quiet_week_note(1))
+
+    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    for name, body in (("html", html), ("text", text)):
+        if "None this week" in body:
+            check(f"the {name} digest carries it on a quiet week",
+                  "does not wait for this digest" in body)
+            check(f"the {name} digest still carries the coverage limit too",
+                  "only read on the weekly sweep" in body)
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2009,7 +2046,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
