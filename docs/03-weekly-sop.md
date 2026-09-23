@@ -305,3 +305,29 @@ records that the page was read.
 The company page URL will not work; it has to be the individual post's link.
 The decoding is observed rather than documented, so if it disagrees with the
 relative timestamp on the page, believe the page.
+
+### Collecting company posts in bulk
+
+Company page activity is in scope, so the sweep reads each of the four company
+pages for the whole window — not only for employee voice. Rather than logging
+each post one at a time, collect the URLs into a file and log them together:
+
+```bash
+cp data/linkedin-posts-2026-09-19.txt data/linkedin-posts-<week>.txt
+# paste one line per post, then:
+python3 scripts/log_company_posts.py data/linkedin-posts-<week>.txt --week <week>
+python3 scripts/log_company_posts.py data/linkedin-posts-<week>.txt --week <week> --write
+```
+
+The first run is a dry run and writes nothing. It dates every post from its
+URL, marks which fall inside the window, and skips URLs already logged — so a
+page can be re-read next week without creating duplicates. Paste freely; the
+filtering is the script's job.
+
+Rows land with `author_type: company` and no sentiment. A post with no summary
+is left `needs_review` so it shows up in the validator rather than passing as
+finished.
+
+**The comments under those posts are separate rows, and they do score.** That
+is where employee voice appears on LinkedIn; a company post with three comments
+is one company row and up to three real mentions.

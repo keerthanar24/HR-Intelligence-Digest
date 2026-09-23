@@ -1,0 +1,18 @@
+# LinkedIn company page posts, 28 Jul - 25 Sep 2026 (the 60-day baseline).
+#
+# One line per post:  <entity>  <post URL>  [themes]  [| one-line summary]
+# Entities: rk_group, rk_world, robust_kommerce, westbury_kommerce
+# Themes:   compensation appraisal payroll_delay management culture work_hours
+#           workload growth_learning exits layoffs interview onboarding
+#           harassment_safety facilities transparency job_security
+#
+# The URL must be the POST's own link: three dots on the post -> Copy link to post.
+# Out-of-window and duplicate URLs are skipped for you, so paste freely.
+
+# --- RK Group ---
+
+# --- RK World Infocom ---
+
+# --- Robust Kommerce ---
+
+# --- Westbury Kommerce ---

@@ -2382,9 +2382,39 @@ def test_linkedin_post_date_from_url() -> None:
           L.published(1234567890123456789) is None)
 
 
+def test_company_post_batch_parsing() -> None:
+    """The batch logger's line format, and the two refusals that matter."""
+    print("company post batch")
+    import log_company_posts as B
+
+    row, err = B.parse_line("robust_kommerce  https://x-activity-7507227023769600000-A  "
+                            "culture | Post on vision")
+    check("entity, url, themes and summary all parse",
+          row is not None and row["entity"] == "robust_kommerce"
+          and row["themes"] == "culture" and row["summary"] == "Post on vision",
+          f"got {row} {err}")
+
+    row, err = B.parse_line("rk_world  https://x-activity-7507227023769600000-A")
+    check("themes and summary are optional",
+          row is not None and row["themes"] == "" and row["summary"] == "")
+
+    check("a blank line is not an error", B.parse_line("   ") == (None, ""))
+    check("a comment is not an error", B.parse_line("# a note") == (None, ""))
+
+    row, err = B.parse_line("just_one_field")
+    check("a line missing its URL is an error", row is None and err)
+
+    # A summary may contain the words the entity is named after; splitting on
+    # the first pipe only keeps a summary that itself contains one.
+    row, _ = B.parse_line("rk_group  https://x-activity-7507227023769600000-A  culture "
+                          "| Vision | team spirit")
+    check("only the first pipe splits", row["summary"] == "Vision | team spirit",
+          f"got {row['summary']!r}")
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
