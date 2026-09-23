@@ -1564,10 +1564,24 @@ def test_unverified_channels_are_named() -> None:
             check("and is still asked about by the prompt",
                   "indeed" in log_sweep.due(week_one, settings),
                   f"(got {log_sweep.due(week_one, settings)})")
-            check("while Quora, collected by alert, is not",
-                  "quora" not in log_sweep.due(week_one, settings))
-            check("and X, whose feeds are disabled, still is",
-                  "x" in log_sweep.due(week_one, settings))
+
+            # Assert the rule, not today's config. A channel is left off the
+            # manual prompt only when a feed genuinely covers it: enabled, and
+            # on a platform whose collection is not manual. Naming a specific
+            # platform here made this test track the config rather than check
+            # it - it broke the moment the Quora alert turned out to be dead
+            # and was disabled, which is a config fact, not a defect.
+            collection = {p["id"]: str(p.get("collection", "manual")).lower()
+                          for p in sources.get("platforms", [])}
+            prompted = set(log_sweep.due(week_one, settings))
+            for platform in H.unverified_channels(week_one, settings):
+                covered = platform in fed and collection.get(platform, "manual") != "manual"
+                check(f"{platform}: {'covered by a feed, not prompted' if covered else 'prompted by hand'}",
+                      (platform not in prompted) == covered,
+                      f"(prompted={platform in prompted}, fed={platform in fed}, "
+                      f"collection={collection.get(platform)})")
+            check("a platform whose feeds are all disabled is still prompted",
+                  "x" in prompted)
 
             # What the collector writes when a fetch succeeds.
             log_sweep.record(week_one, ["reddit"], "collector", found={"reddit": "3"})
@@ -1663,15 +1677,23 @@ def test_same_day_promise_is_qualified() -> None:
           and H.same_day_cover("glassdoor") == "count")
     check("a fed channel has one too - the collector runs daily",
           H.same_day_cover("reddit") == "feed" and H.same_day_cover("news") == "feed")
-    check("the Quora alert gives Quora one", H.same_day_cover("quora") == "feed")
     check("LinkedIn has none - it blocks automated checking",
           H.same_day_cover("linkedin") == "")
     check("nor does X while its feeds are disabled", H.same_day_cover("x") == "")
+    check("a disabled feed gives no cover either",
+          H.same_day_cover("quora") == ""
+          if not any(f.get("enabled") for f in H.load_yaml("sources").get("feeds", [])
+                     if f.get("platform") == "quora")
+          else H.same_day_cover("quora") == "feed")
 
+    # Again the rule rather than a fixed list: whatever has no daily route is
+    # what the digest must name.
     lagging = build_digest.same_day_note(platforms)
-    check("the digest names exactly those",
-          set(lagging) == {"LinkedIn", "X", "YouTube", "Google Reviews"},
-          f"(got {lagging})")
+    expected = sorted(platforms.get(p, p) for p in H.no_same_day_cover())
+    check("the digest names exactly the channels with no daily route",
+          sorted(lagging) == expected, f"(got {lagging}, expected {expected})")
+    check("and LinkedIn is among them", "LinkedIn" in lagging)
+    check("while a review site never is", "Glassdoor" not in lagging)
 
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     for name, body in (("html", html), ("text", text)):

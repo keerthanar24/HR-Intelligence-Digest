@@ -233,9 +233,19 @@ feeds:
   # justify four, and a single feed is one thing to keep working. It catches
   # what Google NEWLY indexes, so it is standing cover from here on - the back
   # catalogue still needs the one manual look.
+  # DISABLED 2026-09-23: this feed URL returns HTTP 400 from Google, which
+  # means the alert behind it does not exist. Most likely it was never saved -
+  # Google declines to create an alert whose query matches nothing, and
+  # site:quora.com for four small companies plausibly matches nothing at all.
+  #
+  # enabled: false is not cosmetic here. While it was true, Quora sat in the
+  # worst state available: log_sweep did not prompt for it (the collector was
+  # assumed to cover it) and the collector never recorded it (the fetch
+  # failed), so it was swept by nobody and only the digest's "not swept" line
+  # would ever have said so. False puts Quora back on the manual prompt list.
   - id: google_alerts_quora
     platform: quora
-    enabled: true
+    enabled: false
     url: "https://www.google.com/alerts/feeds/06869919047613217312/6189939704157504110"
 
   # Indeed has no API and blocks automated collection, so this alert is the
