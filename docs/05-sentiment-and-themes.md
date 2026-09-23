@@ -114,3 +114,21 @@ Not:
 
 The summary is what the four executives actually read. It is the most valuable thing produced
 in the sweep and the easiest to do badly at 5pm on a Friday.
+
+## Who does not get scored
+
+Two kinds of row are deliberately left out of net sentiment, and they are left
+out for opposite reasons.
+
+**Untagged rows** have no score yet. That is a gap, the digest says so in a
+warning line, and it should shrink to nought each week.
+
+**Company-voice rows** (`author_type: company`) will never have one. These are
+the employer's own posts — LinkedIn company page activity, in scope under
+`docs/00-brief.md` §3. They are counted as coverage, shown in section 3 with
+"The company itself" in the Who column, and counted toward a theme, because a
+hiring push genuinely is a hiring theme. They carry no sentiment because
+sentiment here means *what other people say about the group as an employer*,
+and the group is not other people. A tagged company row is a validator error,
+not a warning: it would read as scored everywhere except the one figure that
+matters.

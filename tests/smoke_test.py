@@ -2298,9 +2298,61 @@ def test_red_flag_sla() -> None:
         build_digest.red_flag_rows([mention("M-1")], same_day, entities, platforms)[0]))
 
 
+def test_company_page_activity_is_coverage_not_sentiment() -> None:
+    """docs/00-brief.md section 3 puts LinkedIn company page activity in scope.
+
+    The first version of this recorded the sweep as found=0, which dropped the
+    employer's own post entirely - in scope, and invisible. The fix is not to
+    count it either: with three genuine mentions in the baseline, admitting one
+    promotional post moves group net sentiment from 0.00 to +0.25, so the
+    company would score itself by posting. It is logged, shown, themed, and
+    left out of the average alone.
+    """
+    print("company page activity")
+
+    def row(sentiment, author="ex_employee", themes="culture"):
+        return {"sentiment": sentiment, "author_type": author, "themes": themes,
+                "status": "reviewed"}
+
+    people = [row("negative"), row("negative"), row("neutral")]
+    check("three real mentions average to the real figure",
+          abs(H.net_sentiment(people) - (-2 / 3)) < 1e-9,
+          f"got {H.net_sentiment(people)}")
+
+    promo = row("very_positive", author="company")
+    check("a company post does not move net sentiment",
+          H.net_sentiment(people + [promo]) == H.net_sentiment(people),
+          f"got {H.net_sentiment(people + [promo])}")
+
+    untagged_promo = row("", author="company")
+    check("an untagged company post does not move it either",
+          H.net_sentiment(people + [untagged_promo]) == H.net_sentiment(people))
+    check("and is not nagged as untagged",
+          H.untagged_rows(people + [untagged_promo]) == [])
+    check("while a real untagged row still is",
+          len(H.untagged_rows(people + [row("")])) == 1)
+
+    check("company is an allowed author type", "company" in H.AUTHOR_TYPES)
+    check("and reads as the company in the Who column",
+          build_digest.author_text(untagged_promo) == "The company itself")
+
+    # The theme count is the honest half: a hiring push IS a hiring theme.
+    themed = build_digest.theme_rows(people + [untagged_promo], 10)
+    culture = next((t for t in themed if t["theme"].lower() == "culture"), None)
+    check("a company post still counts toward its theme",
+          culture is not None and culture["count"] == 4,
+          f"got {culture}")
+    check("but does not sway the theme's lean",
+          culture is not None and culture["lean"] == "complaint",
+          f"got {culture}")
+
+    scored = H.scored_rows(people + [untagged_promo])
+    check("scored_rows drops exactly the company row", len(scored) == 3)
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

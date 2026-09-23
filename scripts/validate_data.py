@@ -217,12 +217,20 @@ def check_mentions(report: Report, rows: list[dict], week_of: dt.date | None) ->
         if sentiment and sentiment not in H.SENTIMENT_SCORES:
             report.error(f"{where}: unknown sentiment {sentiment!r}; expected one of "
                          f"{', '.join(H.SENTIMENT_SCORES)}.")
-        elif not sentiment and status not in {"needs_review", "out_of_scope", ""}:
+        elif not sentiment and status not in {"needs_review", "out_of_scope", ""} \
+                and not H.is_company_voice(row):
             report.warn(f"{where}: status is {status!r} but sentiment is blank.")
 
         author = (row.get("author_type") or "").strip()
         if author and author not in H.AUTHOR_TYPES:
             report.warn(f"{where}: unusual author_type {author!r}.")
+        # A tagged company post is the failure mode this author type exists to
+        # prevent: it reads as an ordinary mention everywhere downstream except
+        # the net figure, so the row looks scored and quietly is not.
+        if H.is_company_voice(row) and sentiment:
+            report.error(f"{where}: company page activity carries sentiment {sentiment!r}. "
+                         "The employer's own post is not a sentiment signal - clear the "
+                         "sentiment cell and leave it as coverage.")
 
         for theme in H.split_themes(row.get("themes", "")):
             if theme not in H.THEMES:
@@ -339,7 +347,8 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
     week_ratings = [r for r in ratings if r.get("week_of") == week_of.isoformat()]
 
     untagged = [m for m in week_mentions if not (m.get("sentiment") or "").strip()
-                and (m.get("status") or "") != "out_of_scope"]
+                and (m.get("status") or "") != "out_of_scope"
+                and not H.is_company_voice(m)]
     if untagged:
         report.warn(f"{span}: {len(untagged)} mention(s) still untagged; "
                     "they will be excluded from net sentiment.")

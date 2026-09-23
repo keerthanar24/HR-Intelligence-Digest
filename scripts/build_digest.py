@@ -101,7 +101,7 @@ def headline_rows(mentions_now, mentions_prev, entities, comparable=True):
                 "net": sentiment_text(net_now),
                 "net_prev": sentiment_text(net_prev),
                 "net_delta": delta_text(net_now, net_prev, digits=2) if comparable else "n/a",
-                "untagged": sum(1 for m in now if H.sentiment_score(m) is None),
+                "untagged": len(H.untagged_rows(now)),
                 "is_total": False,
             }
         )
@@ -118,7 +118,7 @@ def headline_rows(mentions_now, mentions_prev, entities, comparable=True):
             "net_prev": sentiment_text(net_prev),
             "net_delta": (delta_text(net_now, net_prev, digits=2)
                           if comparable else "n/a"),
-            "untagged": sum(1 for m in mentions_now if H.sentiment_score(m) is None),
+            "untagged": len(H.untagged_rows(mentions_now)),
             "is_total": True,
         }
     )
@@ -318,7 +318,11 @@ def theme_rows(mentions, limit):
     scores = collections.defaultdict(list)
     examples = collections.defaultdict(list)
     for m in mentions:
-        score = H.sentiment_score(m)
+        # A company post still names its theme - a hiring push IS a hiring
+        # theme, and the count is the honest thing to show. Its score is left
+        # out for the reason in H.scored_rows: the employer does not get a
+        # vote on how the employer reads.
+        score = None if H.is_company_voice(m) else H.sentiment_score(m)
         for theme in H.split_themes(m.get("themes", "")):
             counter[theme] += 1
             if score is not None:
@@ -701,7 +705,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     total_prev = len(prev)
     net_now = H.net_sentiment(now)
     net_prev = H.net_sentiment(prev)
-    untagged = sum(1 for m in now if H.sentiment_score(m) is None)
+    untagged = len(H.untagged_rows(now))
+    company_posts = sum(1 for m in now if H.is_company_voice(m))
     data_link = digest_cfg.get("data_link", "")
     holdings = sheet_contents(now, all_ratings, flags, week_of)
     compare = "n/a" if baseline else None
@@ -731,6 +736,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         "total": total,
         "total_prev": total_prev,
         "untagged": untagged,
+        "company_posts": company_posts,
         "red_flags": len(flags),
         "week_label": week_label,
         "baseline": bool(baseline),
@@ -788,6 +794,16 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         h.append(
             f'<p style="margin:0 0 8px;color:#8a6d3b;font-size:13px;">{plural(untagged, "mention")} '
             'not yet sentiment-tagged, excluded from the net sentiment figures.</p>'
+        )
+    if company_posts:
+        # Without this line a company post is invisible twice over: it moves no
+        # sentiment figure, and the mention count it does move looks like
+        # somebody talking about the group. Saying which is which is the point.
+        h.append(
+            f'<p style="margin:0 0 8px;color:#666;font-size:13px;">'
+            f'{plural(company_posts, "item")} above {"is" if company_posts == 1 else "are"} '
+            'company page activity — the employer posting about itself. Counted as coverage, '
+            'excluded from net sentiment: the group does not score itself.</p>'
         )
 
     # 2. Rating movement
@@ -982,6 +998,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     t.append("\n".join(table))
     if untagged:
         t.append(f"Note: {plural(untagged, 'mention')} untagged; excluded from net sentiment.")
+    if company_posts:
+        t.append(f"Note: {plural(company_posts, 'item')} company page activity "
+                 "(the employer posting about itself); counted as coverage, "
+                 "excluded from net sentiment.")
     t.append("")
     t.append("2. RATING MOVEMENT")
     t.append(t_table(

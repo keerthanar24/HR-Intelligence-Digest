@@ -122,6 +122,7 @@ AUTHOR_LABELS = {
     "contractor": "Contractor",
     "anonymous": "Anonymous",
     "unknown": "Unknown",
+    "company": "The company itself",
 }
 
 # Platforms where a post carries public engagement (likes, reposts, replies).
@@ -255,8 +256,41 @@ def is_review(row: dict) -> bool:
 
 AUTHOR_TYPES = [
     "current_employee", "ex_employee", "candidate", "intern",
-    "contractor", "anonymous", "unknown",
+    "contractor", "anonymous", "unknown", "company",
 ]
+
+
+def is_company_voice(row: dict) -> bool:
+    """Did the employer write this, rather than somebody talking about it?"""
+    return (row.get("author_type") or "").strip().lower() == "company"
+
+
+def scored_rows(rows: list[dict]) -> list[dict]:
+    """The rows a sentiment average may be built from.
+
+    docs/00-brief.md puts LinkedIn "company page activity" in scope, and it
+    belongs there: a hiring push, a culture post, an award announcement all
+    say something about the employer, and the comments underneath are where
+    employee voice actually appears. But the post itself is the employer
+    talking about itself, and averaging it in would let the company move its
+    own score by posting. In the 60-day baseline that is not theoretical -
+    with three genuine mentions, one promotional post would carry group net
+    sentiment from 0.00 to +0.25.
+
+    So company-voice rows are logged, shown and themed like any other, and
+    excluded here alone. In scope and not a sentiment signal are different
+    things, and the row is the only place that difference can live.
+    """
+    return [r for r in rows if not is_company_voice(r)]
+
+
+def untagged_rows(rows: list[dict]) -> list[dict]:
+    """In-scope rows that still need a sentiment tag.
+
+    A company-voice row is never tagged, so counting it as untagged would put
+    a permanent "1 mention untagged" nag on a digest with nothing to fix.
+    """
+    return [r for r in scored_rows(rows) if sentiment_score(r) is None]
 
 STATUSES = ["needs_review", "reviewed", "escalated", "closed", "out_of_scope"]
 
@@ -766,9 +800,11 @@ def net_sentiment(rows: list[dict]) -> float | None:
     """Mean sentiment score over the rows that carry a valid tag.
 
     Untagged rows are excluded rather than counted as neutral — a neutral-looking
-    average built from untagged rows would be a lie.
+    average built from untagged rows would be a lie. So are the employer's own
+    posts; see scored_rows.
     """
-    scores = [s for s in (sentiment_score(r) for r in rows) if s is not None]
+    scores = [s for s in (sentiment_score(r) for r in scored_rows(rows))
+              if s is not None]
     if not scores:
         return None
     return sum(scores) / len(scores)

@@ -37,6 +37,13 @@ for these entities, but the rating movement still matters.
 
 ### LinkedIn
 - Company page: posts, and the comments under them.
+- **A company-authored post is logged, and never scored.** Set `author_type: company`
+  and leave `sentiment` blank. It is in scope — a hiring push or a culture post says
+  something real about the employer, and the comments underneath are often the only
+  place employee voice appears — but averaging it in would let the group move its own
+  score by posting. With three genuine mentions in the baseline, one such post carries
+  group net sentiment from 0.00 to +0.25. `validate_data.py` errors on a company row
+  that carries a sentiment tag.
 - Public post search on the alias list, restricted to the past week.
 - Ex-employee updates only where they appear publicly and are about the employment (e.g. a
   public "why I left" post). **Do not browse individual profiles to compile a picture of a
