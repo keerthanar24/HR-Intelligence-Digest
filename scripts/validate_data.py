@@ -411,6 +411,8 @@ def check_row_shape(report: Report) -> None:
                 f"the wrong number of columns ({len(fields)} expected). They still load - "
                 "short lines read as blanks, long ones lose a value - so check them in "
                 "Notepad rather than trusting what the digest shows.")
+
+
 def check_verbatim(report: Report, mentions: list[dict]) -> None:
     """Review rows holding only somebody's paraphrase.
 
