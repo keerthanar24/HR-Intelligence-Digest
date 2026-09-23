@@ -142,9 +142,9 @@ thing. Every digest now says which is which under section 5.
 |---|---|---|
 | AmbitionBox, Glassdoor | `python3 scripts/daily_check.py` — the review count moving | same day, if the check is run |
 | Reddit, news, Quora, Indeed | the collector, run daily by the GitHub Action | same day |
-| **LinkedIn, YouTube, Google Reviews** | **nothing — only the weekly sweep** | **up to 6 days** |
+| **LinkedIn, X, YouTube, Google Reviews** | **nothing — only the weekly sweep** | **up to 6 days** |
 
-The three in bold block automated checking or have no feed, so this is a limit of the
+The four in bold block automated checking or have no feed, so this is a limit of the
 sources, not of the process. Two things narrow it, and neither is code:
 
 1. **Turn on LinkedIn page notifications.** Whoever administers the four company pages is
@@ -152,6 +152,8 @@ sources, not of the process. Two things narrow it, and neither is code:
    employment-related to the desk, LinkedIn's same-day cover comes from LinkedIn itself.
    This is the single largest improvement available to the red-flag protocol and it costs
    nothing — LinkedIn is both the slowest channel here and the fastest-moving one.
+2. **Set `X_BEARER_TOKEN`.** The X feeds are written and disabled. A token moves X from the
+   weekly sweep to the daily collector, and X is where a complaint goes public fastest.
 
 Claiming the Glassdoor and AmbitionBox employer profiles would also make those platforms
 email the desk directly when a review is posted, which is better than a count check.

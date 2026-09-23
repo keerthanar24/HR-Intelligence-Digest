@@ -44,6 +44,36 @@ for these entities, but the rating movement still matters.
 
 ## Priority 2
 
+### X — weekly, API where available
+
+`scripts/collect_feeds.py` queries X's official **recent-search** endpoint (last 7 days, which
+is exactly the digest window) when a bearer token is present:
+
+```bash
+export X_BEARER_TOKEN="…"        # never commit this; .env and config/secrets.yaml are gitignored
+```
+
+Then set the four `x_search_*` feeds in `config/sources.yaml` to `enabled: true`.
+
+The query is built from the alias register at run time, so a newly confirmed trading name is
+searched without editing anything. It pairs the aliases with a spread of employment terms —
+pay, harassment, layoffs, interviews, notice period — rather than pay alone, because X is
+where a harassment thread or a layoff claim goes public. `-is:retweet` keeps a viral complaint
+to one row instead of hundreds.
+
+**Why the API matters here beyond convenience:** it returns like, repost, reply and quote
+counts. `public_escalation_risk` is the only red-flag trigger with a numeric threshold
+(`red_flags.virality_engagement_threshold` in `config/settings.yaml`), and without those counts
+it is a guess. With them, `python3 scripts/red_flags.py --scan` surfaces a post gaining
+traction automatically.
+
+**No token?** The collector says so and skips, and X falls back to a logged-out manual search:
+
+```bash
+python3 scripts/alert_queries.py --format manual
+```
+
+Record `engagement` by hand in that case — a rough count is still far better than a blank.
 
 ### Reddit — weekly, feed
 
@@ -78,12 +108,6 @@ blocked — so this alert is the only automation available for it.
 > manual look has nothing to look at and `google_alerts_indeed` should carry the channel on
 > its own. A profile can appear at any time — usually created by a candidate, or by Indeed
 > once a job is posted — which is what the alert is standing cover for.
-
-> **X is not in this programme.** The project scope lists "X: Mentions, complaints, and viral
-> threads" among the platform bullets, but the programme owner confirmed on 2026-09-23 that
-> the line marks those things as OUT of scope rather than naming a source. It is consistent
-> with the brief's own boundary: X is overwhelmingly personal accounts, and surveillance of
-> individual employees' personal social media is out of scope in the same document.
 
 > **What "fortnightly" means.** Trial weeks 1, 3, 5, 7 — counted from `programme.trial_start`
 > in `config/settings.yaml`, so the rotation cannot drift. The cadence in `config/sources.yaml`

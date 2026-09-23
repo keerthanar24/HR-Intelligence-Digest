@@ -62,6 +62,7 @@ last Friday**. Sort by newest, not relevance.
 
 **Every week, no fixed page**
 
+- [ ] X — logged-out search, unless the API token is set
 - [ ] Quora — answers naming the group
 - [ ] Reddit — check the subs by hand; the feed sees posts, not comments
 
@@ -107,7 +108,7 @@ python3 scripts/log_mention.py -e … -p … -d … -s "…" --sentiment … --t
 ## 10:45 · Red flags — same day, not Friday afternoon (15 min)
 
 > Same-day cover reaches AmbitionBox, Glassdoor (daily count check), Reddit, news, Quora and
-> Indeed (daily collector). **LinkedIn, YouTube and Google Reviews are only read here, on
+> Indeed (daily collector). **LinkedIn, X, YouTube and Google Reviews are only read here, on
 > the weekly sweep** — anything on them can be up to six days old. See
 > `docs/04-red-flag-protocol.md` for the two things that narrow that, neither of which is code.
 

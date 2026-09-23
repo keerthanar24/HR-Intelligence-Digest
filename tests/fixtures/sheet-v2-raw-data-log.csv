@@ -2,4 +2,4 @@ Mention ID,Date Logged,Date Posted,Week Of,Entity,Platform,Sentiment,Topic Categ
 M-20260912-001,2026-09-19,2026-09-14,2026-09-12,Robust Kommerce,AmbitionBox,Negative,Appraisals,Says the appraisal cycle slipped by a quarter,https://example.invalid/ab/3,Current Employee,0,No,No,,Reviewed,
 M-20260912-002,2026-09-19,2026-09-15,2026-09-12,RK World,AmbitionBox,Negative,Payroll Delay,Ex-employee reports full-and-final pending for two months,https://example.invalid/ab/4,Ex-Employee,0,No,Yes,Non-payment,Escalated,
 M-20260912-003,2026-09-19,2026-09-16,2026-09-12,RK Group,LinkedIn,Positive,Growth,"Long-service post, positive about growth opportunities",https://example.invalid/li/2,Current Employee,42,No,No,,Reviewed,
-M-20260912-004,2026-09-19,2026-09-17,2026-09-12,Westbury Kommerce,Reddit,Mixed,Interviews,"Good recruiter, but the loop had three no-shows",https://example.invalid/r/1,Candidate,18,No,No,,Reviewed,
+M-20260912-004,2026-09-19,2026-09-17,2026-09-12,Westbury Kommerce,X / Twitter,Mixed,Interviews,"Good recruiter, but the loop had three no-shows",https://example.invalid/x/1,Candidate,18,No,No,,Reviewed,
