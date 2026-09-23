@@ -2515,11 +2515,19 @@ def test_channel_yield_separates_empty_from_unmeasured() -> None:
     check("a review site counts as swept through its rating snapshot",
           len(swept.get("ambitionbox", ())) >= 1,
           "a review site never appears in sweeps.csv")
-    check("a swept, empty channel is distinguishable",
-          "x" in swept and found.get("x", 0) == 0)
-    check("from one never swept at all", not swept.get("youtube"))
     check("cadence comes from sources.yaml",
           cadence.get("youtube") == "fortnightly")
+
+    # Against the two cases directly, not against whatever this week's sweep
+    # happens to hold. The first version asserted YouTube was unswept, which
+    # was a fact about Tuesday, and broke the moment it was swept.
+    check("a channel swept and empty reads as a real answer",
+          Y.reading(0, 8) == "nothing, and it was looked at")
+    check("a channel never swept reads as no answer",
+          Y.reading(0, 0) == "NEVER SWEPT - says nothing yet")
+    check("the two zeroes never read alike", Y.reading(0, 8) != Y.reading(0, 0))
+    check("and a productive channel reports its rate",
+          Y.reading(4, 8) == "0.5 per week swept")
 
 
 def main() -> int:

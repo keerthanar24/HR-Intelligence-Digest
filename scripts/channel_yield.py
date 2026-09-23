@@ -62,6 +62,20 @@ def gather(since: dt.date | None) -> tuple[dict, dict, dict, int]:
     return found, swept, cadence, len(weeks)
 
 
+def reading(hits: int, cover: int) -> str:
+    """How a channel's numbers should be read.
+
+    The whole point of the report is that hits == 0 has two meanings, so this
+    is the one piece of logic worth testing directly - and testing it against
+    live data would only assert what this week's sweep happens to hold.
+    """
+    if not cover:
+        return "NEVER SWEPT - says nothing yet"
+    if hits:
+        return f"{hits / cover:.1f} per week swept"
+    return "nothing, and it was looked at"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -86,14 +100,8 @@ def main() -> int:
     ordered = sorted(names, key=lambda p: (-found.get(p, 0), names[p]))
     for platform in ordered:
         hits, cover = found.get(platform, 0), len(swept.get(platform, ()))
-        if not cover:
-            reading = "NEVER SWEPT - says nothing yet"
-        elif hits:
-            reading = f"{hits / cover:.1f} per week swept"
-        else:
-            reading = "nothing, and it was looked at"
         print(f"  {names[platform]:<16} {hits:>6} {cover:>6}  "
-              f"{cadence.get(platform, 'weekly'):<12} {reading}")
+              f"{cadence.get(platform, 'weekly'):<12} {reading(hits, cover)}")
 
     productive = [p for p in names if found.get(p, 0)]
     barren = [p for p in names if not found.get(p, 0) and swept.get(p)]
