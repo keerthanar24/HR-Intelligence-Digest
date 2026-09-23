@@ -43,7 +43,6 @@ Work the platform list in `docs/02-source-map.md`, priority 1 first. For each en
 - [ ] Glassdoor — new reviews, interviews; **record rating + review count + % recommend**
       (`--recommend`; add `--ceo-approval` if the page shows one)
 - [ ] LinkedIn — company page posts and comments; public post search on the aliases
-- [ ] X — logged-out search per alias; note engagement counts
 - [ ] Reddit — check the subs the feed tends to miss
 - [ ] Quora — weekly, alert-assisted
 - [ ] Indeed / YouTube / Google Reviews — fortnightly: **trial weeks 1, 3, 5, 7**

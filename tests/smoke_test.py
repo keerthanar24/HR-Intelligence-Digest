@@ -181,70 +181,6 @@ def test_urls() -> None:
           H.canonical_url("https://a.test/p/1") != H.canonical_url("https://a.test/p/2"))
 
 
-def test_x_collection() -> None:
-    """X recent-search parsing and filtering, without calling the API."""
-    print("x collection")
-    import json
-
-    entities = {e["id"]: e for e in H.load_yaml("entities").get("entities", [])}
-    query = collect_feeds.build_x_query(entities["rk_world"])
-    check("query fits the API tier limit",
-          len(query) <= collect_feeds.X_QUERY_LIMIT, f"({len(query)} chars)")
-    # ValueCart is a separate company and out of scope, so it must not appear
-    # in any entity's query - not RK World Infocom's, and not at all.
-    check("out-of-scope company absent from the query", "ValueCart" not in query)
-    check("the registered-name variants are in the query",
-          '"RK World Infocom"' in query and '"Worldinfocom"' in query)
-    check("out-of-scope company is not an entity", "valuecart" not in entities)
-    check("retweets excluded so a viral post is one row", "-is:retweet" in query)
-    check("context spans more than pay",
-          all(term in query for term in ("harassment", "layoff", "interview")))
-    # An alias list long enough to blow the limit must be trimmed, not sent.
-    huge = {"aliases": [f"Company Name Number {i} Private Limited" for i in range(60)]}
-    check("an overlong alias list is trimmed to fit",
-          len(collect_feeds.build_x_query(huge)) <= collect_feeds.X_QUERY_LIMIT)
-
-    with open(os.path.join(FIXTURES, "x-search-response.json"), encoding="utf-8") as fh:
-        items = collect_feeds.parse_x_payload(json.load(fh))
-    check("all posts parsed", len(items) == 4, f"(got {len(items)})")
-    check("url built from the author handle",
-          items[0]["url"] == "https://x.com/exemployee_blr/status/1800000000000000001",
-          f"({items[0]['url']})")
-    check("a post with no handle still gets a resolvable url",
-          items[2]["url"].startswith("https://x.com/i/web/status/"))
-    check("date taken from created_at", items[0]["published"] == "2026-09-16")
-    # Engagement is the only red-flag trigger with a numeric threshold, and X is
-    # the one source that supplies it.
-    check("engagement sums all four metrics",
-          items[0]["engagement"] == 180 + 64 + 22 + 9, f"(got {items[0]['engagement']})")
-
-    matcher = H.EntityMatcher()
-    feed = {"id": "x_search_rk_world", "platform": "x", "entity": "rk_world"}
-    rows, skipped = collect_feeds.collect_from_items(
-        items, feed, matcher, H.platform_names(), WEEK, set(), {"x"})
-    # Dropped: the "RK World Tours" post (different company) and the ValueCart
-    # post (separate company, deliberately out of scope).
-    check("out-of-scope and wrong-company posts dropped", len(rows) == 2, f"(got {len(rows)})")
-    check("both exclusions counted", skipped["no_entity"] == 2, f"(got {skipped['no_entity']})")
-    check("no ValueCart post reaches the sheet",
-          not any("ValueCart" in r["title_or_snippet"] for r in rows))
-
-    by_url = {r["url"]: r for r in rows}
-    hot = by_url["https://x.com/exemployee_blr/status/1800000000000000001"]
-    check("engagement reaches the mention row", hot["engagement"] == "275",
-          f"(got {hot['engagement']!r})")
-
-    threshold = int(H.load_yaml("settings")["red_flags"]["virality_engagement_threshold"])
-    check("a viral complaint trips the virality scan",
-          "public_escalation_risk" in red_flags.matches_pattern(red_flags.mention_text(hot))
-          or H.to_int(hot["engagement"]) >= threshold)
-    check("an ordinary post does not",
-          H.to_int(by_url["https://x.com/devjobs_in/status/1800000000000000002"]["engagement"])
-          < threshold)
-    check("rows still land untagged for a human",
-          all(r["sentiment"] == "" and r["status"] == "needs_review" for r in rows))
-
-
 def test_config_consistency() -> None:
     """The sheet's vocabulary and the importer's map must not drift apart.
 
@@ -284,8 +220,14 @@ def test_sheet_import() -> None:
           all(m["entity"] for m in mentions))
     check("'RKWorld' maps to the rk_world id",
           any(m["entity"] == "rk_world" for m in mentions))
-    check("'X / Twitter' maps to the x platform",
-          any(m["platform"] == "x" for m in mentions))
+    check("a sheet platform label maps to its id",
+          any(m["platform"] == "reddit" for m in mentions))
+    # X was removed from the programme on 2026-09-23, so the sheet must not
+    # offer it as a choice either - a dropdown value with no platform behind it
+    # imports as 'unknown platform' and fails validation on the row.
+    check("X is not a value the sheet can produce",
+          "x" not in set(H.load_yaml("column_map").get("values", {})
+                         .get("platform", {}).values()))
     check("'Salary & Appraisals' maps to a known theme",
           any(m["themes"] == "compensation" for m in mentions))
     check("every entity is a known id",
@@ -1466,8 +1408,8 @@ def test_absent_values_are_named() -> None:
 
     check("a review site carries no engagement count",
           not H.engagement_applies("ambitionbox") and not H.engagement_applies("glassdoor"))
-    check("X, LinkedIn and Reddit do",
-          all(H.engagement_applies(p) for p in ("x", "linkedin", "reddit")))
+    check("LinkedIn, Reddit and YouTube do",
+          all(H.engagement_applies(p) for p in ("linkedin", "reddit", "youtube")))
 
     # The review's own words: the one field in the row that is not an opinion.
     check("review sites must carry the verbatim line",
@@ -1524,7 +1466,7 @@ def test_unverified_channels_are_named() -> None:
 
     expected = H.unverified_channels(week_one, settings)
     check("every channel without a review count must prove itself",
-          set(expected) == {"linkedin", "x", "indeed", "quora", "youtube",
+          set(expected) == {"linkedin", "indeed", "quora", "youtube",
                             "google_reviews", "reddit", "news"},
           f"(got {expected})")
     check("a review site is exempt - its review count proves it",
@@ -1533,7 +1475,7 @@ def test_unverified_channels_are_named() -> None:
           {"reddit", "news"} <= set(expected))
     check("week 2 drops the fortnightly ones, keeps the weekly ones",
           set(H.unverified_channels(week_two, settings))
-          == {"linkedin", "x", "quora", "reddit", "news"},
+          == {"linkedin", "quora", "reddit", "news"},
           f"(got {H.unverified_channels(week_two, settings)})")
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -1581,8 +1523,7 @@ def test_unverified_channels_are_named() -> None:
                       (platform not in prompted) == covered,
                       f"(prompted={platform in prompted}, fed={platform in fed}, "
                       f"collection={collection.get(platform)})")
-            check("a platform whose feeds are all disabled is still prompted",
-                  "x" in prompted)
+        
 
             # What the collector writes when a fetch succeeds.
             log_sweep.record(week_one, ["reddit"], "collector", found={"reddit": "3"})
@@ -1654,7 +1595,7 @@ def test_linkedin_is_fully_reachable() -> None:
                  red_flags.suggestions(H.read_csv(path), H.load_yaml("settings"))}
 
     check("engagement is recorded on a platform that publishes one",
-          H.engagement_applies("linkedin") and H.engagement_applies("x"))
+          H.engagement_applies("linkedin") and H.engagement_applies("reddit"))
     check("a review site publishes none, so a blank there is not a gap",
           not H.engagement_applies("glassdoor") and not H.engagement_applies("ambitionbox"))
     check("a post over the threshold is raised as public_escalation_risk",
@@ -1680,7 +1621,8 @@ def test_same_day_promise_is_qualified() -> None:
           H.same_day_cover("reddit") == "feed" and H.same_day_cover("news") == "feed")
     check("LinkedIn has none - it blocks automated checking",
           H.same_day_cover("linkedin") == "")
-    check("nor does X while its feeds are disabled", H.same_day_cover("x") == "")
+    check("X is not a platform in this programme at all",
+          "x" not in {p["id"] for p in H.load_yaml("sources")["platforms"]})
     check("a disabled feed gives no cover either",
           H.same_day_cover("quora") == ""
           if not any(f.get("enabled") for f in H.load_yaml("sources").get("feeds", [])
@@ -2174,7 +2116,7 @@ def test_red_flag_sla() -> None:
 
 
 def main() -> int:
-    for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
+    for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector,
                  test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()

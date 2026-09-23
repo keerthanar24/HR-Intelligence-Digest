@@ -108,7 +108,7 @@ AUTHOR_LABELS = {
 # Platforms where a post carries public engagement (likes, reposts, replies).
 # A review site has none, so a blank engagement figure there is correct and a
 # blank one on X is a gap - which is only visible if the two look different.
-ENGAGEMENT_PLATFORMS = {"x", "linkedin", "reddit", "youtube", "quora", "news"}
+ENGAGEMENT_PLATFORMS = {"linkedin", "reddit", "youtube", "quora", "news"}
 
 
 # Platforms where the post's own words are always visible on the page, so a

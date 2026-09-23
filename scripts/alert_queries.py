@@ -88,7 +88,6 @@ def boolean_query(entity: dict) -> str:
 # from config/sources.yaml - only the wording lives here, so a platform added
 # to the source map cannot go missing from the worksheet for want of a hint.
 SWEEP_HINTS = {
-    "x": "if no API plan; logged-out search",
     "quora": "answers naming the group",
     "youtube": "comments on videos about the group; employment only",
     "google_reviews": "employment only - skip customer and product reviews",
@@ -269,7 +268,7 @@ def main() -> int:
         print()
         for entity in entities:
             print(f"--- {entity['name']} ---")
-            print("  X / LinkedIn / Reddit / Quora:")
+            print("  LinkedIn / Reddit / Quora:")
             print(f"    {narrow_query(entity)}")
             print("  Review sites (no context terms needed — every review is employment):")
             print(f"    {broad_query(entity)}")
