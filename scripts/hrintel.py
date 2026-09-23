@@ -35,7 +35,7 @@ SWEEPS_CSV = os.path.join(DATA_DIR, "sweeps.csv")
 
 MENTION_FIELDS = [
     "mention_id", "week_of", "captured_at", "captured_by", "entity", "platform",
-    "source_name", "url", "post_date", "author_type", "role_or_dept",
+    "source_name", "url", "post_date", "item_type", "author_type", "role_or_dept",
     "title_or_snippet", "one_line_summary", "sentiment", "themes",
     "rating_given", "engagement", "names_individual", "red_flag",
     "red_flag_reason", "status", "notes",
@@ -220,6 +220,19 @@ THEMES = [
     "transparency",
     "job_security",
 ]
+
+# What kind of item a row is. The completeness gate compares the review COUNT
+# a page gained against the rows logged for it, and an interview experience is
+# not a review: logging one made the arithmetic add up while an actual review
+# went unread. Blank means review - every row logged before this existed came
+# off a Reviews tab.
+ITEM_TYPES = ["review", "interview", "post", "comment", "article"]
+
+
+def is_review(row: dict) -> bool:
+    """Does this row count against a page's review count?"""
+    return (row.get("item_type") or "review").strip().lower() == "review"
+
 
 AUTHOR_TYPES = [
     "current_employee", "ex_employee", "candidate", "intern",

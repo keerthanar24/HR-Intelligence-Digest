@@ -23,6 +23,7 @@ tabs:
       week_of:           [Week Of, week_of]
       captured_by:       [Logged By, Captured By, captured_by]
       source_name:       [Source, source_name]
+      item_type:       [Item Type, item_type, Type]
       author_type:       [Author Type, author_type, Reviewer Type]
       role_or_dept:      [Role / Department, Role, Department, role_or_dept]
       title_or_snippet:  [Title / Snippet, Title, Snippet, title_or_snippet]

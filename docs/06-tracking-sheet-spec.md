@@ -22,6 +22,7 @@ tell you if the schema drifted.
 | `url` | yes in practice | full URL | A row without a link cannot be verified by anyone else |
 | `post_date` | yes if known | `YYYY-MM-DD` | Date the item was posted. Cannot be in the future |
 | `author_type` | yes | `current_employee`, `ex_employee`, `candidate`, `intern`, `contractor`, `anonymous`, `unknown` | Stated or clearly implied only — never inferred |
+| `item_type` | yes | `review`, `interview`, `post`, `comment`, `article` | What kind of item this is. **Only `review` counts against a page's review count** — the completeness gate compares that count's movement against the rows logged, and an interview experience does not move it. Blank reads as `review` |
 | `role_or_dept` | no | free text | Only if the page states it. Never narrow enough to identify a person. Asked by the guided prompt |
 | `title_or_snippet` | **yes on review sites** | free text | The review title or first line, **as published**. The one field in the row that is not an interpretation — a summary with nothing behind it cannot be checked in November. Required on AmbitionBox, Glassdoor, Indeed and Google Reviews |
 | `one_line_summary` | yes | one sentence | What the four executives read. See `docs/05-sentiment-and-themes.md` |

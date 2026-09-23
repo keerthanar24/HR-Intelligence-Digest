@@ -233,8 +233,11 @@ def coverage_rows(mentions_now, all_ratings, week_of, entities, platforms,
         elif row.get("week_of") == prev_week:
             counts.setdefault(key, {})["prev"] = H.to_int(row.get("review_count"), -1)
 
+    # Only reviews. An interview experience or a LinkedIn post is a mention
+    # but does not move a page's review count, so counting it here made the
+    # sum reach the target while a real review sat unread.
     logged = collections.Counter(
-        (m.get("entity"), m.get("platform")) for m in mentions_now)
+        (m.get("entity"), m.get("platform")) for m in mentions_now if H.is_review(m))
 
     if expected is None:
         expected = H.rated_profiles()

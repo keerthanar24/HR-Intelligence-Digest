@@ -1031,6 +1031,7 @@ def test_interactive_saves_as_it_goes() -> None:
 
         answers = iter([
             "rk_world", "ambitionbox", "2026-09-10",
+            "review",                       # what kind of item
             "Good team, poor pay",          # the review's own words - now required
             "A first summary",
             "mixed", "culture", "unknown",
@@ -1681,6 +1682,58 @@ def test_same_day_promise_is_qualified() -> None:
           "limit of the sources" in text)
 
 
+def test_interviews_do_not_mask_unread_reviews() -> None:
+    """An interview experience must not satisfy the review-count arithmetic.
+
+    The completeness gate is what turns "every new review" from a promise into
+    a check: the rating snapshot carries the review count, so the change in it
+    is how many reviews a page genuinely gained, compared against the rows
+    logged. Interview experiences became loggable the moment the Interviews tab
+    reached the worksheet - and an interview does not move the review count. A
+    page that gained two reviews, with one review and one interview logged,
+    added up to two and passed while a real review sat unread.
+    """
+    print("interviews do not mask unread reviews")
+    entities, platforms = {"rk_world": "RK World"}, {"ambitionbox": "AmbitionBox"}
+    ratings = [
+        {"week_of": "2026-09-12", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "51", "overall_rating": "3.0"},
+        {"week_of": "2026-09-19", "entity": "rk_world", "platform": "ambitionbox",
+         "review_count": "53", "overall_rating": "3.0"},
+    ]
+
+    def row(mid, item_type):
+        return {f: "" for f in H.MENTION_FIELDS} | {
+            "mention_id": mid, "entity": "rk_world", "platform": "ambitionbox",
+            "week_of": "2026-09-19", "sentiment": "negative", "item_type": item_type}
+
+    def gaps_for(rows):
+        _swept, gaps = build_digest.coverage_rows(
+            rows, ratings, dt.date(2026, 9, 19), entities, platforms,
+            expected=[("rk_world", "ambitionbox")])
+        return gaps
+
+    mixed = gaps_for([row("M-1", "review"), row("M-2", "interview")])
+    check("two new reviews with one review logged is still a gap",
+          any(g["kind"] == "unread" and g["missing"] == 1 for g in mixed), f"({mixed})")
+    check("two new reviews with two reviews logged passes",
+          not gaps_for([row("M-1", "review"), row("M-2", "review")]))
+
+    # Every row logged before item_type existed came off a Reviews tab.
+    check("a blank item_type counts as a review",
+          H.is_review({"item_type": ""}) and H.is_review({}))
+    check("an interview does not", not H.is_review({"item_type": "interview"}))
+    check("nor does a LinkedIn post", not H.is_review({"item_type": "post"}))
+    check("interview is in the vocabulary", "interview" in H.ITEM_TYPES)
+    check("item_type is a mention field", "item_type" in H.MENTION_FIELDS)
+
+    # A LinkedIn post must not satisfy a review site's arithmetic either.
+    linkedin_post = row("M-3", "post") | {"platform": "linkedin"}
+    still = gaps_for([row("M-1", "review"), linkedin_post])
+    check("a post on another platform never counted anyway",
+          any(g["kind"] == "unread" for g in still), f"({still})")
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1897,7 +1950,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_interviews_do_not_mask_unread_reviews, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

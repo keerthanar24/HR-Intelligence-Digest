@@ -149,6 +149,10 @@ def interactive(defaults) -> list[argparse.Namespace]:
         platform = ask("platform", allowed=list(platforms), default=last["platform"],
                        required=True)
         date = ask("date the review was posted (YYYY-MM-DD)", required=True)
+        # An interview experience does not move a page's review count, so the
+        # completeness gate has to tell them apart.
+        item = ask("what kind of item", allowed=H.ITEM_TYPES,
+                   default="review" if platform in H.VERBATIM_REQUIRED else "post")
         title = ask("the post's own words - its title, or its first line",
                     required=platform in H.VERBATIM_REQUIRED)
         summary = ask("one factual sentence - no names, no interpretation", required=True)
@@ -171,6 +175,7 @@ def interactive(defaults) -> list[argparse.Namespace]:
 
         one = argparse.Namespace(
             entity=entity, platform=platform, date=date, summary=summary,
+            item_type=item,
             sentiment=sentiment, themes=themes, author=author, url=url, title=title,
             role=role, rating=stars,
             engagement=int(reach) if reach.isdigit() else None,
@@ -240,6 +245,10 @@ def main() -> int:
     p.add_argument("--author", default="unknown")
     p.add_argument("--url", default="")
     p.add_argument("--title", default="", help="review title or first line, as published")
+    p.add_argument("--item-type", dest="item_type", default="review",
+                   choices=H.ITEM_TYPES,
+                   help="review (default), interview, post, comment or article - "
+                        "only 'review' counts against a page's review count")
     p.add_argument("--role", default="",
                    help="department or role, when the review page shows one")
     p.add_argument("--rating", help="stars the reviewer gave, 1-5")
@@ -370,6 +379,7 @@ def log_one(args) -> int:
         "source_name": platforms.get(args.platform, args.platform),
         "url": args.url,
         "post_date": posted.isoformat(),
+        "item_type": getattr(args, "item_type", "") or "review",
         "author_type": args.author,
         "role_or_dept": args.role,
         "title_or_snippet": args.title[:300],
