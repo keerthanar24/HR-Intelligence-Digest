@@ -615,10 +615,37 @@ def customer_side_terms(text: str, cfg: dict | None = None) -> list[str]:
 
 
 def read_csv(path: str) -> list[dict]:
+    """Every row as a dict of strings, whatever shape the file is in.
+
+    csv.DictReader is faithful to a malformed line in two ways that break
+    callers far from the file. A row with too FEW fields gets None for the
+    rest, so `row.get("platform", "")` returns None rather than the default -
+    the default only applies to a missing key, not a present one holding None -
+    and sorting on it raises TypeError. A row with too MANY fields puts the
+    extras under the key None, as a list, which then fails on write.
+
+    Both come from a hand-edited file, which these are: the sweeps log is
+    opened in Notepad, a line gets truncated, and the crash surfaces three
+    files away in a sort. Normalising here means no caller has to know.
+    validate_data.py reports the malformed line itself.
+    """
     if not os.path.exists(path):
         return []
     with open(path, newline="", encoding="utf-8") as fh:
-        return list(csv.DictReader(fh))
+        rows = []
+        for row in csv.DictReader(fh, restval=""):
+            row.pop(None, None)
+            rows.append({k: ("" if v is None else v) for k, v in row.items()})
+        return rows
+
+
+def malformed_rows(path: str, fields: list[str]) -> list[int]:
+    """Line numbers whose field count does not match the header."""
+    if not os.path.exists(path):
+        return []
+    with open(path, newline="", encoding="utf-8") as fh:
+        return [n for n, row in enumerate(csv.reader(fh), start=1)
+                if n > 1 and row and len(row) != len(fields)]
 
 
 class FileInUse(RuntimeError):

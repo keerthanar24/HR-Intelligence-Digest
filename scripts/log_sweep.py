@@ -71,7 +71,7 @@ def record(week: dt.date, platforms: list[str], by: str,
         "found": found.get(platform, ""),
         "notes": notes.get(platform, ""),
     } for platform in platforms]
-    rows.sort(key=lambda r: (r.get("week_of", ""), r.get("platform", "")))
+    rows.sort(key=lambda r: (r.get("week_of") or "", r.get("platform") or ""))
     H.write_csv(H.SWEEPS_CSV, H.SWEEP_FIELDS, rows)
     return len(platforms)
 
