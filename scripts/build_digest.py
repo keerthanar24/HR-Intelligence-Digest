@@ -560,66 +560,6 @@ def quiet_week_note(checked):
             "held in the restricted escalation log, never in here.")
 
 
-def market_rows(week_of, entities):
-    """Hiring volume and salary-entry count per entity, with the week's change.
-
-    The two figures the project scope asks for and the digest never carried:
-    "job-market trends" in its opening line, and "salary insights" among the
-    review-site content. Both are weekly snapshots, so what the digest reports
-    is the MOVEMENT - a level on its own says nothing, and three open roles is
-    neither good nor bad until you know it was one last week.
-    """
-    rows = H.read_csv(H.MARKET_CSV)
-    target = week_of.isoformat()
-    out = []
-    for entity_id, name in entities.items():
-        now = next((r for r in rows if r.get("week_of") == target
-                    and r.get("entity") == entity_id), None)
-        if not now:
-            continue
-        earlier = [r for r in rows if r.get("entity") == entity_id
-                   and r.get("week_of", "") < target]
-        prev = max(earlier, key=lambda r: r.get("week_of", "")) if earlier else None
-
-        def figure(field):
-            value = str(now.get(field) or "").strip()
-            if not value:
-                return "—"
-            before = str(prev.get(field) or "").strip() if prev else ""
-            if not before:
-                return value
-            return f"{value} ({delta_text(H.to_int(value), H.to_int(before))})"
-
-        def moved(field):
-            """Did this figure change since the last week that recorded it?"""
-            if not prev:
-                return False
-            here, there = str(now.get(field) or "").strip(), str(prev.get(field) or "").strip()
-            return bool(here and there and here != there)
-
-        out.append({"entity": name,
-                    "roles": figure("open_roles"),
-                    "salaries": figure("salary_entries"),
-                    "changed": moved("open_roles") or moved("salary_entries"),
-                    "baseline": prev is None,
-                    "source": now.get("source", "")})
-    return out
-
-
-def market_is_quiet(market) -> bool:
-    """Every entity counted, nothing moved, and a previous week to compare to.
-
-    The scope names job-market signals, so the digest always states the
-    position - but a table of four unchanged numbers, every week, in an email
-    to four executives is noise that teaches people to skim. A quiet week gets
-    one line; a week where something moved gets the table.
-
-    A baseline week is never quiet: there is nothing to compare against, and
-    the figures themselves are the thing being established.
-    """
-    return bool(market) and not any(r["baseline"] or r["changed"] for r in market)
-
-
 def same_day_note(platforms):
     """The channels where a red flag cannot surface until the weekly sweep.
 
@@ -732,7 +672,6 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                                 baseline=is_baseline)
     also_swept, not_swept = channel_coverage(week_of, settings, platforms, swept)
     lagging = same_day_note(platforms)
-    market = market_rows(week_of, entities)
     swept = sorted(set(swept) | set(also_swept))
     rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
     rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
@@ -868,45 +807,6 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f'so {"it" if len(unrated) == 1 else "they"} cannot appear above. '
                  f'{"It is" if len(unrated) == 1 else "They are"} covered by LinkedIn, Reddit, '
                  'news and X only — absence here is not evidence of a quiet week.</p>')
-
-    # docs/00-brief.md defines section 2 as "Glassdoor and AmbitionBox score
-    # updates per entity" and nothing else. The job market is separate scope -
-    # "job-market trends", from the scope's opening line - and rendering it
-    # inside section 2 made it read as part of Rating Movement. It gets its own
-    # heading, outside the six numbered sections the brief specifies, so
-    # neither is mistaken for the other.
-    h.append('<h3 style="font-size:16px;margin:20px 0 6px;'
-             'border-top:1px solid #e3e8ef;padding-top:14px;">Job Market</h3>')
-    # An uncounted salary column is a standing fact, not a property of the
-    # table, so it has to survive a quiet week that prints no table.
-    salaries_uncounted = bool(market) and all(r["salaries"] == "—" for r in market)
-    if market and market_is_quiet(market):
-        h.append('<p style="margin:0 0 8px;font-size:13px;">'
-                 'All four entities counted. <strong>No change</strong> in open roles'
-                 f'{"" if salaries_uncounted else " or salary entries"} since last week.</p>')
-    elif market:
-        h.append('<p style="margin:0 0 6px;font-size:12px;color:#52606d;">'
-                 'Roles advertised, and how many salary entries employees have '
-                 'volunteered. The change is the signal; the level on its own is not.</p>')
-        h.append(h_table(
-            ["Entity", "Open roles", "Salary entries"],
-            [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
-            ["left", "right", "right"], ["46%", "27%", "27%"]))
-    if salaries_uncounted:
-        # A column of dashes reads as "no salary data exists". The truth is
-        # that the roles were counted and the salary pages were not, and those
-        # are different facts.
-        h.append('<p style="margin:2px 0 8px;color:#8a6d3b;font-size:13px;">'
-                 'Salary entries were not counted this week — '
-                 'not measured, rather than none.</p>')
-    if not market:
-        # Rendering nothing here says "no hiring to report". Nobody counted is
-        # a different fact, and it is the one that is true - the same
-        # distinction section 3 makes about an unswept channel.
-        h.append('<p style="margin:0 0 8px;color:#8a6d3b;font-size:13px;">'
-                 'Not recorded this week for any entity. No conclusion about hiring '
-                 'should be drawn from its absence: the count was not taken. '
-                 '<code>scripts/log_market.py</code> records it.</p>')
 
     # 3. What's new
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">3 · What\'s New</h3>')
@@ -1087,23 +987,6 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f"appear above. {'It is' if len(unrated) == 1 else 'They are'} covered by "
                  "LinkedIn, Reddit, news and X only - absence here is not evidence of a "
                  "quiet week.")
-    t.append("")
-    t.append("JOB MARKET")
-    salaries_uncounted = bool(market) and all(r["salaries"] == "—" for r in market)
-    if market and market_is_quiet(market):
-        t.append("All four entities counted. No change in open roles"
-                 f"{'' if salaries_uncounted else ' or salary entries'} since last week.")
-    elif market:
-        t.append("Roles advertised, and salary entries volunteered. "
-                 "The change is the signal, not the level.")
-        t.append(t_table(["Entity", "Open roles", "Salary entries"],
-                         [[r["entity"], r["roles"], r["salaries"]] for r in market]))
-    if salaries_uncounted:
-        t.append("Salary entries were not counted this week - not measured, "
-                 "rather than none.")
-    if not market:
-        t.append("Not recorded this week for any entity. No conclusion about hiring "
-                 "should be drawn from its absence: the count was not taken.")
     t.append("")
     t.append("3. WHAT'S NEW")
     if now:

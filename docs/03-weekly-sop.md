@@ -334,6 +334,9 @@ is one company row and up to three real mentions.
 
 ## Counting the job market and salary entries
 
+These figures are **watched, not reported**: they go into `data/market.csv` for the Month 2
+review and do not appear in the weekly digest. Full guide in `docs/13-job-market.md`.
+
 ```bash
 python3 scripts/log_market.py --worksheet --week <week>
 ```

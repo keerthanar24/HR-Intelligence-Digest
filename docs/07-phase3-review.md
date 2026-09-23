@@ -34,6 +34,15 @@ Produce these from the tracking data before the meeting:
    turns on: a channel with nothing found after eight weeks of looking and a channel
    nobody ever opened both print `0`, and point at opposite answers. Only the first
    is evidence for narrowing scope.
+
+   ```bash
+   python3 scripts/log_market.py --show
+   ```
+
+   Hiring volume and salary-entry counts per entity, week by week. These never appeared
+   in a digest — they were watched, not reported (`docs/13-job-market.md`) — so this is
+   the first time anyone sees them in one place. Whether the group's own hiring moved
+   alongside its review sentiment is a question only this table can answer.
 2. **Red flags.** How many were raised? How many were acted on outside this programme? How
    many would have been missed without it?
 3. **Effort.** Actual hours per week against the 3–4 hour budget. Where did the time go?

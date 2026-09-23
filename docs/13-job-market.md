@@ -1,13 +1,16 @@
 # Capturing the job market and salary insights
 
 The project scope asks for two things that are neither a review nor a rating:
-**job-market trends** and **salary insights**. This is how they get into the digest.
+**job-market trends** and **salary insights**.
 
-Until they are recorded, section 2 of the digest carries a disclosure instead of a
-table — *"not recorded this week for any entity. No conclusion about hiring should be
-drawn from its absence: the count was not taken."* That is deliberate. Silence there
-would read as *no hiring to report*, which is a different claim from *nobody counted*.
-Filling it in replaces the disclosure with the figures.
+**Neither is a section of the digest.** The brief enumerates six deliverables — Headline,
+Rating Movement, What's New, Themes, Red Flags, Data Link — and these are not among them.
+The scope names them as things to **watch**: they are recorded weekly into `data/market.csv`
+and read at the Month 2 review, where `docs/07-phase3-review.md` asks for volume by entity
+and platform. They do not go in the weekly email.
+
+So this is a data-collection routine, not a reporting one. Ten minutes a week, and the
+figures are there when the decision needs them.
 
 ---
 

@@ -1976,64 +1976,47 @@ def test_a_server_error_is_retried() -> None:
 
 
 def test_job_market_and_salary_insights() -> None:
-    """The two scope lines the digest never carried.
+    """The two scope lines, and where they live now.
 
     "job-market trends" is in the project scope's opening sentence and in none
-    of the six deliverables. "salary insights" is listed as in-scope content on
-    Glassdoor and AmbitionBox with nowhere to put it. Both are now weekly
-    snapshots, and the digest reports the MOVEMENT: three open roles is neither
-    good nor bad until you know it was one last week, and a company-wide salary
-    median would be an average over unrelated roles - a number nobody should
-    act on - so the honest figure is the count of entries employees have
-    volunteered.
+    of the six deliverables; "salary insights" is in-scope content on the two
+    review sites, likewise not a deliverable. Both are WATCHED - recorded
+    weekly into market.csv and read at the Month 2 review - and neither is a
+    section of the digest.
+
+    The movement is still the point: three open roles is neither good nor bad
+    until you know it was one last week. That comparison lives in log_market
+    now rather than in the digest builder.
     """
     print("job market and salary insights")
-    entities = {"rk_world": "RK World Infocom", "westbury_kommerce": "Westbury Kommerce"}
+    import log_market as M
 
-    with tempfile.TemporaryDirectory() as tmp:
-        saved = H.MARKET_CSV
-        H.MARKET_CSV = os.path.join(tmp, "market.csv")
-        try:
-            check("no snapshots means no block at all - an empty trial stays clean",
-                  build_digest.market_rows(dt.date(2026, 9, 19), entities) == [])
+    rows = [
+        {"week_of": "2026-09-12", "entity": "rk_world",
+         "open_roles": "1", "salary_entries": "49"},
+        {"week_of": "2026-09-19", "entity": "rk_world",
+         "open_roles": "4", "salary_entries": "51"},
+        {"week_of": "2026-09-19", "entity": "westbury_kommerce",
+         "open_roles": "0", "salary_entries": "142"},
+    ]
 
-            H.write_csv(H.MARKET_CSV, H.MARKET_FIELDS, [
-                {"week_of": "2026-09-12", "entity": "rk_world",
-                 "open_roles": "1", "salary_entries": "49"},
-                {"week_of": "2026-09-19", "entity": "rk_world",
-                 "open_roles": "4", "salary_entries": "51"},
-                {"week_of": "2026-09-19", "entity": "westbury_kommerce",
-                 "open_roles": "0", "salary_entries": "142"},
-            ])
-            rows = {r["entity"]: r for r in
-                    build_digest.market_rows(dt.date(2026, 9, 19), entities)}
+    before = M.latest(rows, "rk_world", "2026-09-19")
+    check("the previous week is found, so movement can be read",
+          before is not None and before["open_roles"] == "1")
+    check("roles moved 1 -> 4",
+          H.to_int(rows[1]["open_roles"]) - H.to_int(before["open_roles"]) == 3)
+    check("salary entries moved 49 -> 51",
+          H.to_int(rows[1]["salary_entries"]) - H.to_int(before["salary_entries"]) == 2)
 
-            check("hiring movement is reported, not just the level",
-                  rows["RK World Infocom"]["roles"] == "4 (+3)",
-                  f"({rows['RK World Infocom']['roles']})")
-            check("salary entries move too",
-                  rows["RK World Infocom"]["salaries"] == "51 (+2)",
-                  f"({rows['RK World Infocom']['salaries']})")
-            check("a first snapshot shows the level with no invented change",
-                  rows["Westbury Kommerce"]["roles"] == "0",
-                  f"({rows['Westbury Kommerce']['roles']})")
-            check("zero roles is a figure, not a blank",
-                  rows["Westbury Kommerce"]["roles"] != "—")
+    check("a first snapshot has nothing behind it, so no change is invented",
+          M.latest(rows, "westbury_kommerce", "2026-09-19") is None)
+    check("zero roles is a figure, not a blank", rows[2]["open_roles"] == "0")
 
-            # An entity with no snapshot this week is absent, not shown as nil.
-            H.write_csv(H.MARKET_CSV, H.MARKET_FIELDS, [
-                {"week_of": "2026-09-19", "entity": "rk_world", "open_roles": "4"}])
-            only = build_digest.market_rows(dt.date(2026, 9, 19), entities)
-            check("an entity nobody counted is left out rather than shown as zero",
-                  [r["entity"] for r in only] == ["RK World Infocom"], f"({only})")
-            check("a figure nobody recorded reads as a dash",
-                  only[0]["salaries"] == "—", f"({only[0]['salaries']})")
-        finally:
-            H.MARKET_CSV = saved
-
-    check("the schema carries both figures",
-          {"open_roles", "salary_entries"} <= set(H.MARKET_FIELDS))
-    check("and says where they were counted", "source" in H.MARKET_FIELDS)
+    # 0 and "not counted" are different facts, and the sheet keeps them apart.
+    check("zero roles from the sheet is zero",
+          M.parse_sheet("rk_world 0 12")[0][0]["roles"] == 0)
+    check("while an uncounted salary page is not zero",
+          M.parse_sheet("rk_world 4")[0][0]["salary_parts"] == [])
 
 
 def test_a_malformed_row_does_not_crash_three_files_away() -> None:
@@ -2382,50 +2365,37 @@ def test_linkedin_post_date_from_url() -> None:
           L.published(1234567890123456789) is None)
 
 
-def test_absence_of_a_count_is_not_a_finding() -> None:
-    """The digest must never render silence where a figure was not taken.
+def test_job_market_stays_out_of_the_digest() -> None:
+    """Watched and recorded, but not a section of the weekly email.
 
-    The job-market block only drew itself when there were rows, so 0/4
-    recorded produced no block at all - which reads as "no hiring to report".
-    Same distinction section 3 makes about an unswept channel, missed in the
-    section built last.
+    docs/00-brief.md names job-market signals in its purpose and salaries as
+    in-scope content on the two review sites, but its six deliverables include
+    neither. They are things to WATCH. The figures live in market.csv and feed
+    the Month 2 review; the digest carries the six sections and nothing else.
     """
-    print("an uncounted figure says so")
+    print("job market is watched, not reported")
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+
     for body, name in ((html, "html"), (text, "text")):
-        check(f"the {name} body names the job market either way",
-              "job market" in body.lower())
-    check("and says the count was not taken, not that there is nothing",
-          "not recorded" in text.lower() and "not taken" in text.lower())
+        check(f"the {name} body does not carry a job market block",
+              "job market" not in body.lower(), "it is watched, not reported")
+        check(f"nor an open-roles column in the {name} body",
+              "open roles" not in body.lower())
 
-    # docs/00-brief.md defines section 2 as "Glassdoor and AmbitionBox score
-    # updates per entity" and nothing else. The job market is separate scope,
-    # and rendering it inside section 2 made it read as Rating Movement.
+    # Section 2 is "Glassdoor and AmbitionBox score updates per entity" and
+    # nothing else - which is now the whole of what sits between 2 and 3.
     two = text.split("2. RATING MOVEMENT", 1)[1].split("3. WHAT", 1)[0]
-    check("the job market is not inside section 2's own content",
-          "JOB MARKET" in two and two.index("JOB MARKET") > two.index("Rating"),
-          "it must come after the ratings table, under its own heading")
-    check("and it carries a heading of its own", "JOB MARKET\n" in text)
-    # The scope names job-market signals, so the digest always STATES the
-    # position - but four unchanged numbers every week, in an email to four
-    # executives, is noise that teaches people to skim. A quiet week gets one
-    # line; a week where something moved gets the table.
-    def row(**kw):
-        return {"entity": "x", "roles": "4", "salaries": "—",
-                "changed": False, "baseline": False, **kw}
+    check("section 2 holds the two review sites",
+          "Glassdoor" in two and "AmbitionBox" in two)
+    check("and nothing from the job market",
+          "roles" not in two.lower() and "salary" not in two.lower())
 
-    check("a baseline week is never quiet - the figures ARE the finding",
-          not build_digest.market_is_quiet([row(baseline=True)]))
-    check("nor is a week where something moved",
-          not build_digest.market_is_quiet([row(changed=True)]))
-    check("but a fully counted, unmoved week is",
-          build_digest.market_is_quiet([row(), row()]))
-    check("and no data at all is not 'quiet' - it is uncounted",
-          not build_digest.market_is_quiet([]))
-
-    check("section 2 still holds only the two review sites",
-          "Glassdoor" in two and "AmbitionBox" in two
-          and "LinkedIn" not in two.split("JOB MARKET")[0])
+    # Recording still works and still reaches the file - the watch is real.
+    import log_market as M
+    check("market.csv is still the place the figures go",
+          M.H.MARKET_CSV.endswith("market.csv"))
+    check("and the worksheet still names the pages to check",
+          len(M.tab_urls("rk_group")) == 5)
 
 
 def test_company_post_batch_parsing() -> None:
@@ -2680,7 +2650,7 @@ def test_job_market_sheet() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
