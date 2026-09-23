@@ -79,3 +79,26 @@ and it is a legitimate result.
 
 `data/mentions.sample.csv` holds four illustrative rows with `example.invalid` URLs. It is a
 format reference, not data. Delete it or leave it; the scripts never read it.
+
+---
+
+## `market.csv` — job-market trends and salary insights
+
+The two things the project scope asks for that are neither a review nor a rating. One row per
+entity per week.
+
+| Field | Required | Values | Notes |
+|---|---|---|---|
+| `week_of` | yes | Saturday | the reporting week |
+| `entity` | yes | entity id | |
+| `open_roles` | no | integer | roles the entity is advertising, counted across LinkedIn Jobs, AmbitionBox and Indeed. **`0` is a figure worth recording**; blank means nobody counted |
+| `salary_entries` | no | integer | the count the review site publishes — **not a median**. A company-wide median averages unrelated roles and is a number nobody should act on. The count measures how much salary data employees have volunteered |
+| `source` | no | free text | where they were counted, e.g. `LinkedIn Jobs + AmbitionBox` |
+| `notes` | no | free text | |
+
+**The digest reports the change, not the level.** Three open roles is neither good nor bad
+until you know it was one last week. A spike in openings beside a run of exit reviews is the
+correlation this programme exists to surface, and neither half shows it alone.
+
+An entity with no snapshot for the week is left out of the block entirely rather than shown as
+zero — the same distinction the rest of the digest draws between *empty* and *unchecked*.

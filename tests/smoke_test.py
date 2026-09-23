@@ -1975,6 +1975,67 @@ def test_a_server_error_is_retried() -> None:
               code not in collect_feeds.RETRYABLE)
 
 
+def test_job_market_and_salary_insights() -> None:
+    """The two scope lines the digest never carried.
+
+    "job-market trends" is in the project scope's opening sentence and in none
+    of the six deliverables. "salary insights" is listed as in-scope content on
+    Glassdoor and AmbitionBox with nowhere to put it. Both are now weekly
+    snapshots, and the digest reports the MOVEMENT: three open roles is neither
+    good nor bad until you know it was one last week, and a company-wide salary
+    median would be an average over unrelated roles - a number nobody should
+    act on - so the honest figure is the count of entries employees have
+    volunteered.
+    """
+    print("job market and salary insights")
+    entities = {"rk_world": "RK World Infocom", "westbury_kommerce": "Westbury Kommerce"}
+
+    with tempfile.TemporaryDirectory() as tmp:
+        saved = H.MARKET_CSV
+        H.MARKET_CSV = os.path.join(tmp, "market.csv")
+        try:
+            check("no snapshots means no block at all - an empty trial stays clean",
+                  build_digest.market_rows(dt.date(2026, 9, 19), entities) == [])
+
+            H.write_csv(H.MARKET_CSV, H.MARKET_FIELDS, [
+                {"week_of": "2026-09-12", "entity": "rk_world",
+                 "open_roles": "1", "salary_entries": "49"},
+                {"week_of": "2026-09-19", "entity": "rk_world",
+                 "open_roles": "4", "salary_entries": "51"},
+                {"week_of": "2026-09-19", "entity": "westbury_kommerce",
+                 "open_roles": "0", "salary_entries": "142"},
+            ])
+            rows = {r["entity"]: r for r in
+                    build_digest.market_rows(dt.date(2026, 9, 19), entities)}
+
+            check("hiring movement is reported, not just the level",
+                  rows["RK World Infocom"]["roles"] == "4 (+3)",
+                  f"({rows['RK World Infocom']['roles']})")
+            check("salary entries move too",
+                  rows["RK World Infocom"]["salaries"] == "51 (+2)",
+                  f"({rows['RK World Infocom']['salaries']})")
+            check("a first snapshot shows the level with no invented change",
+                  rows["Westbury Kommerce"]["roles"] == "0",
+                  f"({rows['Westbury Kommerce']['roles']})")
+            check("zero roles is a figure, not a blank",
+                  rows["Westbury Kommerce"]["roles"] != "—")
+
+            # An entity with no snapshot this week is absent, not shown as nil.
+            H.write_csv(H.MARKET_CSV, H.MARKET_FIELDS, [
+                {"week_of": "2026-09-19", "entity": "rk_world", "open_roles": "4"}])
+            only = build_digest.market_rows(dt.date(2026, 9, 19), entities)
+            check("an entity nobody counted is left out rather than shown as zero",
+                  [r["entity"] for r in only] == ["RK World Infocom"], f"({only})")
+            check("a figure nobody recorded reads as a dash",
+                  only[0]["salaries"] == "—", f"({only[0]['salaries']})")
+        finally:
+            H.MARKET_CSV = saved
+
+    check("the schema carries both figures",
+          {"open_roles", "salary_entries"} <= set(H.MARKET_FIELDS))
+    check("and says where they were counted", "source" in H.MARKET_FIELDS)
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2191,7 +2252,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

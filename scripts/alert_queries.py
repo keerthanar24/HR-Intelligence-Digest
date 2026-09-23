@@ -207,6 +207,12 @@ def main() -> int:
                 label += "   [fortnightly, DUE this week]"
             print(f"  [ ] {label}")
         print()
+        print("--- Job market and salary entries (project scope) ---")
+        print("    Count the roles each entity is advertising, and the salary-entry")
+        print("    count the review sites report. The change is the signal.")
+        print("  [ ] python3 scripts/log_market.py -e <entity> --roles <n> --salaries <n>")
+        print("      progress: python3 scripts/log_market.py --status")
+        print()
         print("Search strings: python3 scripts/alert_queries.py --format manual")
         print("Progress:       python3 scripts/log_rating.py --status")
         return 0
