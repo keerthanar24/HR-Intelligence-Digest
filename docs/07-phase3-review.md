@@ -25,6 +25,15 @@ what keeps the other four options honest.
 Produce these from the tracking data before the meeting:
 
 1. **Volume.** Total mentions over 8 weeks, by entity and platform. How many weeks were empty?
+
+   ```bash
+   python3 scripts/channel_yield.py
+   ```
+
+   It prints found against swept per channel, which is the distinction the decision
+   turns on: a channel with nothing found after eight weeks of looking and a channel
+   nobody ever opened both print `0`, and point at opposite answers. Only the first
+   is evidence for narrowing scope.
 2. **Red flags.** How many were raised? How many were acted on outside this programme? How
    many would have been missed without it?
 3. **Effort.** Actual hours per week against the 3–4 hour budget. Where did the time go?
