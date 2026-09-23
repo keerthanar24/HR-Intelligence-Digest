@@ -171,6 +171,10 @@ def main() -> int:
                     note = text
                 print(f"  [ ] {names[entity_id]}")
                 print(f"      {note}")
+            # Tabs on the same page. Named in the scope, absent from this
+            # worksheet until now, and therefore never swept.
+            for extra in (platform.get("also_check") or []):
+                print(f"  [ ] {extra}")
             # A company page shows what the company posts. Anything an employee
             # or leaver writes lives in the platform's own content search, and
             # without a link to it that half of the source map is decorative.

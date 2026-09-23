@@ -1341,6 +1341,13 @@ def test_sweep_worksheet_covers_every_platform() -> None:
     check("every platform in sources.yaml appears in the worksheet",
           not missing, f"(missing {missing})")
     check("Indeed is named", "Indeed" in week1)
+    # Interview experiences are named in the project scope. The SOP said
+    # "new reviews, interviews, salaries" and this worksheet gave only the
+    # Reviews URL, so the tab was in the prose and absent from the tool - and
+    # was never swept once in the whole back-read.
+    check("the Interviews tab is on the worksheet", "Interviews tab" in week1)
+    check("on both review sites",
+          week1.count("Interviews tab") >= 2, f"({week1.count('Interviews tab')})")
     check("the page with no profile says so, rather than going blank",
           "no page on this platform" in week1)
 

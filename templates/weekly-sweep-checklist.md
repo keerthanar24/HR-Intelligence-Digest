@@ -27,6 +27,10 @@ last Friday**. Sort by newest, not relevance.
 | Robust Kommerce | — *no page on this platform; the digest says so in section 2* | — |
 | Westbury Kommerce | ☐ | ☐ |
 
+- [ ] **Interviews tab** on each page — interview experiences are in scope and have never
+      been swept. Log one as a mention: theme `interview`, author `candidate`.
+- [ ] **Salaries tab** — read for context; there is no field to record it in yet.
+
 **Glassdoor**
 
 | | Rating + count | New reviews copied |
