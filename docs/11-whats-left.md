@@ -145,9 +145,11 @@ whatever else is filled in.
 
 ### Worth doing, blocks nothing
 
-- **The Robust Kommerce Google Alert still carries `OR "Robust Results"`** from the old
-  query, so it keeps pulling in another company. Regenerate with
-  `python3 scripts/alert_queries.py --entity robust_kommerce --format google`.
+- ~~**The Robust Kommerce Google Alert carries `OR "Robust Results"`**~~ **Resolved
+  2026-09-23.** The live query was supplied by the programme owner and matches what
+  `alert_queries.py --entity robust_kommerce --format google` generates, character for
+  character, with the stale alias gone. Google Alerts only carry items indexed after a
+  change, so this does not backfill — it stops the wrong company arriving from here on.
 - **Three back-read rows hold no verbatim text** (M-20260808-001, M-20260829-001,
   M-20260905-002). Their summaries are unverifiable at the Month 2 review.
 - **`collector.user_agent` says `contact: TODO`** — `config/settings.yaml:47`. A bot

@@ -69,7 +69,7 @@ Review the list at the end of Week 2 (the end of Phase 1) and again at the Phase
 |---|---|---|---|
 | RK Group | 7 | — | none |
 | RK World Infocom | 11 | R K World Infocom (AmbitionBox), Rk Worldinfocom (Glassdoor) | none |
-| Robust Kommerce | 7 | — | `Robust Results` — rests on one AmbitionBox page that may be a different company |
+| Robust Kommerce | 7 | — | none |
 | Westbury Kommerce | 7 | — | none |
 
 RK World Infocom is written three different ways across two platforms, none of them the form
@@ -78,3 +78,14 @@ fraction of its chatter — the clearest evidence so far that the alias register
 
 `RK Enterprises` is a placeholder recorded during setup. It is searched but flagged by
 `scripts/validate_data.py` until someone confirms or removes it. Do not treat it as fact.
+
+## Names that were ruled out
+
+**`Robust Results`** was carried in as an alias of Robust Kommerce on the strength of a
+single AmbitionBox page. It was **ruled out on 2026-09-21**: it is a different company.
+It is gone from `config/entities.yaml`, from the generated alert queries, and — since
+2026-09-23 — from the live Google Alert that was still running the old query.
+
+It is recorded here rather than deleted because a name that was once searched for will
+resurface, and "we looked and it is not ours" is a cheaper answer the second time than
+the investigation was the first.

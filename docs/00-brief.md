@@ -34,7 +34,7 @@ RK Group  (parent / corporate brand)
 |---|--------|------|-----------------|
 | 1 | RK Group | Parent / corporate brand | R.K. Group |
 | 2 | RK World Infocom | Subsidiary | R K World Infocom, Rk Worldinfocom |
-| 3 | Robust Kommerce | Subsidiary | Robust Results *(unconfirmed)*, Robust |
+| 3 | Robust Kommerce | Subsidiary | Robust |
 | 4 | Westbury Kommerce | Subsidiary | Westburry, Westbery |
 
 **ValueCart — deliberately out of scope.** It is a separate company under the same parent, and
