@@ -29,7 +29,7 @@ platforms:
     # instruction to click what is already on screen.
     also_check:
       - "Interviews tab - log as a mention, theme 'interview', author 'candidate'"
-      - "Salaries tab - read for context only; there is no field for it yet"
+      - "Salaries tab - record the ENTRY COUNT with scripts/log_market.py --salaries, not a median"
     notes: >-
       Highest expected volume for India. Record the overall rating and review count
       into data/ratings.csv on every sweep, even when no new review appeared.
@@ -63,7 +63,7 @@ platforms:
     publishes: [overall_rating, review_count, sub_scores, recommend_pct, ceo_approval_pct]
     also_check:
       - "Interviews tab - log as a mention, theme 'interview', author 'candidate'"
-      - "Salaries tab - read for context only; there is no field for it yet"
+      - "Salaries tab - record the ENTRY COUNT with scripts/log_market.py --salaries, not a median"
     notes: Record rating + review count weekly into data/ratings.csv.
     urls:
       # Company identities confirmed by the programme owner, 2026-09-21.
