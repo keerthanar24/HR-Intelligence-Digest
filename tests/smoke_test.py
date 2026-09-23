@@ -1756,6 +1756,43 @@ def test_interviews_do_not_mask_unread_reviews() -> None:
           any(g["kind"] == "unread" for g in still), f"({still})")
 
 
+def test_partial_feed_run_is_not_coverage() -> None:
+    """Two of four Reddit searches answering is not a swept Reddit.
+
+    The collector runs one search per entity on Reddit. On the first real run
+    three of four returned 429; on a later one, two did. The entities behind a
+    failed search were never searched at all - so recording the platform as
+    swept because its other feeds worked is the same partial-for-whole mistake
+    as letting a configured feed stand in for a fetch, one level down.
+    """
+    print("a partial feed run is not coverage")
+
+    def outcome(attempted, fetched):
+        complete = sorted(p for p, n in fetched.items() if n == attempted.get(p, 0))
+        partial = sorted(p for p, n in fetched.items() if n < attempted.get(p, 0))
+        return complete, partial
+
+    # What the desk actually saw: all alerts answered, 2 of 4 Reddit searches.
+    complete, partial = outcome({"news": 5, "quora": 1, "indeed": 1, "reddit": 4},
+                                {"news": 5, "quora": 1, "reddit": 2})
+    check("the alerts that all answered are recorded",
+          complete == ["news", "quora"], f"(got {complete})")
+    check("Reddit is not, with half its searches unrun",
+          partial == ["reddit"], f"(got {partial})")
+    check("and Indeed is absent - collection: manual, never recorded by feed",
+          "indeed" not in complete and "indeed" not in partial)
+
+    # A clean run records everything it reached.
+    complete, partial = outcome({"news": 5, "reddit": 4}, {"news": 5, "reddit": 4})
+    check("a run where every search answered records the platform",
+          complete == ["news", "reddit"] and not partial, f"({complete}, {partial})")
+
+    # One feed, one failure: nothing recorded rather than a false pass.
+    complete, partial = outcome({"quora": 1}, {})
+    check("a single feed that failed records nothing",
+          not complete and not partial, f"({complete}, {partial})")
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -1972,7 +2009,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_interviews_do_not_mask_unread_reviews, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

@@ -432,8 +432,14 @@ def main() -> int:
     new_rows: list[dict] = []
     skipped = {"no_entity": 0, "no_context": 0, "duplicate": 0,
                "out_of_scope_hint": 0, "personal_profile": 0}
-    # platform id -> items kept, for the channels this run actually reached.
+    # A platform is only covered when EVERY one of its feeds answered. Reddit
+    # runs one search per entity, and on a bad day two of the four 429 - which
+    # is two entities nobody searched. Counting the platform as swept because
+    # the other two worked is the same partial-for-whole mistake as letting a
+    # configured feed stand in for a fetch.
+    attempted: dict[str, int] = {}
     fetched: dict[str, int] = {}
+    items_kept: dict[str, int] = {}
     collection_of = {p["id"]: str(p.get("collection", "manual")).lower()
                      for p in sources.get("platforms", [])}
 
@@ -441,6 +447,8 @@ def main() -> int:
     x_context = X_CONTEXT
 
     for index, feed in enumerate(feeds):
+        if feed.get("platform"):
+            attempted[feed["platform"]] = attempted.get(feed["platform"], 0) + 1
         if feed.get("source") == "x_api":
             entity = entities_by_id.get(feed.get("entity"))
             if not entity:
@@ -503,16 +511,25 @@ def main() -> int:
         # stays open in fact.
         platform_id = feed.get("platform")
         if platform_id and collection_of.get(platform_id, "manual") != "manual":
-            fetched[platform_id] = fetched.get(platform_id, 0) + kept
+            fetched[platform_id] = fetched.get(platform_id, 0) + 1
+            items_kept[platform_id] = items_kept.get(platform_id, 0) + kept
 
         print(f"  {feed['id']}: {len(items)} items, {kept} new")
         if index < len(feeds) - 1:
             time.sleep(delay)
 
-    if fetched and not args.dry_run:
-        log_sweep.record(week_of, sorted(fetched), "collector",
-                         found={p: str(n) for p, n in fetched.items()})
-        print(f"\nRecorded as swept: {', '.join(sorted(fetched))}.")
+    complete = sorted(p for p, n in fetched.items() if n == attempted.get(p, 0))
+    partial = sorted(p for p, n in fetched.items() if n < attempted.get(p, 0))
+    if complete and not args.dry_run:
+        log_sweep.record(week_of, complete, "collector",
+                         found={p: str(items_kept.get(p, 0)) for p in complete})
+        print(f"\nRecorded as swept: {', '.join(complete)}.")
+    if partial:
+        for platform in partial:
+            print(f"\n{platform}: only {fetched[platform]} of {attempted[platform]} "
+                  "searches answered, so it is NOT recorded as swept - the entities "
+                  "behind the failed ones were never searched. Re-run later; Reddit "
+                  "rate-limits by IP and eases off.")
 
     print(
         "\nSkipped — no entity match: {no_entity}, no employment context: {no_context}, "
