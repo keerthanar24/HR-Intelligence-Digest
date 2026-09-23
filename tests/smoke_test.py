@@ -2562,6 +2562,18 @@ def test_market_worksheet_urls() -> None:
           f"got {robust}")
     check("while the pages it does have are still derived", len(robust) == 3)
 
+    # The digest reports the CHANGE, so a week counted from three platforms
+    # against one counted from two reports a movement nobody made. Both counts
+    # are plausible numbers; only the source field can catch it.
+    rows = [{"entity": "rk_group", "week_of": "2026-09-12",
+             "source": "LinkedIn + Glassdoor", "open_roles": "2"}]
+    check("the previous week is found for comparison",
+          M.latest(rows, "rk_group", "2026-09-19") is not None)
+    check("and a later week is not compared against itself",
+          M.latest(rows, "rk_group", "2026-09-12") is None)
+    check("nor another entity's count",
+          M.latest(rows, "westbury_kommerce", "2026-09-19") is None)
+
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,

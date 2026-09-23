@@ -127,11 +127,38 @@ def worksheet(week: dt.date) -> int:
     done = {r.get("entity") for r in H.read_csv(H.MARKET_CSV)
             if r.get("week_of") == week.isoformat()}
     print(f"\nJob market and salary entries — {H.fmt_week(week)}")
-    print("\nOPEN ROLES is how many the entity is advertising, across the pages below,")
-    print("counted once (the same role listed twice is one role).")
-    print("SALARY ENTRIES is the COUNT the platform reports, not a figure — a")
-    print("company-wide median averages unrelated roles and nobody should act on it.")
-    print("\n0 is a real answer and worth recording. Omitting it is not.\n")
+    print("""
+WHAT TO READ ON EACH PAGE
+
+  LinkedIn Jobs        the Jobs tab on the company page. Count the postings.
+  Glassdoor Jobs       the count beside the Jobs tab, e.g. "Jobs (3)".
+  AmbitionBox jobs     the "N jobs" heading on the jobs page.
+  Glassdoor Salaries   "N salaries for M job titles" - take N, the salaries.
+  AmbitionBox salaries "based on N salaries" near the top - take N.
+
+  A page that exists but holds nothing is 0. A page that 404s is not 0 -
+  say so instead and the URL gets fixed rather than recorded as empty.
+
+HOW TO COMBINE THEM - the two figures do NOT combine the same way
+
+  OPEN ROLES: DE-DUPLICATE. The same vacancy posted to LinkedIn and
+  AmbitionBox is one role, not two. You are counting how many people the
+  entity is trying to hire, and adding the platforms up would make a single
+  job look like a hiring push.
+
+  SALARY ENTRIES: ADD THEM UP. These are separate pools - an employee who
+  submitted to AmbitionBox did not thereby submit to Glassdoor - so the sum
+  is how much salary data exists, which is the thing being tracked.
+
+  Either way, use the SAME platforms every week and write them in --source.
+  The digest reports the change, so a week counted from three platforms
+  against a week counted from two invents a movement that did not happen.
+  That matters more than getting every last platform in.
+
+  SALARY ENTRIES is the COUNT, never a figure. A company-wide median
+  averages unrelated roles and nobody should act on it.
+
+0 is a real answer and worth recording. Omitting it is not.""")
 
     for entity_id, name in names.items():
         mark = "  (already recorded)" if entity_id in done else ""
@@ -207,6 +234,28 @@ def main() -> int:
     print(f"Recorded {names[args.entity]} for {H.fmt_week(week)}: "
           f"{args.roles if args.roles is not None else '-'} role(s), "
           f"{args.salaries if args.salaries is not None else '-'} salary entries.")
+
+    # The digest reports the CHANGE, so a week counted from three platforms
+    # against a week counted from two reports a movement nobody made. It is
+    # invisible in the numbers - both are plausible counts - and only the
+    # source field can catch it, which is what the source field is for.
+    before = latest(rows, args.entity, week.isoformat())
+    if before:
+        was = str(before.get("source") or "").strip()
+        now_source = args.source.strip()
+        if was and now_source and was != now_source:
+            print(f"\nWARNING: last time {names[args.entity]} was counted from {was!r}, "
+                  f"this time {now_source!r}.")
+            print("  The digest reports the change, so a different set of platforms "
+                  "shows movement that did not happen.")
+            print("  Re-run with --source matching, or accept that this week's delta "
+                  "is not comparable.")
+        elif now_source and not was:
+            print(f"\nNote: no source recorded last time, so this week's change cannot "
+                  "be checked for a like-for-like count.")
+    elif not args.source.strip():
+        print("\nNote: no --source given. Next week has nothing to match against, and "
+              "a differing count will read as movement.")
     return 0
 
 

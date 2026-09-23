@@ -331,3 +331,28 @@ finished.
 **The comments under those posts are separate rows, and they do score.** That
 is where employee voice appears on LinkedIn; a company post with three comments
 is one company row and up to three real mentions.
+
+## Counting the job market and salary entries
+
+```bash
+python3 scripts/log_market.py --worksheet --week <week>
+```
+
+That prints every page to open per entity, what to read on each, and the command
+to record it. The two figures do **not** combine the same way:
+
+- **Open roles — de-duplicate.** The same vacancy on LinkedIn and AmbitionBox is one
+  role. The figure is how many people the entity is trying to hire, and summing the
+  platforms turns one job into a hiring push.
+- **Salary entries — add them up.** These are separate contributor pools; an employee
+  who submitted to AmbitionBox did not thereby submit to Glassdoor. The sum is how
+  much salary data exists, which is what is being tracked.
+
+Use the **same platforms every week** and write them into `--source`. The digest
+reports the change, so a week counted from three platforms against a week counted
+from two reports a movement nobody made — and both counts look perfectly plausible.
+`log_market.py` warns when the source differs from last week's, which is the only
+place that error is catchable.
+
+Record the **count** of salary entries, never a median. A company-wide median averages
+unrelated roles and nobody should act on it.
