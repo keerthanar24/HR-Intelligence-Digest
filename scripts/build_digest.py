@@ -921,7 +921,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  'sources, not of the process.</p>')
 
     # 6. Data link
-    h.append('<h3 style="font-size:16px;margin:20px 0 6px;">6 · Data</h3>')
+    # The brief names this deliverable "Data Link", not "Data". A reader
+    # checking the email against the six deliverables should find the same
+    # six words.
+    h.append('<h3 style="font-size:16px;margin:20px 0 6px;">6 · Data Link</h3>')
     if data_link and not H.is_todo(data_link):
         h.append(f'<p style="margin:0 0 8px;"><a href="{E(data_link)}" style="color:#2b6cb0;">'
                  f'Open the tracking sheet</a> — {E(holdings)}</p>')
@@ -1067,7 +1070,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  "before it is seen. The platforms block automated checking, so this is a "
                  "limit of the sources, not of the process.")
     t.append("")
-    t.append("6. DATA")
+    t.append("6. DATA LINK")
     if data_link and not H.is_todo(data_link):
         t.append(data_link)
         t.append(holdings)
