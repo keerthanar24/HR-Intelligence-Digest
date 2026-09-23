@@ -146,6 +146,11 @@ platforms:
     cadence: weekly
     priority: 2
     captures: [mentions, complaints, threads]
+    # Checked 2026-09-23: none of the four entities has an X account of its
+    # own. That removes a company profile to monitor - it does NOT reduce the
+    # sweep, which searches for what other people post. An ex-employee can
+    # complain about a company on X whether or not the company is there, and
+    # captures is mentions and complaints, not the company's own posting.
     notes: >-
       Collected through X's official recent-search API when $X_BEARER_TOKEN is
       set in the environment (never in this repo). The API also returns like,
