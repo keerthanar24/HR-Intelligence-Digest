@@ -837,3 +837,25 @@ def next_mention_id(existing: list[dict], week_of: dt.date) -> str:
         if (r.get("mention_id") or "").startswith(prefix)
     ]
     return f"{prefix}{(max(used) + 1) if used else 1:03d}"
+
+
+def run_report(main_fn) -> None:
+    """Run a reporting script's main(), surviving a closed pipe.
+
+    `script.py | head` closes stdout early, and Python's default is a
+    BrokenPipeError traceback - which reads as a crash in the middle of what
+    was a perfectly good report. Piping a long report to head or less is the
+    normal way to read one.
+    """
+    import contextlib
+    import sys
+    try:
+        code = main_fn()
+    except BrokenPipeError:
+        code = 0
+    # Python flushes stdout at exit, which raises again on a closed pipe.
+    with contextlib.suppress(BrokenPipeError):
+        sys.stdout.flush()
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())
+    raise SystemExit(code)
