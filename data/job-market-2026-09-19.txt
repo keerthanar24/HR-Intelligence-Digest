@@ -1,0 +1,24 @@
+# Job market and salary entries — week of 2026-09-19
+#
+#   <entity>  <roles>  <salary count per page...>
+#
+# ROLES is ONE number, already de-duplicated. Open the three Jobs pages, look
+#   at the actual listings, and count how many DISTINCT vacancies there are.
+#   The same job on LinkedIn and AmbitionBox is one role. No script can tell
+#   that two postings are the same job, so this number is your judgement.
+#
+# SALARIES is one number PER PAGE, space separated. They get added up for you:
+#   separate contributor pools, so adding is arithmetic, not judgement.
+#   Keeping them apart means a moving total can be traced to a platform.
+#
+# 0 is a real answer. A page that 404s is NOT 0 — say so and the URL gets
+# fixed, rather than a broken link being recorded as an empty one every week.
+#
+# Get the URLs with:  python3 scripts/log_market.py --worksheet --week 2026-09-19
+# Then record with:   python3 scripts/log_market.py --file data/job-market-2026-09-19.txt --week 2026-09-19
+#
+#                   roles   glassdoor  ambitionbox
+rk_group
+rk_world
+robust_kommerce                       # no AmbitionBox page — Glassdoor only
+westbury_kommerce

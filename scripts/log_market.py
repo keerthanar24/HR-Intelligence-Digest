@@ -177,6 +177,96 @@ HOW TO COMBINE THEM - the two figures do NOT combine the same way
     return 0
 
 
+def parse_sheet(text: str) -> tuple[list[dict], list[str]]:
+    """Read the fill-in sheet. Returns (rows, problems).
+
+    One line per entity:
+
+        rk_group   3   12 40
+
+    ROLES is one number, already de-duplicated: the same vacancy on LinkedIn
+    and AmbitionBox is one role, and no script can tell that the two postings
+    are the same job. That judgement is the person's.
+
+    SALARIES is one number per platform, and those ARE summed here - separate
+    contributor pools, and adding them is arithmetic rather than judgement.
+    Keeping them apart on the line means next week can be checked platform by
+    platform when a total moves.
+    """
+    names = H.entity_names()
+    rows, problems = [], []
+    for number, line in enumerate(text.splitlines(), 1):
+        # A trailing note on a line is useful here and safe: these lines hold
+        # numbers, never a '#' that means something else. (The LinkedIn post
+        # sheet is the opposite case - there a '#' is a hashtag, so only a
+        # leading one is a comment.)
+        text_only = line.split("#", 1)[0]
+        if not text_only.strip():
+            continue
+        parts = text_only.split()
+        entity = parts[0]
+        if entity not in names:
+            problems.append(f"line {number}: unknown entity {entity!r}")
+            continue
+        figures = parts[1:]
+        if not figures:
+            problems.append(f"line {number}: {entity} has no numbers. "
+                            "0 is an answer; a blank line is not.")
+            continue
+        if not all(f.isdigit() for f in figures):
+            bad = [f for f in figures if not f.isdigit()]
+            problems.append(f"line {number}: {entity} has non-numbers {bad}. "
+                            "A page that 404s is not 0 - fix the URL instead.")
+            continue
+        rows.append({"entity": entity, "roles": int(figures[0]),
+                     "salary_parts": [int(f) for f in figures[1:]]})
+    seen = [r["entity"] for r in rows]
+    for entity in {e for e in seen if seen.count(e) > 1}:
+        problems.append(f"{entity} appears more than once")
+    return rows, problems
+
+
+def from_sheet(path: str, week: dt.date, by: str) -> int:
+    text = sys.stdin.read() if path == "-" else open(path, encoding="utf-8").read()
+    rows, problems = parse_sheet(text)
+    names = H.entity_names()
+    for problem in problems:
+        print(f"  BAD  {problem}")
+    if problems:
+        print(f"\n{len(problems)} problem(s). Nothing written.")
+        return 2
+    if not rows:
+        print("No entity lines found. The template is all comments until you fill it in.")
+        return 0
+
+    existing = [r for r in H.read_csv(H.MARKET_CSV)
+                if not (r.get("week_of") == week.isoformat()
+                        and r.get("entity") in {r2["entity"] for r2 in rows})]
+    print(f"\n{H.fmt_week(week)}\n")
+    for row in rows:
+        salaries = sum(row["salary_parts"])
+        detail = (" + ".join(str(p) for p in row["salary_parts"])
+                  if len(row["salary_parts"]) > 1 else str(salaries))
+        print(f"  {names[row['entity']]:<20} {row['roles']:>3} role(s), "
+              f"{salaries:>4} salary entries  ({detail})")
+        existing.append({
+            "week_of": week.isoformat(),
+            "captured_at": dt.date.today().isoformat(),
+            "captured_by": by,
+            "entity": row["entity"],
+            "open_roles": str(row["roles"]),
+            "salary_entries": str(salaries),
+            # Recorded automatically so next week has something to match, and
+            # so the source-changed warning has a value to compare against.
+            "source": f"{len(row['salary_parts'])} salary page(s): {detail}",
+            "notes": "",
+        })
+    existing.sort(key=lambda r: (r.get("week_of", ""), r.get("entity", "")))
+    H.write_csv(H.MARKET_CSV, H.MARKET_FIELDS, existing)
+    print(f"\nRecorded {len(rows)} entit{'y' if len(rows) == 1 else 'ies'}.")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -193,6 +283,7 @@ def main() -> int:
     parser.add_argument("--status", action="store_true",
                         help="which entities still need a snapshot this week")
     parser.add_argument("--show", action="store_true", help="every snapshot recorded")
+    parser.add_argument("--file", help="a filled-in sheet; '-' reads stdin")
     parser.add_argument("--worksheet", action="store_true",
                         help="every page to open, per entity, and the command to record it")
     args = parser.parse_args()
@@ -200,6 +291,8 @@ def main() -> int:
     week = H.week_start_of(H.parse_date(args.week) if args.week else dt.date.today())
     if args.show:
         return show()
+    if args.file:
+        return from_sheet(args.file, week, args.by)
     if args.worksheet:
         return worksheet(week)
     if args.status:

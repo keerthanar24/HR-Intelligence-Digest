@@ -2605,9 +2605,47 @@ def test_status_reports_the_trial_week() -> None:
           H.week_start_of(midweek) == start)
 
 
+def test_job_market_sheet() -> None:
+    """Roles are judgement, salaries are arithmetic, and the sheet splits them.
+
+    The same vacancy on LinkedIn and AmbitionBox is ONE role and no script can
+    know that, so roles arrive already de-duplicated. Salary counts are
+    separate contributor pools, so those ARE summed here.
+    """
+    print("job market sheet")
+    import log_market as M
+
+    rows, problems = M.parse_sheet("rk_group 3 12 40\nrk_world 0 8 51\n")
+    check("no problems in a good sheet", not problems, f"got {problems}")
+    check("roles are taken as given, not summed", rows[0]["roles"] == 3)
+    check("salary pages are kept apart for the record",
+          rows[0]["salary_parts"] == [12, 40])
+    check("a single salary page is fine",
+          M.parse_sheet("robust_kommerce 1 5")[0][0]["salary_parts"] == [5])
+    check("and no salary page at all is fine",
+          M.parse_sheet("rk_group 2")[0][0]["salary_parts"] == [])
+
+    check("a comment line is skipped", M.parse_sheet("# a note")[0] == [])
+    check("and a trailing note does not become data",
+          M.parse_sheet("rk_group 3 12  # Glassdoor only")[0][0]["salary_parts"] == [12])
+
+    # 0 is an answer; a blank is not. Recording a blank as 0 would invent a
+    # count nobody took - the whole failure the digest's "not recorded" line
+    # exists to prevent.
+    check("an entity with no numbers is an error, not a zero",
+          "no numbers" in " ".join(M.parse_sheet("rk_group")[1]))
+    check("zero itself is accepted", M.parse_sheet("rk_group 0 0")[0][0]["roles"] == 0)
+    check("a non-number is refused rather than coerced",
+          M.parse_sheet("rk_group 3 twelve")[0] == [])
+    check("an unknown entity is named", "unknown entity" in
+          " ".join(M.parse_sheet("acme 1 2")[1]))
+    check("and a duplicated entity is caught",
+          "more than once" in " ".join(M.parse_sheet("rk_group 1 2\nrk_group 3 4")[1]))
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
