@@ -123,6 +123,18 @@ def main() -> int:
     print(f"Set {args.name} to {args.email} in {changed} place(s): {', '.join(where)}.")
     if "red_flag" not in where:
         print("NOTE: not set in the red_flag block - escalations would not reach them.")
+
+    # Two systems, one piece of information. Adding the address here makes the
+    # digest send; it does nothing about Google Drive. Forget the second and
+    # deliverable 6 - "a shared link to the underlying spreadsheet" - is a
+    # permission error for every recipient, on an email that otherwise looks
+    # perfect. The reminder lands here because this is the moment the address
+    # is in hand.
+    link = str(H.load_yaml("settings").get("digest", {}).get("data_link", "")).strip()
+    if link and not H.is_todo(link):
+        print(f"\nAlso share the tracking sheet with {args.email} - config sets the "
+              "address, Google Drive does not.")
+        print(f"  {link}")
     return 0
 
 

@@ -157,6 +157,16 @@ def main() -> int:
         print(f"\nWarning: {stats['untagged']} mention(s) are untagged. They are counted but "
               "excluded from net sentiment, and the digest says so.")
 
+    # Deliverable 6 is "a shared link to the underlying spreadsheet". Nothing
+    # here can check Google Drive's permissions, and an unshared sheet fails
+    # for every recipient on an email that otherwise looks complete - so the
+    # last moment before sending is the place to ask.
+    link = str(settings.get("digest", {}).get("data_link", "")).strip()
+    if link and not H.is_todo(link):
+        print(f"\nCheck once: is the tracking sheet shared with all {len(to)} "
+              "recipient(s)? Adding an address to config does not share the sheet.")
+        print(f"  {link}")
+
     if not args.send:
         print("\nDRY RUN - nothing sent. Re-run with --send.")
         print("-" * 68)
