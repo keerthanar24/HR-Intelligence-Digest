@@ -255,29 +255,19 @@ feeds:
     enabled: true
     url: "https://www.google.com/alerts/feeds/06869919047613217312/7799003522757902966"
 
-  - id: reddit_search_rk_world
+  # ONE search for the whole group, not one per entity. Reddit rate-limits
+  # per IP and cumulatively: across three real runs the first request always
+  # succeeded and later ones 429'd, a different pair failing each time, so two
+  # entities went unsearched every run while the retries deepened the
+  # throttling. Four requests become one.
+  #
+  # No 'entity' key, like the cross-entity red-flag alert: the collector
+  # assigns each hit to whichever entity its text matches, so the per-entity
+  # binding is not needed and nothing is lost.
+  - id: reddit_search_group
     platform: reddit
-    entity: rk_world
     enabled: true
-    # Search built from the entity aliases at run time, so a new
-    # trading name is picked up without editing this file.
-    auto_query: reddit
-
-  - id: reddit_search_robust_kommerce
-    platform: reddit
-    entity: robust_kommerce
-    enabled: true
-    # Search built from the entity aliases at run time, so a new
-    # trading name is picked up without editing this file.
-    auto_query: reddit
-
-  - id: reddit_search_westbury_kommerce
-    platform: reddit
-    entity: westbury_kommerce
-    enabled: true
-    # Search built from the entity aliases at run time, so a new
-    # trading name is picked up without editing this file.
-    auto_query: reddit
+    auto_query: reddit_all
 
   # X recent search. Needs a paid X API plan; set X_BEARER_TOKEN in the
   # environment and flip enabled to true. Queries are built from the alias
@@ -306,10 +296,3 @@ feeds:
     source: x_api
     enabled: false
 
-  - id: reddit_search_rk_group
-    platform: reddit
-    entity: rk_group
-    enabled: true
-    # Search built from the entity aliases at run time, so a new
-    # trading name is picked up without editing this file.
-    auto_query: reddit

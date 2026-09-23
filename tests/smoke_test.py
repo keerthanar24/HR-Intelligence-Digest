@@ -18,6 +18,7 @@ import os
 import shutil
 import sys
 import tempfile
+import urllib.parse
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts"))
@@ -1878,6 +1879,43 @@ def test_a_locked_file_says_so(self=None) -> None:
               "except H.FileInUse" in source)
 
 
+def test_reddit_is_one_search_for_the_group() -> None:
+    """Four Reddit requests per run was two entities unsearched, every run.
+
+    Reddit rate-limits per IP and cumulatively. Across three real runs the
+    first request always succeeded and later ones returned 429 - a different
+    pair each time - so two entities went unsearched every run, while the
+    retries (four requests per failing feed) deepened the throttling. One
+    search covering all four entities makes it a single request.
+    """
+    print("reddit is one search for the group")
+    entities = {e["id"]: e for e in H.load_yaml("entities")["entities"]}
+    feeds = [f for f in H.load_yaml("sources").get("feeds", [])
+             if f.get("enabled") and f.get("platform") == "reddit"]
+
+    check("there is exactly one enabled Reddit feed", len(feeds) == 1,
+          f"(got {[f['id'] for f in feeds]})")
+    check("it is not bound to a single entity - the text decides",
+          not feeds[0].get("entity"), f"(got {feeds[0].get('entity')})")
+
+    url = collect_feeds.build_feed_url(feeds[0], entities)
+    check("it is a Reddit search URL", url.startswith("https://www.reddit.com/search.rss?"))
+    check("sorted by new, over the past week",
+          "sort=new" in url and "t=week" in url)
+    for entity in entities.values():
+        first = collect_feeds._distinct_aliases(entity)[0]
+        check(f"{entity['name']} is in the one query",
+              urllib.parse.quote(first) in url, f"(missing {first})")
+    check("the URL stays inside what Reddit accepts", len(url) < 500, f"({len(url)})")
+
+    # Spacing variants are one term to a search engine and must not crowd out
+    # a real trading name.
+    aliases = collect_feeds._distinct_aliases(
+        {"aliases": ["RK World", "R K World", "R.K. World", "Worldinfocom"]})
+    check("punctuation variants collapse to one",
+          aliases == ["RK World", "Worldinfocom"], f"(got {aliases})")
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2094,7 +2132,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_a_locked_file_says_so, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

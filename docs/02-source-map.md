@@ -82,7 +82,13 @@ built from the alias register at run time. No token or account needed; this runs
 
 **Known limitation: Reddit's search covers posts, not comments.** A thread titled "Best
 e-commerce employers in Gujarat?" whose comments name our entities will not surface. That is
-why the manual check stays in the weekly SOP: look through `r/india`, `r/developersIndia`,
+Collected as **one search for the whole group**, not one per entity. Reddit rate-limits per IP
+and cumulatively: across three real runs the first request always succeeded and later ones
+returned 429, a different pair failing each time, so two entities went unsearched every run.
+Four requests became one. The collector assigns each hit to whichever entity its text matches,
+as it already does for the cross-entity red-flag alert.
+
+That is also why the manual check stays in the weekly SOP: look through `r/india`, `r/developersIndia`,
 `r/IndianWorkplace`, `r/jobs` and the relevant city subs for threads the feed cannot see.
 Do not treat a quiet Reddit feed as a quiet Reddit.
 
