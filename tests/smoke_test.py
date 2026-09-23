@@ -2350,9 +2350,41 @@ def test_company_page_activity_is_coverage_not_sentiment() -> None:
     check("scored_rows drops exactly the company row", len(scored) == 3)
 
 
+def test_linkedin_post_date_from_url() -> None:
+    """LinkedIn shows "1mo" and the baseline has a hard edge at 28 Jul.
+
+    A relative timestamp cannot say which side of that edge a post falls, and
+    guessing puts a row in the wrong window - on a 60-day baseline, the
+    difference between a mention being in the digest and not existing.
+    """
+    print("linkedin post date")
+    import linkedin_post_date as L
+
+    check("reads the id out of a /posts/ URL",
+          L.activity_id("https://www.linkedin.com/posts/acme_a-b-activity-"
+                        "7507227023769600000-AbCd") == 7507227023769600000)
+    check("and out of an activity urn",
+          L.activity_id("urn:li:activity:7507227023769600000") == 7507227023769600000)
+    check("and a bare id", L.activity_id("7507227023769600000") == 7507227023769600000)
+    check("a company page URL carries none",
+          L.activity_id("https://www.linkedin.com/company/acme/") is None)
+
+    # Round-trip: an id minted for a known instant decodes back to that day.
+    for day in (dt.date(2026, 7, 28), dt.date(2026, 9, 20), dt.date(2025, 3, 3)):
+        ms = int(dt.datetime(day.year, day.month, day.day).timestamp() * 1000)
+        got = L.published(ms << L.TIMESTAMP_BITS)
+        check(f"{day} round-trips", got is not None and got.date() == day,
+              f"got {got}")
+
+    # A confident wrong date is worse than none: a plain counter, a phone
+    # number, a truncated id all look like an integer and must not decode.
+    check("a number that is not an activity id is refused",
+          L.published(1234567890123456789) is None)
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

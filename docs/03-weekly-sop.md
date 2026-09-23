@@ -283,3 +283,25 @@ Before weekly execution starts, run a deeper sweep to establish the baseline:
 A week with no mentions is a valid result. Send the digest anyway, with the sections showing
 zero. Do not pad it, do not skip it. The pattern of quiet weeks is data, and skipping sends
 cannot be told apart from forgetting to send.
+
+## Dating a LinkedIn post
+
+LinkedIn shows a relative timestamp only — "3w", "1mo", "2mo". That is not
+precise enough to decide whether a post falls inside the reporting window, and
+week 1's 60-day baseline has a hard edge at 28 Jul 2026.
+
+The publish time is in the URL. On the post, click the three dots → **Copy link
+to post**, then:
+
+```bash
+python3 scripts/linkedin_post_date.py "<the URL>" --week 2026-09-19
+```
+
+It prints the exact publish date, the `-d` argument to log it with, and whether
+it falls in that week's window — exiting non-zero when it does not. A post
+outside the window is not a finding: leave it unlogged, the sweep row already
+records that the page was read.
+
+The company page URL will not work; it has to be the individual post's link.
+The decoding is observed rather than documented, so if it disagrees with the
+relative timestamp on the page, believe the page.
