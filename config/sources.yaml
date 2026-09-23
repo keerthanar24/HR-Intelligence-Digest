@@ -233,10 +233,17 @@ feeds:
   # justify four, and a single feed is one thing to keep working. It catches
   # what Google NEWLY indexes, so it is standing cover from here on - the back
   # catalogue still needs the one manual look.
+  # Second URL. The first, .../6189939704157504110, returned HTTP 400 - the
+  # feed id had no alert behind it, so that alert was never actually saved.
+  # Supplied again on 2026-09-23 as .../9279805802777017235, a different id,
+  # so this one exists. Not yet fetched from anywhere: verify with
+  # `make checkfeeds` before trusting it, because a feed that 400s leaves its
+  # channel swept by nobody - log_sweep skips a channel it believes is fed,
+  # and the collector records nothing when the fetch fails.
   - id: google_alerts_quora
     platform: quora
     enabled: true
-    url: "https://www.google.com/alerts/feeds/06869919047613217312/6189939704157504110"
+    url: "https://www.google.com/alerts/feeds/06869919047613217312/9279805802777017235"
 
   # Indeed has no API and blocks automated collection, so this alert is the
   # only automation available for it. It stays on the MANUAL rotation as well:

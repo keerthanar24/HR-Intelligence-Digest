@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Open every page the sweep expects to exist, and say which ones answer.
+"""Open every page and feed the sweep expects to exist, and say which answer.
 
 Every URL in config/sources.yaml was typed in by hand from a browser. A typo
 survives indefinitely because the worksheet prints it either way and the desk
@@ -12,6 +12,7 @@ editing config - not something on a schedule.
 
     python3 scripts/check_urls.py
     python3 scripts/check_urls.py --platform linkedin
+    python3 scripts/check_urls.py --feeds      # the Google Alerts RSS URLs
 
 What the codes mean is the whole point of the output: Glassdoor, AmbitionBox
 and LinkedIn all answer a script differently from a browser, and treating their
@@ -55,11 +56,33 @@ def verdict(url: str, timeout: int) -> tuple[str, str]:
     except urllib.error.HTTPError as exc:
         if exc.code in BOT_BLOCK:
             return "blocked", f"HTTP {exc.code} - {BOT_BLOCK[exc.code]}"
-        if exc.code in (404, 410):
-            return "MISSING", f"HTTP {exc.code} - no such page. Check the URL in config."
+        if exc.code in (400, 404, 410):
+            # 400 is what Google Alerts returns for a feed id that does not
+            # exist, which is the commonest way an alert turns out never to
+            # have been saved.
+            return "MISSING", f"HTTP {exc.code} - no such page or feed. Check the URL in config."
         return "error", f"HTTP {exc.code}"
     except (urllib.error.URLError, OSError) as exc:
         return "error", str(exc)
+
+
+def feed_targets() -> list[tuple[str, str, str, str]]:
+    """Every enabled feed URL, so a dead alert is caught when it is added.
+
+    A Google Alerts RSS URL that returns 400 means the alert behind it does
+    not exist - usually because it was never saved, since Google declines to
+    create an alert whose query matches nothing. That is indistinguishable
+    from a quiet week unless somebody reads the collector's output, and a
+    channel assumed to be fed is not prompted for by hand either. So it is
+    worth being able to ask directly.
+    """
+    rows = []
+    for feed in H.load_yaml("sources").get("feeds", []):
+        url = str(feed.get("url") or "").strip()
+        if not feed.get("enabled") or not url or H.is_todo(url):
+            continue
+        rows.append(("feed", "Feed", feed["id"], url))
+    return rows
 
 
 def targets(platform_filter: str = "") -> list[tuple[str, str, str, str]]:
@@ -82,18 +105,22 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--platform", default="", help="check one platform only")
+    parser.add_argument("--feeds", action="store_true",
+                        help="check the enabled feed URLs instead of the pages")
     parser.add_argument("--delay", type=float, default=2.0,
                         help="seconds between requests (default 2)")
     args = parser.parse_args()
 
     timeout = int(H.load_yaml("settings").get("collector", {}).get("timeout_seconds", 20))
-    rows = targets(args.platform)
+    rows = feed_targets() if args.feeds else targets(args.platform)
     if not rows:
-        print("No pages configured to check." if not args.platform
-              else f"No pages configured for {args.platform!r}.")
+        print("No enabled feeds configured." if args.feeds else
+              ("No pages configured to check." if not args.platform
+               else f"No pages configured for {args.platform!r}."))
         return 0
 
-    print(f"Opening {len(rows)} configured page(s). This touches real sites, so it is "
+    what = "feed" if args.feeds else "configured page"
+    print(f"Opening {len(rows)} {what}(s). This touches real sites, so it is "
           "slow on purpose.\n")
     missing, blocked, unknown = [], [], []
     for index, (_pid, platform, entity, url) in enumerate(rows):
@@ -114,9 +141,9 @@ def main() -> int:
 
     print()
     if missing:
-        print(f"{len(missing)} page(s) do not exist. Fix these in config/sources.yaml - "
-              "the worksheet prints them either way, so a dead link is ticked off "
-              "every week like a real one:")
+        print(f"{len(missing)} do not exist. Fix these in config/sources.yaml - a dead "
+              "page is ticked off every week like a real one, and a dead feed leaves "
+              "its channel swept by nobody:")
         for platform, entity, url in missing:
             print(f"  {platform} / {entity}: {url}")
     if blocked:

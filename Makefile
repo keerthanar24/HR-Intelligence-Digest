@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek checkurls test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek checkurls checkfeeds test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -25,6 +25,7 @@ help:
 	@echo "  make send      dry-run the email send (add --send to really send)"
 	@echo "  make logsweep  tick off the channels you checked (LinkedIn, X, Quora, ...)"
 	@echo "  make checkurls open every configured page and report dead links (one-off)"
+	@echo "  make checkfeeds test every enabled alert/RSS URL — run after adding one"
 	@echo "  make logweek   record the hours and what was new (do it the same Friday)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
@@ -84,6 +85,11 @@ send:
 # One-off, after editing config/sources.yaml. Touches real sites, so not scheduled.
 checkurls:
 	$(PY) scripts/check_urls.py
+
+# Run after creating a Google Alert. A feed URL that 400s means the alert
+# behind it does not exist, usually because it was never saved.
+checkfeeds:
+	$(PY) scripts/check_urls.py --feeds
 
 # The channels with no review count: only a person can say they were opened.
 logsweep:
