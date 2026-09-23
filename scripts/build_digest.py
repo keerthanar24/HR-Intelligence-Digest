@@ -136,6 +136,19 @@ def stars_text(mention) -> str:
     return f"{value}/5" if 1 <= value <= 5 else "—"
 
 
+def sentiment_label(mention) -> str:
+    """The sentiment column. A company post is unscored by design, not by neglect.
+
+    "Untagged" on a company row reads as work outstanding, and the reader who
+    goes looking for the missing tag will not find one - the row is never
+    getting scored. "Not scored" says the same absence and the right reason.
+    """
+    key = (mention.get("sentiment") or "").strip().lower()
+    if not key and H.is_company_voice(mention):
+        return "Not scored"
+    return H.SENTIMENT_LABELS.get(key, "Untagged")
+
+
 def author_text(mention) -> str:
     """'Ex-employee', 'Candidate', 'Anonymous' - who the line came from."""
     key = (mention.get("author_type") or "").strip().lower()
@@ -842,6 +855,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             ["Entity", "Open roles", "Salary entries"],
             [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
             ["left", "right", "right"], ["46%", "27%", "27%"]))
+    else:
+        # Rendering nothing here says "no hiring to report". Nobody counted is
+        # a different fact, and it is the one that is true - the same
+        # distinction section 3 makes about an unswept channel.
+        h.append('<p style="margin:12px 0 4px;color:#8a6d3b;font-size:13px;">'
+                 '<strong>Job market</strong> — not recorded this week for any entity. '
+                 'No conclusion about hiring should be drawn from its absence: the count '
+                 'was not taken. <code>scripts/log_market.py</code> records it.</p>')
 
     # 3. What's new
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">3 · What\'s New</h3>')
@@ -859,7 +880,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 E(m.get("post_date") or m.get("captured_at", "")),
                 E(stars_text(m)),
                 E(author_text(m)),
-                E(H.SENTIMENT_LABELS.get((m.get("sentiment") or "").lower(), "Untagged")),
+                E(sentiment_label(m)),
                 cell,
             ])
         # The summary is still the column people read; the rest is context for it.
@@ -1028,6 +1049,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  "The change is the signal, not the level.")
         t.append(t_table(["Entity", "Open roles", "Salary entries"],
                          [[r["entity"], r["roles"], r["salaries"]] for r in market]))
+    else:
+        t.append("")
+        t.append("JOB MARKET - not recorded this week for any entity. No conclusion "
+                 "about hiring should be drawn from its absence: the count was not taken.")
     t.append("")
     t.append("3. WHAT'S NEW")
     if now:
@@ -1037,7 +1062,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                 f"{platforms.get(m.get('platform'), m.get('platform',''))} / "
                 f"{m.get('post_date') or m.get('captured_at','')} / "
                 f"{stars_text(m)} / {author_text(m)} / "
-                f"{H.SENTIMENT_LABELS.get((m.get('sentiment') or '').lower(), 'Untagged')}] "
+                f"{sentiment_label(m)}] "
                 f"{truncate(m.get('one_line_summary') or m.get('title_or_snippet',''), summary_max)}"
             )
             link, label = source_link(m)

@@ -47,7 +47,10 @@ import linkedin_post_date as L  # noqa: E402
 
 def parse_line(line: str) -> tuple[dict | None, str]:
     """(row-ish dict, error). One line in, one post out."""
-    text = line.split("#", 1)[0].strip()
+    # A comment is a '#' that STARTS the line. Splitting on any '#' ate the
+    # hashtags out of every summary - and hashtags are most of what a company
+    # post's summary is worth quoting.
+    text = "" if line.lstrip().startswith("#") else line.strip()
     if not text:
         return None, ""
     summary = ""

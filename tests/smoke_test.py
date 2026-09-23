@@ -2382,6 +2382,23 @@ def test_linkedin_post_date_from_url() -> None:
           L.published(1234567890123456789) is None)
 
 
+def test_absence_of_a_count_is_not_a_finding() -> None:
+    """The digest must never render silence where a figure was not taken.
+
+    The job-market block only drew itself when there were rows, so 0/4
+    recorded produced no block at all - which reads as "no hiring to report".
+    Same distinction section 3 makes about an unswept channel, missed in the
+    section built last.
+    """
+    print("an uncounted figure says so")
+    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    for body, name in ((html, "html"), (text, "text")):
+        check(f"the {name} body names the job market either way",
+              "Job market" in body or "JOB MARKET" in body)
+    check("and says the count was not taken, not that there is nothing",
+          "not recorded" in text.lower() and "not taken" in text.lower())
+
+
 def test_company_post_batch_parsing() -> None:
     """The batch logger's line format, and the two refusals that matter."""
     print("company post batch")
@@ -2419,6 +2436,17 @@ def test_company_post_batch_parsing() -> None:
     check("out_of_scope is accepted in the themes field",
           row is not None and row["themes"] == "out_of_scope")
 
+    # A '#' inside a summary is a hashtag. Splitting on any '#' truncated
+    # every summary at the first one - and hashtags are most of what a
+    # company post's summary is worth quoting.
+    row, _ = B.parse_line("robust_kommerce  https://x-activity-7507227023769600000-A  "
+                          "culture | Company post tagged #leadership #teamculture")
+    check("a hashtag in a summary survives",
+          row["summary"] == "Company post tagged #leadership #teamculture",
+          f"got {row['summary']!r}")
+    check("a line that starts with # is still a comment",
+          B.parse_line("  # a note") == (None, ""))
+
     # week_of keys to the POST's week, not the reporting week: the baseline
     # gathers sixty days by post_date, and a row keyed to the capture week
     # would compare against a week that never held it.
@@ -2433,7 +2461,7 @@ def test_company_post_batch_parsing() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
