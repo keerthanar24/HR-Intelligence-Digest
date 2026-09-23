@@ -2394,9 +2394,21 @@ def test_absence_of_a_count_is_not_a_finding() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     for body, name in ((html, "html"), (text, "text")):
         check(f"the {name} body names the job market either way",
-              "Job market" in body or "JOB MARKET" in body)
+              "job market" in body.lower())
     check("and says the count was not taken, not that there is nothing",
           "not recorded" in text.lower() and "not taken" in text.lower())
+
+    # docs/00-brief.md defines section 2 as "Glassdoor and AmbitionBox score
+    # updates per entity" and nothing else. The job market is separate scope,
+    # and rendering it inside section 2 made it read as Rating Movement.
+    two = text.split("2. RATING MOVEMENT", 1)[1].split("3. WHAT", 1)[0]
+    check("the job market is not inside section 2's own content",
+          "JOB MARKET" in two and two.index("JOB MARKET") > two.index("Rating"),
+          "it must come after the ratings table, under its own heading")
+    check("and it carries a heading of its own", "JOB MARKET\n" in text)
+    check("section 2 still holds only the two review sites",
+          "Glassdoor" in two and "AmbitionBox" in two
+          and "LinkedIn" not in two.split("JOB MARKET")[0])
 
 
 def test_company_post_batch_parsing() -> None:

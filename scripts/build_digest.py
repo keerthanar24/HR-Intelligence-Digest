@@ -846,11 +846,18 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f'{"It is" if len(unrated) == 1 else "They are"} covered by LinkedIn, Reddit, '
                  'news and X only — absence here is not evidence of a quiet week.</p>')
 
+    # docs/00-brief.md defines section 2 as "Glassdoor and AmbitionBox score
+    # updates per entity" and nothing else. The job market is separate scope -
+    # "job-market trends", from the scope's opening line - and rendering it
+    # inside section 2 made it read as part of Rating Movement. It gets its own
+    # heading, outside the six numbered sections the brief specifies, so
+    # neither is mistaken for the other.
+    h.append('<h3 style="font-size:16px;margin:20px 0 6px;'
+             'border-top:1px solid #e3e8ef;padding-top:14px;">Job Market</h3>')
     if market:
-        h.append('<p style="margin:12px 0 4px;font-size:13px;"><strong>Job market</strong> '
-                 '<span style="font-size:12px;color:#52606d;">— roles advertised, and how '
-                 'many salary entries employees have volunteered. The change is the '
-                 'signal; the level on its own is not.</span></p>')
+        h.append('<p style="margin:0 0 6px;font-size:12px;color:#52606d;">'
+                 'Roles advertised, and how many salary entries employees have '
+                 'volunteered. The change is the signal; the level on its own is not.</p>')
         h.append(h_table(
             ["Entity", "Open roles", "Salary entries"],
             [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
@@ -866,10 +873,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
         # Rendering nothing here says "no hiring to report". Nobody counted is
         # a different fact, and it is the one that is true - the same
         # distinction section 3 makes about an unswept channel.
-        h.append('<p style="margin:12px 0 4px;color:#8a6d3b;font-size:13px;">'
-                 '<strong>Job market</strong> — not recorded this week for any entity. '
-                 'No conclusion about hiring should be drawn from its absence: the count '
-                 'was not taken. <code>scripts/log_market.py</code> records it.</p>')
+        h.append('<p style="margin:0 0 8px;color:#8a6d3b;font-size:13px;">'
+                 'Not recorded this week for any entity. No conclusion about hiring '
+                 'should be drawn from its absence: the count was not taken. '
+                 '<code>scripts/log_market.py</code> records it.</p>')
 
     # 3. What's new
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">3 · What\'s New</h3>')
@@ -1050,9 +1057,10 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f"appear above. {'It is' if len(unrated) == 1 else 'They are'} covered by "
                  "LinkedIn, Reddit, news and X only - absence here is not evidence of a "
                  "quiet week.")
+    t.append("")
+    t.append("JOB MARKET")
     if market:
-        t.append("")
-        t.append("JOB MARKET - roles advertised, and salary entries volunteered. "
+        t.append("Roles advertised, and salary entries volunteered. "
                  "The change is the signal, not the level.")
         t.append(t_table(["Entity", "Open roles", "Salary entries"],
                          [[r["entity"], r["roles"], r["salaries"]] for r in market]))
@@ -1060,9 +1068,8 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             t.append("Salary entries were not counted this week - the dash means not "
                      "measured, not none.")
     else:
-        t.append("")
-        t.append("JOB MARKET - not recorded this week for any entity. No conclusion "
-                 "about hiring should be drawn from its absence: the count was not taken.")
+        t.append("Not recorded this week for any entity. No conclusion about hiring "
+                 "should be drawn from its absence: the count was not taken.")
     t.append("")
     t.append("3. WHAT'S NEW")
     if now:
