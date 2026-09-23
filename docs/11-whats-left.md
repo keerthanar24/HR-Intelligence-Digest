@@ -121,9 +121,13 @@ Nothing below is blocked on code. Ordered by what blocks the most.
 
 | | |
 |---|---|
-| Four recipient addresses | `config/recipients.yaml`, in **both** the `digest` and `red_flag` blocks |
+| Four recipient addresses | `python3 scripts/set_recipients.py <name> <email>` — sets both the `digest` and `red_flag` blocks at once |
 | `programme.owner` | `config/settings.yaml:6` — who runs the desk |
 | `programme.reply_to` | `config/settings.yaml:7` — the address it comes from |
+
+Do not edit `config/recipients.yaml` by hand: the same four are listed twice, and an
+address set for the digest but not for red_flag is now a validator **error** — the
+weekly send would look finished while escalations had nowhere to go.
 
 The baseline also does not close until **25 Sep**, so nothing goes out before then
 whatever else is filled in.

@@ -112,6 +112,25 @@ def check_config(report: Report) -> None:
             report.warn(f"config/recipients.yaml: no email yet for {', '.join(unset)} in "
                         f"{group} - the digest can be built and reviewed, but not sent.")
 
+    # The same four people are listed twice. Filling the digest block and
+    # leaving red_flag is the easy mistake - the digest warning is the one you
+    # are chasing - and it fails silently in the worst direction: the weekly
+    # send looks finished while an escalation has nowhere to go. An address
+    # set in one block and not the other is an ERROR for that reason.
+    addresses = {group: {p.get("name"): str(p.get("email") or "").strip()
+                         for p in recipients.get(group, [])}
+                 for group in ("digest", "red_flag")}
+    for name in sorted(set(addresses["digest"]) & set(addresses["red_flag"])):
+        digest_set = not H.is_todo(addresses["digest"][name]) and addresses["digest"][name]
+        flag_set = not H.is_todo(addresses["red_flag"][name]) and addresses["red_flag"][name]
+        if digest_set and not flag_set:
+            report.error(f"config/recipients.yaml: {name} has an address for the digest but "
+                         "not for red_flag - escalations would not reach them. Set both with "
+                         f"scripts/set_recipients.py {name} <email>")
+        elif digest_set and flag_set and digest_set != flag_set:
+            report.warn(f"config/recipients.yaml: {name} has different addresses in digest "
+                        f"({digest_set}) and red_flag ({flag_set}). Deliberate?")
+
     entity_ids = {e["id"] for e in entities.get("entities", [])}
     for ent in entities.get("entities", []):
         if ent.get("needs_confirmation"):
