@@ -135,8 +135,12 @@ def main() -> int:
             print(f"Unknown platform id: {', '.join(unknown)}", file=sys.stderr)
             print(f"One of: {', '.join(sorted(names))}", file=sys.stderr)
             return 2
-        record(week, wanted, by)
-        print(f"Recorded {len(wanted)} channel(s) checked for {H.fmt_week(week)}.")
+        # "0" rather than blank. --checked means "I looked and found nothing",
+        # which is the whole point of the record; a blank cell in the file
+        # reads as a value nobody filled in, which is the opposite claim.
+        record(week, wanted, by, found={p: "0" for p in wanted})
+        print(f"Recorded {len(wanted)} channel(s) checked, 0 items found, "
+              f"for {H.fmt_week(week)}.")
         return 0
 
     already = H.channels_checked(week)
