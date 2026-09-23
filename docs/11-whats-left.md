@@ -113,7 +113,55 @@ python3 scripts/log_rating.py -e rk_group -p ambitionbox -r <rating> -c <count> 
 
 ---
 
-## 3. Two identity confirmations
+## 3. Still outstanding — state as of 2026-09-23
+
+Nothing below is blocked on code. Ordered by what blocks the most.
+
+### Blocking the send
+
+| | |
+|---|---|
+| Four recipient addresses | `config/recipients.yaml`, in **both** the `digest` and `red_flag` blocks |
+| `programme.owner` | `config/settings.yaml:6` — who runs the desk |
+| `programme.reply_to` | `config/settings.yaml:7` — the address it comes from |
+
+The baseline also does not close until **25 Sep**, so nothing goes out before then
+whatever else is filled in.
+
+### Blocking a complete week 1
+
+- **YouTube** — the last unswept channel. Four searches; read the COMMENTS, not the
+  videos. `python3 scripts/log_sweep.py --checked youtube` once done.
+- **Job market and salary entries — 0/4.** The digest now says the count was not taken
+  rather than rendering silence, but that is a disclosure, not a substitute.
+  `python3 scripts/log_market.py --status --week 2026-09-19`.
+- **Two held LinkedIn posts** — the store-launch campaign, 2026-08-18 and 2026-09-08.
+  In scope only if the body mentions hiring, jobs or the team. They sit commented out
+  in `data/linkedin-posts-2026-09-19.txt` with the question beside them.
+
+### Worth doing, blocks nothing
+
+- **The Robust Kommerce Google Alert still carries `OR "Robust Results"`** from the old
+  query, so it keeps pulling in another company. Regenerate with
+  `python3 scripts/alert_queries.py --entity robust_kommerce --format google`.
+- **Three back-read rows hold no verbatim text** (M-20260808-001, M-20260829-001,
+  M-20260905-002). Their summaries are unverifiable at the Month 2 review.
+- **`collector.user_agent` says `contact: TODO`** — `config/settings.yaml:47`. A bot
+  with no contact address is the kind a site blocks without asking.
+- **Confirm the Google Sheet is shared** with the four recipients.
+
+### Optional, costs money or time
+
+- **X bearer token** — without it the four X searches are skipped and X stays manual.
+- **Reddit API credentials** — two of four queries still hit HTTP 429 from CI.
+- **YouTube Data API collector** — free, roughly an hour's work, would make YouTube
+  automatic instead of the one channel still swept by hand every week.
+- **Claim the Glassdoor employer profiles** — closes the last red-flag gap.
+
+---
+
+## Superseded — the identity confirmations
+
 
 ~~**`Robust Results`**~~ **Resolved 2026-09-21: it was never a name of Robust Kommerce**, and the
 alias is removed. One follow-up: the live Google Alert for Robust Kommerce was created with the
