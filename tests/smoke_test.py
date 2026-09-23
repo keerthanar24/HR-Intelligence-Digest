@@ -2036,6 +2036,54 @@ def test_job_market_and_salary_insights() -> None:
     check("and says where they were counted", "source" in H.MARKET_FIELDS)
 
 
+def test_a_malformed_row_does_not_crash_three_files_away() -> None:
+    """A truncated line in a hand-edited CSV surfaced as a TypeError in a sort.
+
+    csv.DictReader is faithful to a bad line in two ways that break callers far
+    from the file. Too FEW fields gives None for the rest - and row.get(k, "")
+    returns that None, because the default only applies to a MISSING key, not a
+    present one holding None - so sorting raises TypeError. Too MANY puts the
+    extras under the key None as a list, which fails on write.
+
+    It happened to data/sweeps.csv on 2026-09-23, and the traceback pointed at
+    log_sweep.record(), three files from the cause.
+    """
+    print("a malformed row does not crash three files away")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "sweeps.csv")
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            fh.write(",".join(H.SWEEP_FIELDS) + "\n")
+            fh.write("2026-09-19,news\n")                          # too few
+            fh.write("2026-09-19,quora,a,b,0,note,SPILLOVER\n")     # too many
+            fh.write("2026-09-19,reddit,a,b,0,fine\n")              # right
+
+        rows = H.read_csv(path)
+        check("every row still loads", len(rows) == 3, f"({len(rows)})")
+        check("no value is None", all(v is not None for r in rows for v in r.values()))
+        check("no key is None", all(None not in r for r in rows))
+        check("a short row's missing columns read as blank",
+              rows[0]["checked_by"] == "", f"({rows[0]['checked_by']!r})")
+
+        try:
+            sorted(rows, key=lambda r: (r.get("week_of", ""), r.get("platform", "")))
+            check("sorting on the plain .get() default works again", True)
+        except TypeError as exc:
+            check("sorting on the plain .get() default works again", False, f"({exc})")
+
+        check("the bad lines are reported, not silently repaired",
+              H.malformed_rows(path, H.SWEEP_FIELDS) == [2, 3],
+              f"({H.malformed_rows(path, H.SWEEP_FIELDS)})")
+
+        saved = H.SWEEPS_CSV
+        H.SWEEPS_CSV = path
+        try:
+            report = validate_data.Report()
+            validate_data.check_row_shape(report)
+            check("validate warns about them", any("wrong number of columns" in w
+                                                   for w in report.warnings),
+                  f"({report.warnings})")
+        finally:
+            H.SWEEPS_CSV = saved
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2252,7 +2300,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

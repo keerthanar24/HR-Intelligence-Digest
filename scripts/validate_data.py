@@ -390,6 +390,27 @@ def check_conflict_markers(report: Report) -> None:
                 "<<<<<<< / ======= / >>>>>>> lines, and keep the rows you meant.")
 
 
+def check_row_shape(report: Report) -> None:
+    """Lines whose field count does not match the header.
+
+    read_csv() normalises them so nothing crashes, but a short line means
+    columns silently became blank and a long one means a value was dropped -
+    both from hand-editing, which these files get. Quiet repair is the wrong
+    default for a data file somebody will make a decision from.
+    """
+    for path, fields in ((H.MENTIONS_CSV, H.MENTION_FIELDS),
+                         (H.RATINGS_CSV, H.RATING_FIELDS),
+                         (H.ESCALATIONS_CSV, H.ESCALATION_FIELDS),
+                         (H.SWEEPS_CSV, H.SWEEP_FIELDS),
+                         (H.MARKET_CSV, H.MARKET_FIELDS),
+                         (H.WEEKLY_LOG_CSV, H.WEEKLY_LOG_FIELDS)):
+        bad = H.malformed_rows(path, fields)
+        if bad:
+            report.warn(
+                f"{os.path.relpath(path, H.ROOT)}: line(s) {', '.join(map(str, bad))} have "
+                f"the wrong number of columns ({len(fields)} expected). They still load - "
+                "short lines read as blanks, long ones lose a value - so check them in "
+                "Notepad rather than trusting what the digest shows.")
 def check_verbatim(report: Report, mentions: list[dict]) -> None:
     """Review rows holding only somebody's paraphrase.
 
@@ -452,6 +473,7 @@ def main() -> int:
 
     report = Report()
     check_conflict_markers(report)
+    check_row_shape(report)
     check_config(report)
     check_mentions(report, mentions, week_of)
     check_escalations(report, mentions, escalations)
