@@ -188,7 +188,8 @@ platform to cross-check them against.
 
 ## 4. Missing source URLs
 
-~~**Four Google Alerts RSS feeds.**~~ **Done.** All five alerts are connected and verified on a
+~~**Four Google Alerts RSS feeds.**~~ **Done.** All seven alerts — four entities, the
+cross-entity red-flag one, Quora and Indeed — are connected and verified on a
 live run — each feed reports its own query as its title, which confirms every URL is bound to the
 entity it belongs to. They return 0 items today because a Google Alert only carries items indexed
 after it was created; they fill from here.
