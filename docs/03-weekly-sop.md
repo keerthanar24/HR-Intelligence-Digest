@@ -356,3 +356,21 @@ place that error is catchable.
 
 Record the **count** of salary entries, never a median. A company-wide median averages
 unrelated roles and nobody should act on it.
+
+## Checking the project is healthy
+
+```bash
+python3 scripts/status.py
+```
+
+One command. It runs the smoke tests and the validator, shows this week's sweep
+coverage, and lists what is waiting on a person. It exits non-zero only when
+something is **broken** — an outstanding input is work remaining, not a fault, and
+a status command that always fails is one people stop reading.
+
+If it reports failures you do not recognise, you are probably running code you have
+not pulled:
+
+```bash
+git pull origin $(git branch --show-current)
+```

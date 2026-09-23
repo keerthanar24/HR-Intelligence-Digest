@@ -2575,9 +2575,39 @@ def test_market_worksheet_urls() -> None:
           M.latest(rows, "westbury_kommerce", "2026-09-19") is None)
 
 
+def test_status_reports_the_trial_week() -> None:
+    """Two off-by-ones, both of which made week 1 look wrong.
+
+    last_complete_week() is right for a digest and wrong here: mid-week-1
+    there is no complete week, so it reached back to a week BEFORE the trial
+    began and reported every channel unswept. And weeks_into_trial is 0-based,
+    so `if number` hid week 1 - the only week that exists - behind a generic
+    label.
+    """
+    print("status")
+    settings = H.load_yaml("settings")
+    start = H.parse_date(str(settings["programme"]["trial_start"]))
+
+    check("week 1 of the trial is numbered 0",
+          H.weeks_into_trial(start, settings) == 0)
+    check("so a truthiness test loses it",
+          not H.weeks_into_trial(start, settings))
+    check("and week 2 is 1", H.weeks_into_trial(start + dt.timedelta(days=7), settings) == 1)
+    check("before the trial there is no week number",
+          H.weeks_into_trial(start - dt.timedelta(days=7), settings) is None)
+
+    # Mid-week-1, the last COMPLETE week predates the trial entirely.
+    midweek = start + dt.timedelta(days=4)
+    check("mid-week-1 the last complete week is before the trial",
+          H.last_complete_week(midweek) < start,
+          "the bug this test exists for")
+    check("while the week being worked on is week 1",
+          H.week_start_of(midweek) == start)
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_absence_of_a_count_is_not_a_finding, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
