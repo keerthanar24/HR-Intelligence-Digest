@@ -5,14 +5,31 @@
 # Themes:   compensation appraisal payroll_delay management culture work_hours
 #           workload growth_learning exits layoffs interview onboarding
 #           harassment_safety facilities transparency job_security
+#   or      out_of_scope  - commercial rather than employment; recorded, counts
+#                           toward nothing. A store opening, a product line.
 #
 # The URL must be the POST's own link: three dots on the post -> Copy link to post.
 # Out-of-window and duplicate URLs are skipped for you, so paste freely.
+#
+# ENTITY IS THE PAGE THAT PUBLISHED IT, read from the URL slug - not the page you
+# were scrolling when you found it. A reshare carries the original author's slug.
 
-# --- RK Group ---
+# --- RK Group (page slug rk-groupp) ---
+# 2026-09-08  #next #robustkommerce #newstorelaunch
+#   HELD: store launch. In scope only if the post mentions hiring, jobs or the
+#   team. Awaiting the body text.
+# rk_group  https://www.linkedin.com/posts/rk-groupp_next-robustkommerce-newstorelaunch-activity-7503010165638717440-V3rw  ?
 
 # --- RK World Infocom ---
+# No posts in the 60-day baseline. Confirmed 2026-09-23. A silent employer page
+# is a finding, not a gap - recorded in data/sweeps.csv.
 
-# --- Robust Kommerce ---
+# --- Robust Kommerce (page slug robust-kommerce-india) ---
+robust_kommerce  https://www.linkedin.com/posts/robust-kommerce-india_leadership-businessstrategy-teamculture-activity-7492466837209636865-K6VS  culture,management | Company post tagged #leadership #businessstrategy #teamculture
+robust_kommerce  https://www.linkedin.com/posts/robust-kommerce-india_mango-mangoman-gurugram-ugcPost-7493528587313143808-9vew  out_of_scope
+# 2026-08-18  #next #robustkommerce #newstorelaunch
+#   HELD with the RK Group one above - same campaign, same question.
+# robust_kommerce  https://www.linkedin.com/posts/robust-kommerce-india_next-robustkommerce-newstorelaunch-ugcPost-7495361524270694400-n1UN  ?
 
 # --- Westbury Kommerce ---
+# No posts in the 60-day baseline. Confirmed 2026-09-23.

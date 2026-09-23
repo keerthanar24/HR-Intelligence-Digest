@@ -2411,6 +2411,25 @@ def test_company_post_batch_parsing() -> None:
     check("only the first pipe splits", row["summary"] == "Vision | team spirit",
           f"got {row['summary']!r}")
 
+    # A company page posts about its business too. A store opening is company
+    # page activity and not an employment signal; logging it in scope would
+    # bury three real employee reviews under four pieces of retail marketing.
+    row, _ = B.parse_line("robust_kommerce  https://x-ugcPost-7507227023769600000-A  "
+                          "out_of_scope")
+    check("out_of_scope is accepted in the themes field",
+          row is not None and row["themes"] == "out_of_scope")
+
+    # week_of keys to the POST's week, not the reporting week: the baseline
+    # gathers sixty days by post_date, and a row keyed to the capture week
+    # would compare against a week that never held it.
+    import linkedin_post_date as L
+    day = dt.date(2026, 8, 10)
+    ms = int(dt.datetime(day.year, day.month, day.day).timestamp() * 1000)
+    decoded = L.published(ms << L.TIMESTAMP_BITS)
+    check("a post's week comes from its own date, not the sweep's",
+          H.week_start_of(decoded.date()) == dt.date(2026, 8, 8),
+          f"got {H.week_start_of(decoded.date())}")
+
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,

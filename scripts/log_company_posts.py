@@ -24,6 +24,11 @@ window decision is the whole point of looking before you commit.
 
 Rows land as author_type=company with NO sentiment, which is what keeps the
 employer out of its own score; see docs/05-sentiment-and-themes.md.
+
+A company page also posts about its business. Put `out_of_scope` in the themes
+field for a post that is commercial rather than employment - a store opening, a
+product line, a festival greeting. It is still recorded, so the month-2 review
+can see it was read and judged, and it counts toward nothing.
 """
 
 from __future__ import annotations
@@ -94,6 +99,15 @@ def main() -> int:
             bad.append((number, parsed["url"], f"unknown entity {parsed['entity']!r}; "
                                                f"one of {', '.join(entities)}"))
             continue
+        # A company page posts about its business, not only about itself as an
+        # employer. A store launch or a product line is company page activity
+        # and is NOT an employment signal, and logging it in scope would bury
+        # three real employee reviews under four pieces of retail marketing.
+        # Marking it out_of_scope keeps the record that it was read and judged
+        # - which is the fact the month-2 review needs - without it counting.
+        parsed["out_of_scope"] = parsed["themes"].strip().lower() == "out_of_scope"
+        if parsed["out_of_scope"]:
+            parsed["themes"] = ""
         for theme in H.split_themes(parsed["themes"]):
             if theme not in H.THEMES:
                 bad.append((number, parsed["url"], f"unknown theme {theme!r}"))
@@ -117,8 +131,10 @@ def main() -> int:
 
     print(f"\n{label}\n")
     for parsed in keep:
-        print(f"  KEEP  {parsed['post_date']}  {entities[parsed['entity']]:<22} "
-              f"{parsed['themes'] or '(no theme)'}")
+        mark = "OUT " if parsed["out_of_scope"] else "KEEP"
+        what = ("not an employment signal" if parsed["out_of_scope"]
+                else parsed["themes"] or "(no theme)")
+        print(f"  {mark}  {parsed['post_date']}  {entities[parsed['entity']]:<22} {what}")
     for parsed, day, why in skipped:
         print(f"  skip  {day}  {entities[parsed['entity']]:<22} {why}")
     for number, where, why in bad:
@@ -138,10 +154,16 @@ def main() -> int:
 
     rows = list(existing)
     for parsed in keep:
+        # week_of is the week the POST falls in, not the week it was captured.
+        # The baseline gathers sixty days by post_date, so a row keyed to the
+        # reporting week would sit in the digest at the right time and in the
+        # wrong week everywhere else - and week 2 onward would compare against
+        # a week that never held it.
+        post_week = H.week_start_of(parsed["post_date"])
         rows.append({
             **{field: "" for field in H.MENTION_FIELDS},
-            "mention_id": H.next_mention_id(rows, week),
-            "week_of": week.isoformat(),
+            "mention_id": H.next_mention_id(rows, post_week),
+            "week_of": post_week.isoformat(),
             "captured_at": dt.date.today().isoformat(),
             "captured_by": args.by,
             "entity": parsed["entity"],
@@ -155,12 +177,17 @@ def main() -> int:
             "themes": parsed["themes"],
             # No sentiment, ever. The employer does not score itself.
             "sentiment": "",
-            "status": "reviewed" if parsed["summary"] else "needs_review",
+            "status": ("out_of_scope" if parsed["out_of_scope"]
+                       else "reviewed" if parsed["summary"] else "needs_review"),
         })
     H.write_csv(H.MENTIONS_CSV, H.MENTION_FIELDS, rows)
 
     print(f"\nLogged {len(keep)} company post(s) for {H.fmt_week(week)}.")
-    missing = [p for p in keep if not p["summary"]]
+    out = sum(1 for p in keep if p["out_of_scope"])
+    if out:
+        print(f"{out} recorded as out of scope - read, judged commercial rather than "
+              "employment, and excluded from every count.")
+    missing = [p for p in keep if not p["summary"] and not p["out_of_scope"]]
     if missing:
         print(f"{len(missing)} have no one-line summary, so they are left as "
               "needs_review. Add one with the | form, or edit the row.")

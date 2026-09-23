@@ -37,6 +37,14 @@ for these entities, but the rating movement still matters.
 
 ### LinkedIn
 - Company page: posts, and the comments under them.
+- **A company page posts about its business, not only about itself as an employer.**
+  A store opening, a product line, a festival greeting is company page activity and
+  is *not* an employment signal. Log it with `out_of_scope` in the themes field: the
+  record that it was read and judged survives, and it counts toward nothing. The test
+  is whether the post says anything about working there — hiring, the team, leadership,
+  culture, an award as an employer. In the 60-day baseline, 3 of the 4 company posts
+  found were commercial; logging those in scope would have buried three real employee
+  reviews under retail marketing.
 - **A company-authored post is logged, and never scored.** Set `author_type: company`
   and leave `sentiment` blank. It is in scope — a hiring push or a culture post says
   something real about the employer, and the comments underneath are often the only

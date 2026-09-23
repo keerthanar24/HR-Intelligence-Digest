@@ -1,7 +1,7 @@
 week_of,platform,checked_at,checked_by,found,notes
 2026-09-19,google_reviews,2026-09-23,desk,0,
 2026-09-19,indeed,2026-09-22,desk,0,"No Indeed employer page exists for any of the four entities - confirmed by the programme owner 2026-09-22. Not ""page with no reviews"": no profile at all."
-2026-09-19,linkedin,2026-09-23,desk,1,"All four company pages opened and all four content searches run (2026-09-23). No employee or ex-employee voice anywhere - no posts, no comments under the company posts. One item found: the Robust Kommerce page carries a company-authored post about vision and team spirit. In scope as company page activity (docs/00-brief.md section 3); pending a mention row once its URL and publication date are captured."
+2026-09-19,linkedin,2026-09-23,desk,4,"All four pages and all four content searches, 2026-09-23. No employee or ex-employee voice anywhere: no posts, no comments under the company posts. Company page activity across the baseline: RK Group 1 post, Robust Kommerce 3, RK World Infocom NONE, Westbury Kommerce NONE - both pages silent for the whole 60 days, which is a finding about employer presence rather than a gap in the sweep. Of the 4 posts, 1 is employment-related (leadership/team culture), 1 is product marketing (logged out_of_scope), 2 are a store-launch campaign held pending their body text - in scope only if they mention hiring."
 2026-09-19,news,2026-09-23,collector,0,
 2026-09-19,quora,2026-09-23,collector,0,
 2026-09-19,reddit,2026-09-23,collector,0,
