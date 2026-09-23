@@ -1,6 +1,6 @@
 # What is left to do
 
-State as of 2026-09-22 (the 60-day back-read is done — see section 1). Everything here is an **input only a person can supply** — none of it is
+State as of 2026-09-23 (job-market trends and salary insights are now built — the last two scope gaps are closed). Everything here is an **input only a person can supply** — none of it is
 blocked on code. Ordered by what unblocks the most.
 
 Re-check this list any time with:

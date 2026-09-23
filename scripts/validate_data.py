@@ -362,6 +362,34 @@ def check_coverage(report: Report, mentions: list[dict], ratings: list[dict],
                     "nothing, that is a valid empty week — say so in the digest.")
 
 
+CONFLICT_MARKERS = ("<<<<<<<", "=======", ">>>>>>>")
+
+
+def check_conflict_markers(report: Report) -> None:
+    """A data file that still holds a merge conflict.
+
+    GitHub Desktop stashes local edits to pull, and restoring the stash can
+    leave <<<<<<< / ======= / >>>>>>> in the file. Committed as-is, the CSV
+    still parses: csv.DictReader reads each marker as a row with a nonsense
+    week_of and every other column blank. So the file looks fine, the digest
+    builds, and the rows either side of the markers may or may not be the ones
+    anybody intended. Loud is the only safe setting.
+    """
+    for path in (H.MENTIONS_CSV, H.RATINGS_CSV, H.ESCALATIONS_CSV,
+                 H.SWEEPS_CSV, H.WEEKLY_LOG_CSV):
+        if not os.path.exists(path):
+            continue
+        with open(path, encoding="utf-8") as handle:
+            hits = [n for n, line in enumerate(handle, start=1)
+                    if line.startswith(CONFLICT_MARKERS)]
+        if hits:
+            report.error(
+                f"{os.path.relpath(path, H.ROOT)}: unresolved merge conflict on "
+                f"line(s) {', '.join(map(str, hits))}. The file still parses, so "
+                "nothing else will tell you. Open it in Notepad, delete the "
+                "<<<<<<< / ======= / >>>>>>> lines, and keep the rows you meant.")
+
+
 def check_verbatim(report: Report, mentions: list[dict]) -> None:
     """Review rows holding only somebody's paraphrase.
 
@@ -423,6 +451,7 @@ def main() -> int:
     escalations = H.read_csv(H.ESCALATIONS_CSV)
 
     report = Report()
+    check_conflict_markers(report)
     check_config(report)
     check_mentions(report, mentions, week_of)
     check_escalations(report, mentions, escalations)

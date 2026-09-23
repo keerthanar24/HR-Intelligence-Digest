@@ -71,6 +71,21 @@ last Friday**. Sort by newest, not relevance.
 
 - [ ] Indeed *(reviews and interview experiences)* · [ ] YouTube comments · [ ] Google Reviews *(employment only — skip customer and product reviews)*
 
+## 10:05 · Job market and salary entries (5 min)
+
+The project scope asks for **job-market trends** and **salary insights**, and both are weekly
+counts rather than reviews. For each entity: how many roles is it advertising (LinkedIn Jobs,
+AmbitionBox, Indeed), and what salary-entry count does the review site report?
+
+```bash
+python3 scripts/log_market.py -e <entity> --roles <n> --salaries <n> --source "LinkedIn + AmbitionBox"
+python3 scripts/log_market.py --status
+```
+
+**0 roles is a figure worth recording.** The digest reports the change, not the level — a spike
+in openings beside a run of exit reviews is the correlation this programme exists to surface,
+and neither half shows it alone.
+
 ## 10:10 · Tick off what you checked (2 min)
 
 ```bash

@@ -41,6 +41,22 @@ NS = {
 }
 
 
+def _distinct_aliases(entity: dict) -> list[str]:
+    """Aliases that are genuinely different names, not spacing variants.
+
+    "RK World", "R K World" and "R.K. World" are one term to a search engine,
+    so collapsing them first stops them crowding out a real trading name.
+    """
+    names = list(entity.get("aliases") or []) + list(entity.get("needs_confirmation") or [])
+    distinct, seen = [], set()
+    for alias in names:
+        shape = "".join(ch for ch in alias.lower() if ch.isalnum())
+        if shape not in seen:
+            seen.add(shape)
+            distinct.append(alias)
+    return distinct
+
+
 def build_feed_url(feed: dict, entities: dict) -> str:
     """Resolve a feed's URL, generating it from the alias register where asked.
 
@@ -54,6 +70,21 @@ def build_feed_url(feed: dict, entities: dict) -> str:
     if not kind:
         return feed.get("url", "")
 
+    if kind == "reddit_all":
+        # One search for the whole group rather than one per entity. Reddit
+        # rate-limits per IP and cumulatively: the first request of a run has
+        # always succeeded, later ones 429, and a different pair failed on
+        # each of three real runs - so two entities went unsearched each time
+        # while the retries made the throttling worse. Four requests become
+        # one. The collector assigns each hit to whichever entity the text
+        # matches, exactly as it already does for the cross-entity red-flag
+        # alert, so nothing is lost by dropping the per-entity binding.
+        terms = []
+        for entity in entities.values():
+            terms += [f'"{alias}"' for alias in _distinct_aliases(entity)[:2]]
+        return ("https://www.reddit.com/search.rss?q="
+                + urllib.parse.quote(" OR ".join(terms)) + "&sort=new&t=week")
+
     entity = entities.get(feed.get("entity"))
     if not entity:
         return feed.get("url", "")
@@ -62,14 +93,7 @@ def build_feed_url(feed: dict, entities: dict) -> str:
     # genuinely different names. Spacing and punctuation variants ("RK World",
     # "R K World", "R.K. World") are one term to a search engine, so collapse
     # them first - otherwise they crowd out a real trading name like ValueCart.
-    names = list(entity.get("aliases") or []) + list(entity.get("needs_confirmation") or [])
-    distinct, seen = [], set()
-    for alias in names:
-        shape = "".join(ch for ch in alias.lower() if ch.isalnum())
-        if shape not in seen:
-            seen.add(shape)
-            distinct.append(alias)
-    query = " OR ".join(f'"{alias}"' for alias in distinct[:8])
+    query = " OR ".join(f'"{alias}"' for alias in _distinct_aliases(entity)[:8])
 
     if kind == "reddit":
         return ("https://www.reddit.com/search.rss?q="
@@ -197,8 +221,17 @@ def _space_out(host: str) -> None:
     _last_hit[host] = time.monotonic()
 
 
+# Statuses worth trying again. 429 and 503 are the host asking for patience.
+# The 5xx codes are the host failing on its own side: Google Alerts feeds
+# return 500 intermittently and serve the same URL fine moments later, and
+# without a retry that reads as "this alert found nothing" - which is the
+# failure this whole collector is built to avoid. Everything else, including
+# 400 and 404, means asking again cannot help.
+RETRYABLE = (429, 500, 502, 503, 504)
+
+
 def fetch(url: str, user_agent: str, timeout: int, attempts: int = 4) -> bytes:
-    """Fetch a feed, backing off when the host throttles us.
+    """Fetch a feed, backing off when the host throttles us or falls over.
 
     A 429 is not an answer, so retrying is the difference between searching an
     entity and silently skipping it. Honours Retry-After when the host sends
@@ -214,7 +247,7 @@ def fetch(url: str, user_agent: str, timeout: int, attempts: int = 4) -> bytes:
                 return response.read()
         except urllib.error.HTTPError as exc:
             global _backoff_spent
-            if exc.code not in (429, 503) or attempt == attempts:
+            if exc.code not in RETRYABLE or attempt == attempts:
                 raise
             wait = delay
             retry_after = exc.headers.get("Retry-After") if exc.headers else None

@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek checkurls checkfeeds test clean
+.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek logmarket checkurls checkfeeds test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -23,6 +23,7 @@ help:
 	@echo "  make weekly    scan + validate + digest, in order"
 	@echo "  make auto      collect + validate + digest (what the scheduler runs)"
 	@echo "  make send      dry-run the email send (add --send to really send)"
+	@echo "  make logmarket open roles and salary entries per entity (scope: job-market)"
 	@echo "  make logsweep  tick off the channels you checked (LinkedIn, X, Quora, ...)"
 	@echo "  make checkurls open every configured page and report dead links (one-off)"
 	@echo "  make checkfeeds test every enabled alert/RSS URL — run after adding one"
@@ -90,6 +91,10 @@ checkurls:
 # behind it does not exist, usually because it was never saved.
 checkfeeds:
 	$(PY) scripts/check_urls.py --feeds
+
+# The two scope figures that are neither a review nor a rating.
+logmarket:
+	$(PY) scripts/log_market.py --status
 
 # The channels with no review count: only a person can say they were opened.
 logsweep:

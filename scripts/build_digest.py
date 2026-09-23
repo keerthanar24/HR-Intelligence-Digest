@@ -543,6 +543,43 @@ def quiet_week_note(checked):
             "held in the restricted escalation log, never in here.")
 
 
+def market_rows(week_of, entities):
+    """Hiring volume and salary-entry count per entity, with the week's change.
+
+    The two figures the project scope asks for and the digest never carried:
+    "job-market trends" in its opening line, and "salary insights" among the
+    review-site content. Both are weekly snapshots, so what the digest reports
+    is the MOVEMENT - a level on its own says nothing, and three open roles is
+    neither good nor bad until you know it was one last week.
+    """
+    rows = H.read_csv(H.MARKET_CSV)
+    target = week_of.isoformat()
+    out = []
+    for entity_id, name in entities.items():
+        now = next((r for r in rows if r.get("week_of") == target
+                    and r.get("entity") == entity_id), None)
+        if not now:
+            continue
+        earlier = [r for r in rows if r.get("entity") == entity_id
+                   and r.get("week_of", "") < target]
+        prev = max(earlier, key=lambda r: r.get("week_of", "")) if earlier else None
+
+        def figure(field):
+            value = str(now.get(field) or "").strip()
+            if not value:
+                return "—"
+            before = str(prev.get(field) or "").strip() if prev else ""
+            if not before:
+                return value
+            return f"{value} ({delta_text(H.to_int(value), H.to_int(before))})"
+
+        out.append({"entity": name,
+                    "roles": figure("open_roles"),
+                    "salaries": figure("salary_entries"),
+                    "source": now.get("source", "")})
+    return out
+
+
 def same_day_note(platforms):
     """The channels where a red flag cannot surface until the weekly sweep.
 
@@ -655,6 +692,7 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                                 baseline=is_baseline)
     also_swept, not_swept = channel_coverage(week_of, settings, platforms, swept)
     lagging = same_day_note(platforms)
+    market = market_rows(week_of, entities)
     swept = sorted(set(swept) | set(also_swept))
     rolling_weeks = int(digest_cfg.get("rolling_theme_weeks", 4))
     rolling, rolling_total = rolling_theme_rows(all_mentions, week_of, rolling_weeks, max_themes)
@@ -778,6 +816,16 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f'so {"it" if len(unrated) == 1 else "they"} cannot appear above. '
                  f'{"It is" if len(unrated) == 1 else "They are"} covered by LinkedIn, Reddit, '
                  'news and X only — absence here is not evidence of a quiet week.</p>')
+
+    if market:
+        h.append('<p style="margin:12px 0 4px;font-size:13px;"><strong>Job market</strong> '
+                 '<span style="font-size:12px;color:#52606d;">— roles advertised, and how '
+                 'many salary entries employees have volunteered. The change is the '
+                 'signal; the level on its own is not.</span></p>')
+        h.append(h_table(
+            ["Entity", "Open roles", "Salary entries"],
+            [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
+            ["left", "right", "right"], ["46%", "27%", "27%"]))
 
     # 3. What's new
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;">3 · What\'s New</h3>')
@@ -954,6 +1002,12 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  f"appear above. {'It is' if len(unrated) == 1 else 'They are'} covered by "
                  "LinkedIn, Reddit, news and X only - absence here is not evidence of a "
                  "quiet week.")
+    if market:
+        t.append("")
+        t.append("JOB MARKET - roles advertised, and salary entries volunteered. "
+                 "The change is the signal, not the level.")
+        t.append(t_table(["Entity", "Open roles", "Salary entries"],
+                         [[r["entity"], r["roles"], r["salaries"]] for r in market]))
     t.append("")
     t.append("3. WHAT'S NEW")
     if now:

@@ -32,6 +32,7 @@ RATINGS_CSV = os.path.join(DATA_DIR, "ratings.csv")
 ESCALATIONS_CSV = os.path.join(DATA_DIR, "escalations.csv")
 WEEKLY_LOG_CSV = os.path.join(DATA_DIR, "weekly_log.csv")
 SWEEPS_CSV = os.path.join(DATA_DIR, "sweeps.csv")
+MARKET_CSV = os.path.join(DATA_DIR, "market.csv")
 
 MENTION_FIELDS = [
     "mention_id", "week_of", "captured_at", "captured_by", "entity", "platform",
@@ -46,6 +47,24 @@ RATING_FIELDS = [
     "overall_rating", "review_count", "recommend_pct", "ceo_approval_pct",
     "work_life_balance", "salary_benefits", "job_security", "career_growth",
     "culture", "url", "notes",
+]
+
+# One row per entity per week: the two figures in the project scope that are
+# neither a review nor a rating.
+#
+# open_roles is what "job-market trends" means for this programme. The scope's
+# first line asks for chatter about the group AS AN EMPLOYER, so the trend that
+# matters is the group's own hiring: how many roles it is advertising, week on
+# week. A spike in openings beside a run of exit reviews is the correlation the
+# digest exists to surface, and neither half shows it alone.
+#
+# salary_entries is the count AmbitionBox and Glassdoor publish, not a median.
+# A single company-wide median is an average over unrelated roles and would be
+# a number nobody should act on. The count is honest: it measures how much
+# salary data employees have volunteered, and its movement is a real signal.
+MARKET_FIELDS = [
+    "week_of", "captured_at", "captured_by", "entity",
+    "open_roles", "salary_entries", "source", "notes",
 ]
 
 # One row per channel per week, written when somebody checks it. The review
