@@ -48,16 +48,16 @@ RATING_FIELDS = [
     "culture", "url", "notes",
 ]
 
-# One row per week, written when the digest goes out. Everything derivable is
-# derived; these are the three things only the person who did the sweep knows.
-# docs/07-phase3-review.md asks for effort and signal quality at the month-2
-# review, and neither can be reconstructed eight weeks later from memory.
 # One row per channel per week, written when somebody checks it. The review
 # sites prove their own coverage through the review count; these channels have
 # no count, so a morning spent on YouTube finding nothing leaves no trace and
 # reads at month 2 exactly like a channel nobody opened.
 SWEEP_FIELDS = ["week_of", "platform", "checked_at", "checked_by", "found", "notes"]
 
+# One row per week, written when the digest goes out. Everything derivable is
+# derived; these are the three things only the person who did the sweep knows.
+# docs/07-phase3-review.md asks for effort and signal quality at the month-2
+# review, and neither can be reconstructed eight weeks later from memory.
 WEEKLY_LOG_FIELDS = [
     "week_of", "logged_at", "swept_by", "minutes_spent", "new_to_recipients",
     "acted_on_elsewhere", "mentions", "red_flags", "out_of_scope",
@@ -602,11 +602,36 @@ def read_csv(path: str) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
+class FileInUse(RuntimeError):
+    """A data file could not be written because something else holds it open.
+
+    On Windows, opening a CSV in Excel takes an exclusive lock, so a sweep or
+    a logged mention dies with PermissionError and a traceback pointing at
+    open() - which says nothing about the actual cause or the fix. It happens
+    the moment somebody opens a file to look at it, which is often.
+    """
+
+
+def _guard_write(path: str):
+    """Turn a Windows file lock into a sentence a person can act on."""
+    return FileInUse(
+        f"{os.path.basename(path)} is open in another program, so it cannot be "
+        "written. Excel locks a CSV while it is open - close it and run this "
+        "again. Nothing was lost.\n"
+        f"  {path}\n"
+        "  Use Notepad rather than Excel for these files: Excel also rewrites "
+        "dates and strips leading zeros on save."
+    )
+
+
 def ensure_csv(path: str, fields: list[str]) -> None:
     if not os.path.exists(path):
         os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", newline="", encoding="utf-8") as fh:
-            csv.DictWriter(fh, fieldnames=fields).writeheader()
+        try:
+            with open(path, "w", newline="", encoding="utf-8") as fh:
+                csv.DictWriter(fh, fieldnames=fields).writeheader()
+        except PermissionError:
+            raise _guard_write(path) from None
 
 
 def append_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
@@ -614,10 +639,13 @@ def append_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
     if not rows:
         return 0
     ensure_csv(path, fields)
-    with open(path, "a", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
-        for row in rows:
-            writer.writerow({k: row.get(k, "") for k in fields})
+    try:
+        with open(path, "a", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+            for row in rows:
+                writer.writerow({k: row.get(k, "") for k in fields})
+    except PermissionError:
+        raise _guard_write(path) from None
     return len(rows)
 
 
@@ -625,11 +653,14 @@ def write_csv(path: str, fields: list[str], rows: Iterable[dict]) -> int:
     """Replace a CSV wholesale. Callers that only add rows want append_csv."""
     rows = list(rows)
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
-        writer.writeheader()
-        for row in rows:
-            writer.writerow({k: row.get(k, "") for k in fields})
+    try:
+        with open(path, "w", newline="", encoding="utf-8") as fh:
+            writer = csv.DictWriter(fh, fieldnames=fields, extrasaction="ignore")
+            writer.writeheader()
+            for row in rows:
+                writer.writerow({k: row.get(k, "") for k in fields})
+    except PermissionError:
+        raise _guard_write(path) from None
     return len(rows)
 
 

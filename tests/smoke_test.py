@@ -1830,6 +1830,54 @@ def test_quiet_red_flag_week_states_the_protocol() -> None:
                   "only read on the weekly sweep" in body)
 
 
+def test_a_locked_file_says_so(self=None) -> None:
+    """A CSV open in Excel is somebody's window, not a bug.
+
+    On Windows, Excel takes an exclusive lock on an open CSV, so a sweep or a
+    logged review dies with PermissionError and a traceback pointing at
+    open() - which names neither the cause nor the fix. It happens the moment
+    somebody opens a file to look at it, which is often.
+    """
+    print("a locked file says so")
+    import builtins
+
+    real = builtins.open
+
+    def deny(path, *args, **kwargs):
+        if str(path).endswith("locked.csv"):
+            raise PermissionError(13, "Permission denied")
+        return real(path, *args, **kwargs)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "locked.csv")
+        builtins.open = deny
+        try:
+            for name, call in (("write_csv", lambda: H.write_csv(path, H.SWEEP_FIELDS, [])),
+                               ("append_csv", lambda: H.append_csv(path, H.SWEEP_FIELDS,
+                                                                   [{"platform": "x"}]))):
+                try:
+                    call()
+                    check(f"{name} refuses a locked file", False, "(no error raised)")
+                except H.FileInUse as locked:
+                    message = str(locked)
+                    check(f"{name} raises FileInUse, not PermissionError", True)
+                    check(f"{name} names the file", "locked.csv" in message)
+                    check(f"{name} names the cause", "open in another program" in message)
+                    check(f"{name} says nothing was lost", "Nothing was lost" in message)
+                    check(f"{name} warns off Excel", "Notepad" in message)
+                except PermissionError:
+                    check(f"{name} raises FileInUse, not PermissionError", False,
+                          "(still a bare PermissionError)")
+        finally:
+            builtins.open = real
+
+    # Every script that writes a data file must report it rather than traceback.
+    for script in ("collect_feeds", "log_sweep", "log_mention", "log_rating", "log_week"):
+        source = open(os.path.join(ROOT, "scripts", f"{script}.py"), encoding="utf-8").read()
+        check(f"{script}.py handles it at the top level",
+              "except H.FileInUse" in source)
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2046,7 +2094,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_a_locked_file_says_so, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

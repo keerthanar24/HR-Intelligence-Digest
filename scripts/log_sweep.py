@@ -177,4 +177,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except H.FileInUse as locked:
+        # A locked file is somebody's Excel window, not a bug. Say so once,
+        # without a traceback that buries the one sentence that matters.
+        print(f"\n{locked}", file=sys.stderr)
+        raise SystemExit(4)
