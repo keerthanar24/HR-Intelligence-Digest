@@ -590,11 +590,34 @@ def market_rows(week_of, entities):
                 return value
             return f"{value} ({delta_text(H.to_int(value), H.to_int(before))})"
 
+        def moved(field):
+            """Did this figure change since the last week that recorded it?"""
+            if not prev:
+                return False
+            here, there = str(now.get(field) or "").strip(), str(prev.get(field) or "").strip()
+            return bool(here and there and here != there)
+
         out.append({"entity": name,
                     "roles": figure("open_roles"),
                     "salaries": figure("salary_entries"),
+                    "changed": moved("open_roles") or moved("salary_entries"),
+                    "baseline": prev is None,
                     "source": now.get("source", "")})
     return out
+
+
+def market_is_quiet(market) -> bool:
+    """Every entity counted, nothing moved, and a previous week to compare to.
+
+    The scope names job-market signals, so the digest always states the
+    position - but a table of four unchanged numbers, every week, in an email
+    to four executives is noise that teaches people to skim. A quiet week gets
+    one line; a week where something moved gets the table.
+
+    A baseline week is never quiet: there is nothing to compare against, and
+    the figures themselves are the thing being established.
+    """
+    return bool(market) and not any(r["baseline"] or r["changed"] for r in market)
 
 
 def same_day_note(platforms):
@@ -854,7 +877,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     # neither is mistaken for the other.
     h.append('<h3 style="font-size:16px;margin:20px 0 6px;'
              'border-top:1px solid #e3e8ef;padding-top:14px;">Job Market</h3>')
-    if market:
+    # An uncounted salary column is a standing fact, not a property of the
+    # table, so it has to survive a quiet week that prints no table.
+    salaries_uncounted = bool(market) and all(r["salaries"] == "—" for r in market)
+    if market and market_is_quiet(market):
+        h.append('<p style="margin:0 0 8px;font-size:13px;">'
+                 'All four entities counted. <strong>No change</strong> in open roles'
+                 f'{"" if salaries_uncounted else " or salary entries"} since last week.</p>')
+    elif market:
         h.append('<p style="margin:0 0 6px;font-size:12px;color:#52606d;">'
                  'Roles advertised, and how many salary entries employees have '
                  'volunteered. The change is the signal; the level on its own is not.</p>')
@@ -862,14 +892,14 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             ["Entity", "Open roles", "Salary entries"],
             [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
             ["left", "right", "right"], ["46%", "27%", "27%"]))
-        if all(r["salaries"] == "—" for r in market):
-            # A column of dashes reads as "no salary data exists". The truth
-            # is that the roles were counted and the salary pages were not,
-            # and those are different facts.
-            h.append('<p style="margin:2px 0 8px;color:#8a6d3b;font-size:13px;">'
-                     'Salary entries were not counted this week — the dash means '
-                     'not measured, not none.</p>')
-    else:
+    if salaries_uncounted:
+        # A column of dashes reads as "no salary data exists". The truth is
+        # that the roles were counted and the salary pages were not, and those
+        # are different facts.
+        h.append('<p style="margin:2px 0 8px;color:#8a6d3b;font-size:13px;">'
+                 'Salary entries were not counted this week — '
+                 'not measured, rather than none.</p>')
+    if not market:
         # Rendering nothing here says "no hiring to report". Nobody counted is
         # a different fact, and it is the one that is true - the same
         # distinction section 3 makes about an unswept channel.
@@ -1059,15 +1089,19 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  "quiet week.")
     t.append("")
     t.append("JOB MARKET")
-    if market:
+    salaries_uncounted = bool(market) and all(r["salaries"] == "—" for r in market)
+    if market and market_is_quiet(market):
+        t.append("All four entities counted. No change in open roles"
+                 f"{'' if salaries_uncounted else ' or salary entries'} since last week.")
+    elif market:
         t.append("Roles advertised, and salary entries volunteered. "
                  "The change is the signal, not the level.")
         t.append(t_table(["Entity", "Open roles", "Salary entries"],
                          [[r["entity"], r["roles"], r["salaries"]] for r in market]))
-        if all(r["salaries"] == "—" for r in market):
-            t.append("Salary entries were not counted this week - the dash means not "
-                     "measured, not none.")
-    else:
+    if salaries_uncounted:
+        t.append("Salary entries were not counted this week - not measured, "
+                 "rather than none.")
+    if not market:
         t.append("Not recorded this week for any entity. No conclusion about hiring "
                  "should be drawn from its absence: the count was not taken.")
     t.append("")

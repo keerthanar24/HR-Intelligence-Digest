@@ -2406,6 +2406,23 @@ def test_absence_of_a_count_is_not_a_finding() -> None:
           "JOB MARKET" in two and two.index("JOB MARKET") > two.index("Rating"),
           "it must come after the ratings table, under its own heading")
     check("and it carries a heading of its own", "JOB MARKET\n" in text)
+    # The scope names job-market signals, so the digest always STATES the
+    # position - but four unchanged numbers every week, in an email to four
+    # executives, is noise that teaches people to skim. A quiet week gets one
+    # line; a week where something moved gets the table.
+    def row(**kw):
+        return {"entity": "x", "roles": "4", "salaries": "—",
+                "changed": False, "baseline": False, **kw}
+
+    check("a baseline week is never quiet - the figures ARE the finding",
+          not build_digest.market_is_quiet([row(baseline=True)]))
+    check("nor is a week where something moved",
+          not build_digest.market_is_quiet([row(changed=True)]))
+    check("but a fully counted, unmoved week is",
+          build_digest.market_is_quiet([row(), row()]))
+    check("and no data at all is not 'quiet' - it is uncounted",
+          not build_digest.market_is_quiet([]))
+
     check("section 2 still holds only the two review sites",
           "Glassdoor" in two and "AmbitionBox" in two
           and "LinkedIn" not in two.split("JOB MARKET")[0])
