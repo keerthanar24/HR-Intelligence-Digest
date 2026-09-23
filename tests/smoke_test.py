@@ -2625,6 +2625,12 @@ def test_job_market_sheet() -> None:
     check("and no salary page at all is fine",
           M.parse_sheet("rk_group 2")[0][0]["salary_parts"] == [])
 
+    # sum([]) is 0, so a roles-only line all but recorded "nought salary
+    # entries" - a count nobody took. The digest has a line saying exactly
+    # that must not happen; this was the same error one layer down.
+    check("a roles-only line carries no salary figure, not a zero",
+          M.parse_sheet("rk_group 2")[0][0]["salary_parts"] != [0])
+
     check("a comment line is skipped", M.parse_sheet("# a note")[0] == [])
     check("and a trailing note does not become data",
           M.parse_sheet("rk_group 3 12  # Glassdoor only")[0][0]["salary_parts"] == [12])

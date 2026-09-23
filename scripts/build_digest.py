@@ -855,6 +855,13 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
             ["Entity", "Open roles", "Salary entries"],
             [[E(r["entity"]), E(r["roles"]), E(r["salaries"])] for r in market],
             ["left", "right", "right"], ["46%", "27%", "27%"]))
+        if all(r["salaries"] == "—" for r in market):
+            # A column of dashes reads as "no salary data exists". The truth
+            # is that the roles were counted and the salary pages were not,
+            # and those are different facts.
+            h.append('<p style="margin:2px 0 8px;color:#8a6d3b;font-size:13px;">'
+                     'Salary entries were not counted this week — the dash means '
+                     'not measured, not none.</p>')
     else:
         # Rendering nothing here says "no hiring to report". Nobody counted is
         # a different fact, and it is the one that is true - the same
@@ -1049,6 +1056,9 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
                  "The change is the signal, not the level.")
         t.append(t_table(["Entity", "Open roles", "Salary entries"],
                          [[r["entity"], r["roles"], r["salaries"]] for r in market]))
+        if all(r["salaries"] == "—" for r in market):
+            t.append("Salary entries were not counted this week - the dash means not "
+                     "measured, not none.")
     else:
         t.append("")
         t.append("JOB MARKET - not recorded this week for any entity. No conclusion "

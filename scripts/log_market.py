@@ -244,21 +244,28 @@ def from_sheet(path: str, week: dt.date, by: str) -> int:
                         and r.get("entity") in {r2["entity"] for r2 in rows})]
     print(f"\n{H.fmt_week(week)}\n")
     for row in rows:
-        salaries = sum(row["salary_parts"])
+        # No salary page counted is NOT nought salary entries. sum([]) is 0,
+        # which would record a count nobody took - the exact error the
+        # digest's "not recorded" line exists to prevent, reintroduced one
+        # layer down.
+        counted = bool(row["salary_parts"])
+        salaries = sum(row["salary_parts"]) if counted else None
         detail = (" + ".join(str(p) for p in row["salary_parts"])
-                  if len(row["salary_parts"]) > 1 else str(salaries))
-        print(f"  {names[row['entity']]:<20} {row['roles']:>3} role(s), "
-              f"{salaries:>4} salary entries  ({detail})")
+                  if len(row["salary_parts"]) > 1 else
+                  (str(salaries) if counted else "not counted"))
+        shown = f"{salaries:>4} salary entries" if counted else "   salary: not counted"
+        print(f"  {names[row['entity']]:<20} {row['roles']:>3} role(s), {shown}  ({detail})")
         existing.append({
             "week_of": week.isoformat(),
             "captured_at": dt.date.today().isoformat(),
             "captured_by": by,
             "entity": row["entity"],
             "open_roles": str(row["roles"]),
-            "salary_entries": str(salaries),
+            "salary_entries": "" if not counted else str(salaries),
             # Recorded automatically so next week has something to match, and
             # so the source-changed warning has a value to compare against.
-            "source": f"{len(row['salary_parts'])} salary page(s): {detail}",
+            "source": (f"{len(row['salary_parts'])} salary page(s): {detail}"
+                       if counted else "roles only; salary entries not counted"),
             "notes": "",
         })
     existing.sort(key=lambda r: (r.get("week_of", ""), r.get("entity", "")))
