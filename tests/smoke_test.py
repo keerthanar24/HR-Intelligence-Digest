@@ -1916,6 +1916,49 @@ def test_reddit_is_one_search_for_the_group() -> None:
           aliases == ["RK World", "Worldinfocom"], f"(got {aliases})")
 
 
+def test_a_merge_conflict_in_a_data_file_is_an_error() -> None:
+    """Conflict markers parse as rows, so nothing else would notice.
+
+    GitHub Desktop stashes local edits to pull, and restoring the stash can
+    leave <<<<<<< / ======= / >>>>>>> in a CSV. Committed like that, the file
+    still reads: each marker becomes a row with a nonsense week_of and every
+    other column blank. The digest builds, the counts are quietly wrong, and
+    the rows either side may not be the ones anybody intended. It happened to
+    data/sweeps.csv on 2026-09-23.
+    """
+    print("a merge conflict in a data file is an error")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "sweeps.csv")
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write(",".join(H.SWEEP_FIELDS) + "\n")
+            fh.write("2026-09-19,news,2026-09-23,collector,0,\n")
+            fh.write("<<<<<<< Updated upstream\n=======\n")
+            fh.write("2026-09-19,quora,2026-09-23,collector,0,\n")
+            fh.write(">>>>>>> Stashed changes\n")
+
+        check("the broken file still parses, which is the whole danger",
+              len(H.read_csv(path)) == 5, f"({len(H.read_csv(path))} rows)")
+
+        saved = H.SWEEPS_CSV
+        H.SWEEPS_CSV = path
+        try:
+            report = validate_data.Report()
+            validate_data.check_conflict_markers(report)
+            check("it is an ERROR, not a warning", len(report.errors) == 1,
+                  f"({report.errors})")
+            check("it names the lines", report.errors and "3, 4, 6" in report.errors[0],
+                  f"({report.errors})")
+            check("it says how to fix it", report.errors and "Notepad" in report.errors[0])
+
+            H.write_csv(path, H.SWEEP_FIELDS,
+                        [r for r in H.read_csv(path) if r.get("platform")])
+            clean = validate_data.Report()
+            validate_data.check_conflict_markers(clean)
+            check("a clean file passes", not clean.errors, f"({clean.errors})")
+        finally:
+            H.SWEEPS_CSV = saved
+
+
 def test_remove_mention() -> None:
     """A row logged by mistake must be removable without editing the CSV.
 
@@ -2132,7 +2175,7 @@ def test_red_flag_sla() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
