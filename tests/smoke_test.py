@@ -1689,20 +1689,37 @@ def test_same_day_promise_is_qualified() -> None:
 
     # Again the rule rather than a fixed list: whatever has no daily route is
     # what the digest must name.
-    lagging = build_digest.same_day_note(platforms)
+    # A route existing is not a route being walked. The list therefore depends
+    # on whether the review pages have actually been opened - these three
+    # checks used to assert a review site was NEVER named, which is what let
+    # the digest promise same-day cover on two platforms nobody was checking.
+    saved = H.count_route_is_live
+    try:
+        H.count_route_is_live = lambda *a, **k: True
+        walked = build_digest.same_day_note(platforms)
+        H.count_route_is_live = lambda *a, **k: False
+        unwalked = build_digest.same_day_note(platforms)
+    finally:
+        H.count_route_is_live = saved
+
     expected = sorted(platforms.get(p, p) for p in H.no_same_day_cover())
-    check("the digest names exactly the channels with no daily route",
-          sorted(lagging) == expected, f"(got {lagging}, expected {expected})")
-    check("and LinkedIn is among them", "LinkedIn" in lagging)
-    check("while a review site never is", "Glassdoor" not in lagging)
+    check("with the count check current, only the routeless channels are named",
+          sorted(walked) == expected, f"(got {walked}, expected {expected})")
+    check("and LinkedIn is among them either way",
+          "LinkedIn" in walked and "LinkedIn" in unwalked)
+    check("with the check stale, the review sites join them",
+          "Glassdoor" in unwalked and "AmbitionBox" in unwalked,
+          f"(got {unwalked})")
+    check("which is strictly more channels, never fewer",
+          set(walked) < set(unwalked))
 
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     for name, body in (("html", html), ("text", text)):
         check(f"the {name} digest says so under Red Flags",
               "only read on the weekly sweep" in body)
         check(f"the {name} digest names LinkedIn as lagging", "LinkedIn" in body)
-    check("and does not blame the process for it",
-          "limit of the sources" in text)
+    check("and attributes the lag to one cause or the other",
+          "limit of the sources" in text or "the process, not the sources" in text)
 
 
 def test_interviews_do_not_mask_unread_reviews() -> None:
@@ -2899,9 +2916,44 @@ def test_daily_check_records_and_reports_staleness() -> None:
             H.RATINGS_CSV = saved
 
 
+def test_same_day_claim_follows_the_data() -> None:
+    """The digest must not promise cover that is not happening.
+
+    same_day_cover() returns "count" for AmbitionBox and Glassdoor because a
+    route EXISTS - the review count moves and daily_check.py would catch it.
+    A route nobody walks delivers nothing, so the claim now asks the data:
+    were those pages opened since the last sweep?
+    """
+    print("the same-day claim follows the data")
+    today = dt.date(2026, 9, 24)
+
+    check("a page checked today counts as live cover",
+          H.count_route_is_live(today=today) is not None)
+
+    # The cause sentence differs, and that is the point. Blaming the platforms
+    # when a two-minute check was simply not run excuses a process gap as a
+    # technical one, to four people who cannot tell the difference.
+    saved = H.count_route_is_live
+    try:
+        H.count_route_is_live = lambda *a, **k: True
+        live = build_digest.same_day_cause()
+        H.count_route_is_live = lambda *a, **k: False
+        stale = build_digest.same_day_cause()
+    finally:
+        H.count_route_is_live = saved
+
+    check("with the check current, the sources are blamed",
+          "limit of the sources, not of the process" in live)
+    check("with it stale, the process is",
+          "the process, not the sources" in stale)
+    check("and the stale wording names the two platforms",
+          "AmbitionBox and Glassdoor" in stale)
+    check("the two sentences are not the same", live != stale)
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

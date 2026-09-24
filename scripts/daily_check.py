@@ -82,10 +82,7 @@ def record_count(entity: str, platform: str, count: int, by: str = "desk") -> No
 
 def last_checked() -> dt.date | None:
     """The most recent day anybody looked at a review page."""
-    days = [H.parse_date(r.get("captured_at", "")) for r in H.read_csv(H.RATINGS_CSV)
-            if r.get("platform") in REVIEW_PLATFORMS]
-    real = [d for d in days if d]
-    return max(real) if real else None
+    return H.last_review_page_check()
 
 
 def main() -> int:

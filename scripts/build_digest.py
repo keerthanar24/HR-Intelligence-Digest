@@ -563,6 +563,25 @@ def quiet_week_note(checked):
             "held in the restricted escalation log, never in here.")
 
 
+def same_day_cause() -> str:
+    """Why those channels lag. The honest answer differs by cause.
+
+    "The platforms block automated checking, so this is a limit of the
+    sources, not of the process" is true of Google Reviews, LinkedIn, X and
+    YouTube. It is NOT true of AmbitionBox and Glassdoor, which have a
+    same-day route that simply is not being walked. Printing the same sentence
+    for both excuses a two-minute habit nobody is doing as a technical
+    limitation, to four people who cannot tell the difference.
+    """
+    if H.count_route_is_live():
+        return ("The platforms block automated checking, so this is a limit of "
+                "the sources, not of the process.")
+    return ("The platforms block automated checking. AmbitionBox and Glassdoor "
+            "are the exception: their review count could be checked daily in "
+            "about two minutes, and has not been since the last sweep - that "
+            "part is the process, not the sources.")
+
+
 def same_day_note(platforms):
     """The channels where a red flag cannot surface until the weekly sweep.
 
@@ -573,8 +592,15 @@ def same_day_note(platforms):
     The promise is real for the rest; saying which is which is the difference
     between a safeguard and an assurance.
     """
-    names = [platforms.get(p, p.replace("_", " ").title()) for p in H.no_same_day_cover()]
-    return sorted(names)
+    lagging = list(H.no_same_day_cover())
+    # AmbitionBox and Glassdoor have a same-day ROUTE - the review count moves
+    # and daily_check.py would catch it - but a route nobody walks delivers
+    # nothing. If the pages have not been opened since the last sweep, they
+    # belong on this list with the rest, and the digest should say so rather
+    # than promise four people cover that is not happening.
+    if not H.count_route_is_live():
+        lagging += [p for p in ("ambitionbox", "glassdoor") if p not in lagging]
+    return sorted(platforms.get(p, p.replace("_", " ").title()) for p in lagging)
 
 
 def channel_coverage(week_of, settings, platforms, swept):
@@ -1277,8 +1303,7 @@ def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, 
                  f'<strong>{E(", ".join(lagging))}</strong> '
                  f'{"is" if len(lagging) == 1 else "are"} only read on the weekly sweep, '
                  'so something posted there can be up to a week old before it is seen. '
-                 'The platforms block automated checking, so this is a limit of the '
-                 'sources, not of the process.</p>')
+                 f'{E(same_day_cause())}</p>')
 
     # 6. Data link
     # The brief names this deliverable "Data Link", not "Data". A reader
@@ -1427,8 +1452,7 @@ def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, 
         t.append(f"Same-day escalation covers the channels checked daily. "
                  f"{', '.join(lagging)} {'is' if len(lagging) == 1 else 'are'} only read on "
                  "the weekly sweep, so something posted there can be up to a week old "
-                 "before it is seen. The platforms block automated checking, so this is a "
-                 "limit of the sources, not of the process.")
+                 "before it is seen. " + same_day_cause())
     t.append("")
     t.append("6. DATA LINK")
     if data_link and not H.is_todo(data_link):
@@ -1502,8 +1526,7 @@ def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, 
                 + ", ".join(lagging)
                 + (" is" if len(lagging) == 1 else " are")
                 + " only read on the weekly sweep, so something posted there can be "
-                "up to a week old before it is seen. The platforms block automated "
-                "checking, so this is a limit of the sources, not of the process."
+                "up to a week old before it is seen. " + same_day_cause()
                 if lagging else ""),
             data_link=data_link,
             holdings_note=holdings,

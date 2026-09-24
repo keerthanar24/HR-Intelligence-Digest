@@ -183,6 +183,31 @@ def same_day_cover(platform_id: str) -> str:
     return ""
 
 
+def last_review_page_check() -> dt.date | None:
+    """The most recent day anybody opened AmbitionBox or Glassdoor."""
+    days = [parse_date(r.get("captured_at", "")) for r in read_csv(RATINGS_CSV)
+            if r.get("platform") in {"ambitionbox", "glassdoor"}]
+    real = [d for d in days if d]
+    return max(real) if real else None
+
+
+def count_route_is_live(within_days: int = 1, today: dt.date | None = None) -> bool:
+    """Is the review-count route actually delivering same-day cover?
+
+    same_day_cover() returns "count" for AmbitionBox and Glassdoor because a
+    route EXISTS - the count moves and daily_check.py would see it. That is
+    not the same as it being used. If nobody has opened those pages since the
+    last sweep, the route is nominal, and the digest saying they have same-day
+    cover is an assurance rather than a safeguard.
+
+    So the digest asks the data instead of the config.
+    """
+    seen = last_review_page_check()
+    if seen is None:
+        return False
+    return ((today or dt.date.today()) - seen).days <= within_days
+
+
 def no_same_day_cover() -> list[str]:
     """Platform ids where a red flag can only surface on the weekly sweep."""
     return sorted(p["id"] for p in load_yaml("sources").get("platforms", [])

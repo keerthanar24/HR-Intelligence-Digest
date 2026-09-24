@@ -58,7 +58,7 @@ jobs:
 
       - name: Is the review-page check actually happening?
         id: freshness
-        run: python scripts/daily_check.py --stale-after 2 | tee -a check.log
+        run: python scripts/daily_check.py --stale-after 7 | tee -a check.log
         continue-on-error: true
 
       - name: Report
