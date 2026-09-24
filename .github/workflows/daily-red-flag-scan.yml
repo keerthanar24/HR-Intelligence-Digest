@@ -44,6 +44,23 @@ jobs:
           python scripts/red_flags.py --scan --exit-code | tee scan.log
         continue-on-error: true
 
+      # The scan can only flag what has been logged, and AmbitionBox and
+      # Glassdoor block automated access - so nothing lands there between
+      # Friday sweeps unless a person looks. Three of the four baseline
+      # mentions came from those two pages, so this is the gap that matters.
+      #
+      # CI cannot do the looking. What it can do is make NOT looking visible,
+      # which is the only part that was missing: until now the digest told
+      # four people escalation was same-day while nothing measured whether
+      # the check behind that claim was happening.
+      - name: The review pages a person still has to open
+        run: python scripts/daily_check.py | tee check.log
+
+      - name: Is the review-page check actually happening?
+        id: freshness
+        run: python scripts/daily_check.py --stale-after 2 | tee -a check.log
+        continue-on-error: true
+
       - name: Report
         run: |
           {
@@ -60,6 +77,19 @@ jobs:
             echo '```'
             cat scan.log
             echo '```'
+            echo ""
+            echo "## Review pages (AmbitionBox, Glassdoor)"
+            echo ""
+            if [ "${{ steps.freshness.outcome }}" = "failure" ]; then
+              echo "**Nobody has checked these recently. Same-day escalation is not"
+              echo "being delivered on the two platforms that produce most findings.**"
+            fi
+            echo ""
+            echo '```'
+            cat check.log
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # Fail the job when there is something to look at, so GitHub notifies.
-          [ "${{ steps.scan.outcome }}" != "failure" ]
+          # Fail the job when there is something to look at, so GitHub notifies -
+          # either a candidate to judge, or a check nobody is doing.
+          [ "${{ steps.scan.outcome }}" != "failure" ] \
+            && [ "${{ steps.freshness.outcome }}" != "failure" ]

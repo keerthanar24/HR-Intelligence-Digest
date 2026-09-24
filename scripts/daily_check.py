@@ -45,15 +45,80 @@ def platform_url(platform: str, entity: str) -> str:
     return ""
 
 
+def record_count(entity: str, platform: str, count: int, by: str = "desk") -> None:
+    """Write the new count into this week's rating snapshot.
+
+    --bump said it recorded and did not: it computed the difference, printed
+    it, and returned. So nothing anywhere showed that a daily check had ever
+    been done, and "same-day cover" rested on somebody's memory of having
+    looked - the failure this whole project is built to prevent, sitting in
+    the script whose entire job is preventing it.
+
+    Only review_count and the capture stamp move. A bump knows the count and
+    nothing else; overwriting the rating or the sub-scores with blanks would
+    lose the Friday snapshot's work.
+    """
+    today = dt.date.today()
+    week = H.week_start_of(today)
+    rows = H.read_csv(H.RATINGS_CSV)
+    for row in rows:
+        if (row.get("entity") == entity and row.get("platform") == platform
+                and row.get("week_of") == week.isoformat()):
+            row["review_count"] = str(count)
+            row["captured_at"] = today.isoformat()
+            row["captured_by"] = by
+            break
+    else:
+        rows.append({**{f: "" for f in H.RATING_FIELDS},
+                     "week_of": week.isoformat(),
+                     "captured_at": today.isoformat(), "captured_by": by,
+                     "entity": entity, "platform": platform,
+                     "review_count": str(count),
+                     "notes": "count only, from the daily check"})
+    rows.sort(key=lambda r: (r.get("week_of", ""), r.get("entity", ""),
+                             r.get("platform", "")))
+    H.write_csv(H.RATINGS_CSV, H.RATING_FIELDS, rows)
+
+
+def last_checked() -> dt.date | None:
+    """The most recent day anybody looked at a review page."""
+    days = [H.parse_date(r.get("captured_at", "")) for r in H.read_csv(H.RATINGS_CSV)
+            if r.get("platform") in REVIEW_PLATFORMS]
+    real = [d for d in days if d]
+    return max(real) if real else None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--bump", nargs=3, metavar=("PLATFORM", "ENTITY", "COUNT"),
                         help="record that a page's count moved, without a full snapshot")
+    parser.add_argument("--stale-after", type=int, metavar="DAYS",
+                        help="exit non-zero if nobody has checked a review page "
+                             "in this many days; for CI, where the useful signal "
+                             "is that the check is NOT being done")
     args = parser.parse_args()
 
     entities = H.entity_names()
     counts = latest_counts()
+
+    if args.stale_after is not None:
+        seen = last_checked()
+        if seen is None:
+            print("No review page has ever been checked. Same-day cover on "
+                  "AmbitionBox and Glassdoor is not being delivered.", file=sys.stderr)
+            return 1
+        age = (dt.date.today() - seen).days
+        if age > args.stale_after:
+            print(f"Last review-page check was {seen} - {age} days ago.",
+                  file=sys.stderr)
+            print("The digest tells four people that escalation is same-day. On "
+                  "these two platforms that is currently untrue.", file=sys.stderr)
+            print("  python3 scripts/daily_check.py", file=sys.stderr)
+            return 1
+        print(f"Last review-page check: {seen} ({age} day(s) ago). Within "
+              f"{args.stale_after}.")
+        return 0
 
     if args.bump:
         platform, entity, count = args.bump
@@ -63,6 +128,10 @@ def main() -> int:
         before = H.to_int(counts.get((entity, platform), ("", ""))[0], -1)
         after = H.to_int(count, -1)
         print(f"{entities[entity]} / {platform}: {before} -> {after}")
+        if after >= 0:
+            record_count(entity, platform, after)
+            print(f"Recorded. {H.RATINGS_CSV.rsplit('/', 1)[-1]} now shows "
+                  f"{after} for this week.")
         if after > before >= 0:
             print(f"\n{after - before} new review(s). Open the page and read them:")
             print(f"  {platform_url(platform, entity)}")

@@ -141,6 +141,20 @@ thing. Every digest now says which is which under section 5.
 | Channel | How a new item could be seen today | Lag |
 |---|---|---|
 | AmbitionBox, Glassdoor | `python3 scripts/daily_check.py` — the review count moving | same day, if the check is run |
+
+**"If the check is run" is now measured.** The daily Action prints the pages a person
+still has to open, and fails — so GitHub notifies — when nobody has checked one in more
+than two days. It cannot do the looking; those sites block scripted access. What it can
+do is stop the digest promising four people something nobody is delivering.
+
+When a count has moved:
+
+```bash
+python3 scripts/daily_check.py --bump ambitionbox rk_world 52
+```
+
+That now writes the new count and today's date into `data/ratings.csv`. Until recently it
+only printed, so nothing anywhere recorded that a check had happened.
 | Reddit, news, Quora, Indeed | the collector, run daily by the GitHub Action | same day |
 | **LinkedIn, X, YouTube, Google Reviews** | **nothing — only the weekly sweep** | **up to 6 days** |
 
