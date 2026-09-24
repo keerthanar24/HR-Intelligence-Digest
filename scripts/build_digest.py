@@ -890,7 +890,10 @@ def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratin
             bs_card(
                 X((m.get("one_line_summary") or m.get("title_or_snippet")
                    or "(no summary)").strip()),
-                source_link(m),
+                # source_link returns (url, label). Passing the tuple straight
+                # in put a Python repr inside every href - the links rendered,
+                # looked right, and went nowhere.
+                source_link(m)[0],
                 " &middot; ".join(filter(None, [
                     f'{stars_text(m)} stars' if stars_text(m) != "—" else "",
                     author_text(m), sentiment_label(m)])),

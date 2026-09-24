@@ -2738,6 +2738,17 @@ def test_broadsheet_is_a_skin_not_a_restructure() -> None:
           "the skin must not touch the text alternative")
     check("the two HTML styles really do differ", plain != broad)
 
+    # source_link returns (url, label). Passing the tuple in put a Python
+    # repr inside every href - the links rendered, looked right, and went
+    # nowhere. A broken link is invisible until somebody clicks it.
+    import re as _re
+    hrefs = _re.findall(r'href="([^"]*)"', broad)
+    check("every link in the broadsheet is a real URL",
+          hrefs and all(h.startswith("http") for h in hrefs),
+          f"bad: {[h for h in hrefs if not h.startswith('http')][:2]}")
+    check("and the plain style's links are too",
+          all(h.startswith("http") for h in _re.findall(r'href="([^"]*)"', plain)))
+
     check("it uses the 600px email shell, not 900px",
           'width="600"' in broad and "max-width:900px" not in broad)
     check("and serif type throughout", "Georgia" in broad)
