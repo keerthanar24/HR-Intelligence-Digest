@@ -2243,8 +2243,13 @@ def test_red_flag_sla() -> None:
                 "red_flag_reason": "non_payment", "url": "https://example.invalid/1",
                 "names_individual": "no", "status": "escalated"}
 
+    # `notified` is yes/no - "was the alert sent" - per ESCALATION_FIELDS.
+    # This fixture used to carry "Mahendra, Sonal" there, and the check below
+    # asserted the names came back out. That is what kept the bug alive: the
+    # digest printed "alerted 2026-09-16 (same day) to yes" in production,
+    # where the real column holds a flag rather than a list of people.
     same_day = [{"mention_id": "M-1", "raised_at": "2026-09-16",
-                 "notified_at": "2026-09-16", "notified": "Mahendra, Sonal",
+                 "notified_at": "2026-09-16", "notified": "yes",
                  "severity": "high", "status": "acknowledged"}]
     late = [dict(same_day[0], notified_at="2026-09-19")]
     unsent = [dict(same_day[0], notified_at="", notified="")]
@@ -2254,7 +2259,7 @@ def test_red_flag_sla() -> None:
           f"(got {on['timing']})")
     check("the trigger reads as a label, not a field name", on["reason"] == "Non-payment",
           f"(got {on['reason']})")
-    check("the row carries who was told", "Mahendra" in on["notified_to"])
+    check("the row records that the alert was sent", on["alert_sent"])
 
     lt = build_digest.red_flag_rows([mention("M-1")], late, entities, platforms)[0]
     check("a late escalation is not marked on time", not lt["on_time"])
@@ -2803,9 +2808,52 @@ def test_broadsheet_is_a_skin_not_a_restructure() -> None:
           "No red flags" in lines[2])
 
 
+def test_an_escalation_reaches_section_5() -> None:
+    """Section 5 is the RECORD of same-day escalations, not the mechanism.
+
+    Escalation does not wait for the Friday send - docs/04-red-flag-protocol
+    opens by saying so. Section 5 reports what was already sent, so an empty
+    section means nothing was raised, not that the section is broken. This
+    proves a raised flag does reach it.
+    """
+    print("an escalation reaches section 5")
+    entities = H.entity_names()
+    platforms = {p["id"]: p for p in H.load_yaml("sources").get("platforms", [])}
+    mention = {
+        "mention_id": "M-TEST", "entity": "rk_group", "platform": "ambitionbox",
+        "post_date": "2026-09-22", "red_flag": "yes", "red_flag_reason": "non_payment",
+        "one_line_summary": "Says final settlement is unpaid two months after exit",
+        "status": "escalated", "url": "https://example.test/review",
+    }
+
+    def escalation(**over):
+        return {"mention_id": "M-TEST", "raised_at": "2026-09-22",
+                "notified_at": "2026-09-22", "notified": "yes", "severity": "high",
+                "reason": "non_payment", "status": "closed", **over}
+
+    rows = build_digest.red_flag_rows([mention], [escalation()], entities, platforms)
+    check("a raised flag produces a row", len(rows) == 1)
+    check("alerted the same day reads as on time", rows[0]["on_time"])
+    check("and the alert is recorded as sent", rows[0]["alert_sent"])
+
+    # `notified` is yes/no, not a recipient list - the schema has no such
+    # field, because it is always the four. Rendered as one it printed
+    # "alerted 2026-09-22 (same day) to yes".
+    late = build_digest.red_flag_rows(
+        [mention], [escalation(notified_at="2026-09-25")], entities, platforms)
+    check("a three-day delay is not on time", not late[0]["on_time"])
+
+    unsent = build_digest.red_flag_rows(
+        [mention], [escalation(notified="no", status="open")], entities, platforms)
+    check("a flag never sent is marked unsent", not unsent[0]["alert_sent"],
+          "a raised, recorded, unsent flag is the worst row in the digest")
+    check("and the HTML says so in red",
+          "not recorded as sent" in build_digest.alert_cell(unsent[0]))
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

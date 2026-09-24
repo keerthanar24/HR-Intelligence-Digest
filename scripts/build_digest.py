@@ -412,7 +412,10 @@ def red_flag_rows(mentions, escalations, entities, platforms):
                 "summary": m.get("one_line_summary", ""),
                 "url": m.get("url", ""),
                 "status": esc.get("status") or m.get("status") or "open",
-                "notified_to": esc.get("notified", ""),
+                # `notified` is a yes/no flag - "was the alert sent" - not a
+                # list of recipients; the schema has no such field because it
+                # is always the four. Rendered as one it printed "to yes".
+                "alert_sent": H.is_yes(esc.get("notified", "")),
                 "names_individual": H.is_yes(m.get("names_individual")),
             }
         )
@@ -435,12 +438,12 @@ def alert_cell(r):
         return ('<strong style="color:#a12622;">NOT YET SENT</strong><br>'
                 '<span style="font-size:11px;color:#a12622;">escalate now</span>')
     colour = "#1e7a3c" if r["on_time"] else "#a12622"
-    who = ""
-    if r["notified_to"]:
-        who = ('<br><span style="font-size:11px;color:#52606d;">to '
-               f'{E(truncate(r["notified_to"], 44))}</span>')
+    # A date with no alert behind it is the worst row in the digest: a flag
+    # raised, recorded, and never actually sent to anyone.
+    unsent = ('<br><span style="font-size:11px;color:#a12622;">alert not '
+              'recorded as sent</span>') if not r["alert_sent"] else ""
     return (f'{E(r["notified"])}<br><strong style="color:{colour};font-size:11px;">'
-            f'{E(r["timing"])}</strong>{who}')
+            f'{E(r["timing"])}</strong>{unsent}')
 
 
 def h_table(headers, rows, aligns=None, widths=None):
@@ -1408,8 +1411,8 @@ def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, 
             t.append(f"  {r['reason']} · {r['severity']} · status {r['status']}")
             if r["notified"]:
                 line = f"  Found {r['raised']} → alerted {r['notified']} ({r['timing']})"
-                if r["notified_to"]:
-                    line += f" to {truncate(r['notified_to'], 60)}"
+                if not r["alert_sent"]:
+                    line += " - ALERT NOT RECORDED AS SENT"
             else:
                 line = f"  Found {r['raised']} → NOT YET SENT - escalate now"
             t.append(line)
