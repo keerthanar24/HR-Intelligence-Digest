@@ -23,6 +23,53 @@ and week-on-week rating movement.
 
 ---
 
+## The week at a glance
+
+Friday morning, in this order. Nothing here is optional; the times are the budget, not
+the target.
+
+| | Step | Time | What it produces |
+|---|---|---|---|
+| **Mon–Thu** | [The daily check](#the-daily-check-2-min-a-day) | 2 min/day | same-day cover on AmbitionBox and Glassdoor |
+| 0 | Start the week | 5 min | feeds pulled, repo current |
+| 1 | Manual sweep | 90–120 min | every channel read and **recorded as read** |
+| 2 | Tag | 45–60 min | sentiment and themes on every new row |
+| 3 | Red flags | 10 min | anything escalated — **same day, always** |
+| 4 | Export, validate, gate | 10 min | the arithmetic agrees with the pages |
+| 5 | Build and send | 20 min | the digest, in the body, to the four |
+| 6 | Record the week | 5 min | the hours, and what was new |
+
+Four jobs inside Step 1 have their own procedure, because each is easy to do
+inconsistently:
+
+- [Dating a LinkedIn post](#dating-a-linkedin-post) — the window edge is hard, `3w` is not
+- [Collecting company posts in bulk](#collecting-company-posts-in-bulk) — and what counts
+- [Counting the job market and salary entries](#counting-the-job-market-and-salary-entries) — watched, not reported
+- [Checking the project is healthy](#checking-the-project-is-healthy) — one command
+
+## The daily check (2 min a day)
+
+Not part of Friday, and the thing that makes the red-flag promise true rather than
+aspirational.
+
+```bash
+python3 scripts/daily_check.py
+```
+
+Seven pages, one number each. **You are not reading reviews — you are comparing a count.**
+If it matches, move on. If it moved, open that one page, read what arrived, and:
+
+```bash
+python3 scripts/daily_check.py --bump ambitionbox rk_world 52
+```
+
+That records the check and tells you what to read. Skipping it is a real choice, not a
+neutral one: the digest reads the data and names AmbitionBox and Glassdoor as
+weekly-only when nobody has looked, because on those days a Tuesday allegation waits
+until Friday.
+
+---
+
 ## Step 0 — Start the week (5 min)
 
 ```bash
