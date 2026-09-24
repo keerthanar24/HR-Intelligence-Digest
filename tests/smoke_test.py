@@ -2726,13 +2726,21 @@ def test_broadsheet_is_a_skin_not_a_restructure() -> None:
     _s1, plain, text, _st = build_digest.build(WEEK, settings)
     _s2, broad, text2, _st2 = build_digest.build(WEEK, settings, style="broadsheet")
 
+    # Match the numbered SECTION HEADINGS, not the first time a phrase turns
+    # up anywhere. The Brief legitimately says "No red flags" before section
+    # 5 exists, so a plain search finds that first. This passed only because
+    # the search was case-sensitive and the Brief is lower case - luck, not a
+    # check, and it would have hidden a genuinely misordered section.
+    import re as _re
+    headings = _re.findall(r">(\d) &middot; ([^<]+)</div>", broad)
     six = ["Headline", "Rating Movement", "What&#x27;s New", "Themes",
            "Red Flags", "Data Link"]
-    where = [broad.find(name) for name in six]
-    check("all six deliverables are in the broadsheet",
-          all(i >= 0 for i in where),
-          f"missing {[n for n, i in zip(six, where) if i < 0]}")
-    check("and in the brief's order", where == sorted(where))
+    check("the broadsheet carries six numbered section headings",
+          len(headings) == 6, f"got {headings}")
+    check("numbered 1 to 6 in order",
+          [n for n, _ in headings] == list("123456"), f"got {headings}")
+    check("and they are the brief's six deliverables",
+          [t for _, t in headings] == six, f"got {[t for _, t in headings]}")
 
     check("the plain text body is identical either way", text == text2,
           "the skin must not touch the text alternative")
