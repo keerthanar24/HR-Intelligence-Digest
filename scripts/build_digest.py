@@ -633,7 +633,361 @@ baseline_window = H.baseline_window
 mentions_in = H.mentions_in
 
 
-def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
+# --- broadsheet style -------------------------------------------------------
+# A second HTML skin, modelled on the Westbury Intelligence house format:
+# 600px shell (the email standard - Outlook handles it where 900px wraps
+# badly), Georgia throughout, a numbered Brief above the sections, and news
+# cards in place of a wide table for What's New.
+#
+# The six deliverables in docs/00-brief.md are unchanged and in the same
+# order. This is a skin, not a restructure - the test that asserts all six
+# appear, in order, in both bodies runs against this style too.
+
+BS = {
+    "paper": "#f2efe9", "card": "#ffffff", "ink": "#191714",
+    "accent": "#8a2f2a", "muted": "#6b635a", "rule": "#d9d2c5",
+    "faint": "#a89f92", "warn": "#8a6d3b",
+}
+SERIF = "Georgia,'Times New Roman',Times,serif"
+
+def X(value) -> str:
+    """Escape for HTML, stringifying first.
+
+    E is html.escape, which wants a str; several row values are ints (counts,
+    weeks). The plain style passes those through unescaped, which works but
+    means the two styles disagree about which values are escaped. This makes
+    it one rule.
+    """
+    return E("" if value is None else str(value))
+
+
+
+
+def bs_kicker(text: str) -> str:
+    return (f'<div style="font:400 10px/1 {SERIF};letter-spacing:.28em;'
+            f'text-transform:uppercase;color:{BS["muted"]};">{text}</div>')
+
+
+def bs_rule_head(text: str) -> str:
+    """A section heading: small caps, accent colour, hard rule beneath."""
+    return (f'<tr><td class="pad" style="background:{BS["card"]};padding:26px 40px 0 40px;">'
+            f'<div style="font:400 11px/1 {SERIF};letter-spacing:.24em;'
+            f'text-transform:uppercase;color:{BS["accent"]};'
+            f'border-bottom:1px solid {BS["ink"]};padding-bottom:7px;">{text}</div>'
+            '</td></tr>')
+
+
+def bs_row(inner: str, pad: str = "18px 40px 4px 40px") -> str:
+    return (f'<tr><td class="pad" style="background:{BS["card"]};padding:{pad};">'
+            f'{inner}</td></tr>')
+
+
+def bs_table(headers, rows, aligns, widths) -> str:
+    """The same grid as the plain style, set in the broadsheet's type."""
+    out = ['<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+           'border="0" style="margin-top:6px;table-layout:fixed;border-collapse:collapse;">']
+    out.append("<tr>")
+    for head, align, width in zip(headers, aligns, widths):
+        out.append(
+            f'<th width="{width.rstrip("%")}" align="{align}" style="width:{width};'
+            f'padding:7px 8px 7px 0;font:700 10px/1.3 {SERIF};letter-spacing:.1em;'
+            f'text-transform:uppercase;color:{BS["muted"]};'
+            f'border-bottom:1px solid {BS["ink"]};">{head}</th>')
+    out.append("</tr>")
+    for row in rows:
+        out.append("<tr>")
+        for cell, align in zip(row, aligns):
+            out.append(
+                f'<td align="{align}" style="padding:8px 8px 8px 0;'
+                f'font:400 14px/1.5 {SERIF};color:{BS["ink"]};vertical-align:top;'
+                f'border-bottom:1px solid {BS["rule"]};word-break:break-word;'
+                f'overflow-wrap:anywhere;">{cell}</td>')
+        out.append("</tr>")
+    out.append("</table>")
+    return "".join(out)
+
+
+def bs_note(text: str, *, warn: bool = False) -> str:
+    colour = BS["warn"] if warn else BS["muted"]
+    return (f'<div style="font:400 12px/1.6 {SERIF};color:{colour};'
+            f'padding-top:8px;">{text}</div>')
+
+
+def bs_card(title: str, url: str, detail: str, meta: str) -> str:
+    """One mention, as a news card rather than a table row.
+
+    Four items read far better as cards than as a seven-column table; forty
+    would not, which is why the plain style keeps the grid.
+    """
+    head = (f'<a href="{url}" style="font:400 19px/1.32 {SERIF};'
+            f'color:{BS["ink"]};">{title}</a>' if url else
+            f'<div style="font:400 19px/1.32 {SERIF};color:{BS["ink"]};">{title}</div>')
+    more = (f'<a href="{url}" style="font:400 11px/1 {SERIF};letter-spacing:.14em;'
+            f'text-transform:uppercase;color:{BS["accent"]};display:inline-block;'
+            'padding-top:8px;">Read more &rarr;</a>') if url else ""
+    return (f'<div style="padding:0 0 16px 0;">'
+            f'<div style="font:700 11px/1 {SERIF};letter-spacing:.12em;'
+            f'text-transform:uppercase;color:{BS["muted"]};padding-bottom:8px;">{meta}</div>'
+            f'{head}'
+            f'<div style="font:400 14px/1.62 {SERIF};color:{BS["muted"]};'
+            f'padding-top:6px;">{detail}</div>{more}</div>')
+
+
+def bs_quiet(rows) -> str:
+    """'Quiet this week — last known', the pattern worth borrowing.
+
+    An entity with nothing this week still appears, with the last thing
+    recorded about it and when. A blank row says 'nothing found'; this says
+    'nothing found, and here is how long that has been true' - which for a
+    group averaging one mention every three weeks is the more useful fact,
+    and the one a reader would otherwise mistake for a gap in the sweep.
+    """
+    if not rows:
+        return ""
+    out = [f'<div style="border-top:1px solid {BS["rule"]};padding-top:10px;'
+           f'font:400 10px/1 {SERIF};letter-spacing:.22em;text-transform:uppercase;'
+           f'color:{BS["muted"]};">Quiet this week &mdash; last known</div>',
+           '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+           'border="0" style="margin-top:4px;table-layout:fixed;">']
+    for name, text, when in rows:
+        dated = (f'<span style="font-style:normal;font-size:10px;letter-spacing:.1em;'
+                 f'color:{BS["faint"]};">&nbsp;{when}</span>') if when else ""
+        out.append(
+            f'<tr><td width="146" valign="top" style="width:146px;padding:6px 12px 6px 0;'
+            f'font:700 11px/1.4 {SERIF};letter-spacing:.06em;text-transform:uppercase;'
+            f'color:{BS["muted"]};">{name}</td>'
+            f'<td valign="top" style="padding:6px 0;font:italic 400 13px/1.5 {SERIF};'
+            f'color:{BS["muted"]};">{text}{dated}</td></tr>')
+    out.append("</table>")
+    return "".join(out)
+
+
+def last_known(entity_id, entity_name, all_mentions, week_of):
+    """(name, summary, '12 Aug') for an entity's most recent mention before this week."""
+    earlier = [m for m in all_mentions
+               if m.get("entity") == entity_id
+               and (m.get("status") or "") != "out_of_scope"
+               and (m.get("post_date") or "") < week_of.isoformat()]
+    if not earlier:
+        return (entity_name, "Nothing on record.", "")
+    latest = max(earlier, key=lambda m: m.get("post_date", ""))
+    said = (latest.get("one_line_summary") or latest.get("title_or_snippet") or "").strip()
+    when = H.parse_date(latest.get("post_date", ""))
+    return (entity_name, said or "Recorded, no summary.",
+            H.day_month(when) if when else "")
+
+
+def brief_lines(stats, heads, ratings, flags, market_note):
+    """The numbered Brief: what a reader needs before any table.
+
+    Three facts, in the order they would change a decision: whether anything
+    was said, whether any rating moved, whether anything escalated. Derived,
+    never written by hand, so it cannot drift from the sections below it.
+    """
+    lines = []
+    total = stats["total"]
+    group = next((r for r in heads if r.get("is_total")), None)
+    net = group.get("net", "—") if group else "—"
+    lines.append(f"{plural(total, 'mention')} across the four entities"
+                 + (f", group net sentiment {net}" if total else
+                    " — a quiet week, not an unswept one"))
+
+    moved = [r for r in ratings
+             if r.get("rating_delta") not in (None, "", "n/a", "—", "no change")]
+    lines.append(f"{plural(len(moved), 'rating')} moved on Glassdoor or AmbitionBox"
+                 if moved else
+                 "No Glassdoor or AmbitionBox rating moved this week")
+
+    lines.append(f"{plural(len(flags), 'red flag')} raised — see section 5"
+                 if flags else
+                 "No red flags: nothing named an individual, alleged harassment or "
+                 "non-payment, or gathered public traction")
+    return lines
+
+
+def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratings,
+                    now, themes, rolling, rolling_total, rolling_weeks, flags,
+                    entities, all_mentions, week_of, swept_line, no_page_note,
+                    unrated_note, company_note, untagged_note, quiet_note,
+                    same_day, data_link, holdings_note, scope_note, trial_note,
+                    date_band) -> str:
+    """The six deliverables, set as a broadsheet. Structure is unchanged."""
+    p = []
+    p.append(
+        '<meta charset="utf-8"><meta name="viewport" content="width=device-width,'
+        'initial-scale=1"><style>a{text-decoration:none;}'
+        '@media only screen and (max-width:620px){.shell{width:100%!important;}'
+        '.pad{padding-left:18px!important;padding-right:18px!important;}'
+        '.h1{font-size:24px!important;}}</style>'
+        f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+        f'border="0" style="margin:0;padding:0;background:{BS["paper"]};">'
+        '<tr><td align="center" style="padding:24px 12px;">'
+        '<table role="presentation" class="shell" width="600" cellpadding="0" '
+        'cellspacing="0" border="0" style="width:600px;max-width:100%;">'
+    )
+
+    # Masthead
+    p.append(
+        f'<tr><td class="pad" align="center" style="background:{BS["card"]};'
+        f'padding:34px 40px 18px 40px;border-top:3px solid {BS["ink"]};">'
+        f'<div style="font:400 10px/1 {SERIF};letter-spacing:.34em;'
+        f'text-transform:uppercase;color:{BS["accent"]};">'
+        'Employer reputation &middot; four entities &middot; public sources</div>'
+        f'<div class="h1" style="font:400 33px/1.12 {SERIF};color:{BS["ink"]};'
+        'padding:12px 0 10px 0;letter-spacing:-.01em;">HR Intelligence Digest</div>'
+        f'<div style="border-top:1px solid {BS["rule"]};border-bottom:3px double '
+        f'{BS["rule"]};padding:8px 0;font:400 11px/1 {SERIF};letter-spacing:.16em;'
+        f'text-transform:uppercase;color:{BS["muted"]};">{date_band}</div>'
+        '</td></tr>'
+    )
+
+    if partial_notice:
+        p.append(bs_row(
+            f'<div style="font:400 13px/1.6 {SERIF};color:{BS["warn"]};'
+            f'border-left:3px solid {BS["warn"]};padding-left:12px;">{partial_notice}</div>',
+            pad="18px 40px 0 40px"))
+
+    # The Brief
+    brief = brief_lines(stats, heads, ratings, flags, None)
+    rows = "".join(
+        f'<tr><td width="34" valign="top" style="padding:9px 0;font:400 15px/1.4 '
+        f'{SERIF};color:{BS["accent"]};">{i:02d}</td>'
+        f'<td valign="top" style="padding:9px 0;font:400 15px/1.55 {SERIF};'
+        f'color:{BS["ink"]};border-bottom:1px solid {BS["rule"]};">{X(line)}</td></tr>'
+        for i, line in enumerate(brief, 1))
+    p.append(bs_row(bs_kicker("The Brief") +
+                    f'<table role="presentation" width="100%" cellpadding="0" '
+                    f'cellspacing="0" border="0" style="margin-top:4px;">{rows}</table>',
+                    pad="20px 40px 8px 40px"))
+
+    # 1 Headline
+    p.append(bs_rule_head("1 &middot; Headline"))
+    p.append(bs_row(bs_table(
+        ["Entity", "Mentions", "vs last wk", "Net sentiment", "vs last wk"],
+        [[(f'<strong>{X(r["entity"])}</strong>' if r["is_total"] else X(r["entity"])),
+          (f'<strong>{r["count"]}</strong>' if r["is_total"] else r["count"]),
+          X(r["count_delta"]), X(r["net"]), X(r["net_delta"])] for r in heads],
+        ["left", "right", "right", "right", "right"],
+        ["32%", "15%", "18%", "18%", "17%"])
+        + (bs_note(company_note) if company_note else "")
+        + (bs_note(untagged_note, warn=True) if untagged_note else "")))
+
+    # 2 Rating Movement
+    p.append(bs_rule_head("2 &middot; Rating Movement"))
+    p.append(bs_row(bs_table(
+        ["Entity", "Platform", "Rating", "Change", "Reviews", "New", "Recommend"],
+        [[X(r["entity"]), X(r["platform"]), X(r["rating"]), X(r["rating_delta"]),
+          X(r["reviews"]), X(r["reviews_delta"]), X(r["recommend"])] for r in ratings],
+        ["left", "left", "right", "right", "right", "right", "right"],
+        ["23%", "15%", "11%", "14%", "11%", "12%", "14%"])
+        + (bs_note(no_page_note) if no_page_note else "")
+        + (bs_note(unrated_note) if unrated_note else "")))
+
+    # 3 What's New
+    p.append(bs_rule_head("3 &middot; What&#x27;s New"))
+    if now:
+        cards = "".join(
+            bs_card(
+                X((m.get("one_line_summary") or m.get("title_or_snippet")
+                   or "(no summary)").strip()),
+                source_link(m),
+                " &middot; ".join(filter(None, [
+                    f'{stars_text(m)} stars' if stars_text(m) != "—" else "",
+                    author_text(m), sentiment_label(m)])),
+                f'{X(entities.get(m.get("entity"), m.get("entity")))} '
+                f'&middot; {X(H.platform_names().get(m.get("platform"), m.get("platform")))} '
+                f'&middot; {X(m.get("post_date", ""))}')
+            for m in now)
+        p.append(bs_row(cards))
+    else:
+        p.append(bs_row(f'<div style="font:400 15px/1.6 {SERIF};color:{BS["ink"]};">'
+                        'Nothing new on any channel this week.</div>'))
+
+    # Quiet this week - last known
+    silent = [last_known(eid, name, all_mentions, week_of)
+              for eid, name in entities.items()
+              if not any(m.get("entity") == eid for m in now)]
+    if silent:
+        p.append(bs_row(bs_quiet(silent), pad="8px 40px 4px 40px"))
+    p.append(bs_row(bs_note(swept_line), pad="4px 40px 8px 40px"))
+
+    # 4 Themes
+    p.append(bs_rule_head("4 &middot; Themes"))
+    if themes:
+        items = "".join(
+            f'<div style="padding:0 0 10px 0;">'
+            f'<span style="font:700 12px/1.4 {SERIF};letter-spacing:.08em;'
+            f'text-transform:uppercase;color:{BS["ink"]};">{X(r["theme"])}</span>'
+            f'<span style="font:400 13px/1.5 {SERIF};color:{BS["muted"]};"> &mdash; '
+            f'{X(plural(r["count"], "mention"))}, {X(r["lean"])}, net {X(r["net"])}'
+            f'{"" if r["recurring"] else ", single mention &mdash; not yet a pattern"}'
+            f'</span>'
+            f'<div style="font:italic 400 13px/1.55 {SERIF};color:{BS["muted"]};'
+            f'padding-top:3px;">{X(r.get("example", ""))}</div></div>'
+            for r in themes)
+        p.append(bs_row(items))
+    else:
+        p.append(bs_row(f'<div style="font:400 15px/1.6 {SERIF};color:{BS["ink"]};">'
+                        'No themes yet — too few mentions to show a pattern.</div>'))
+    if rolling:
+        roll = "".join(
+            f'<div style="font:400 13px/1.6 {SERIF};color:{BS["muted"]};">'
+            f'{X(r["theme"])} &mdash; {X(plural(r["count"], "mention"))} across '
+            f'{X(plural(r["weeks"], "week"))}, {X(r["lean"])}, net {X(r["net"])}</div>'
+            for r in rolling)
+        p.append(bs_row(
+            f'<div style="border-top:1px solid {BS["rule"]};padding-top:10px;'
+            f'font:400 10px/1 {SERIF};letter-spacing:.22em;text-transform:uppercase;'
+            f'color:{BS["muted"]};">Recurring across the last '
+            f'{rolling_weeks} weeks ({plural(rolling_total, "mention")})</div>' + roll,
+            pad="4px 40px 8px 40px"))
+
+    # 5 Red Flags
+    p.append(bs_rule_head("5 &middot; Red Flags"))
+    if flags:
+        rows5 = "".join(
+            f'<div style="padding:0 0 12px 0;border-left:3px solid {BS["accent"]};'
+            f'padding-left:12px;">'
+            f'<div style="font:700 11px/1.4 {SERIF};letter-spacing:.1em;'
+            f'text-transform:uppercase;color:{BS["accent"]};">{X(r["reason"])}</div>'
+            f'<div style="font:400 15px/1.5 {SERIF};color:{BS["ink"]};padding-top:4px;">'
+            f'{X(r["summary"])}</div>'
+            f'<div style="font:400 12px/1.5 {SERIF};color:{BS["muted"]};padding-top:3px;">'
+            f'{X(r["entity"])} &middot; {X(r["platform"])} &middot; {X(r["raised"])} '
+            f'&middot; {X(r["status"])}</div></div>'
+            for r in flags)
+        p.append(bs_row(rows5))
+    else:
+        p.append(bs_row(
+            f'<div style="font:400 15px/1.5 {SERIF};color:{BS["ink"]};">'
+            '<strong>None this week.</strong></div>' + bs_note(quiet_note)))
+    if same_day:
+        p.append(bs_row(bs_note(same_day, warn=True), pad="0 40px 8px 40px"))
+
+    # 6 Data Link
+    p.append(bs_rule_head("6 &middot; Data Link"))
+    p.append(bs_row(
+        f'<div style="font:400 15px/1.6 {SERIF};color:{BS["ink"]};">'
+        f'<a href="{data_link}" style="color:{BS["accent"]};border-bottom:1px solid '
+        f'{BS["rule"]};">Open the tracking sheet</a></div>' + bs_note(holdings_note),
+        pad="18px 40px 8px 40px"))
+
+    # Colophon
+    p.append(
+        f'<tr><td class="pad" align="center" style="background:{BS["card"]};'
+        f'padding:26px 40px 34px 40px;border-bottom:3px solid {BS["ink"]};">'
+        f'<div style="border-top:1px solid {BS["rule"]};padding-top:16px;'
+        f'font:400 11px/1.7 {SERIF};color:{BS["muted"]};text-align:left;">{scope_note}'
+        f'<br><br>{trial_note}</div>'
+        f'<div style="padding-top:14px;font:400 10px/1.7 {SERIF};letter-spacing:.16em;'
+        f'text-transform:uppercase;color:{BS["muted"]};">'
+        f'HR Intelligence Digest | {date_band} | Confidential</div></td></tr>'
+    )
+    p.append("</table></td></tr></table>")
+    return "".join(p)
+
+
+def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
     platforms = H.platform_names()
@@ -1100,6 +1454,57 @@ def build(week_of: dt.date, settings: dict) -> tuple[str, str, str, dict]:
     if flags:
         subject += f" · {len(flags)} red flag{'s' if len(flags) != 1 else ''}"
 
+    if style == "broadsheet":
+        # The same computed rows, set as a broadsheet. Notes are rebuilt as
+        # plain sentences here rather than reusing the plain style's inline
+        # markup, which carries its own colours and margins.
+        swept_line = ("Swept this week: "
+                      + ", ".join(H.platform_names().get(p, p) for p in swept) + ".")
+        if not_swept:
+            swept_line += (" NOT swept: "
+                           + ", ".join(H.platform_names().get(p, p) for p in not_swept)
+                           + ". Nothing was found there because nobody looked.")
+        broadsheet = broadsheet_html(
+            week_label=week_label,
+            baseline=bool(baseline),
+            partial_notice=(notice if partial else ""),
+            stats=stats, heads=heads, ratings=ratings, now=now,
+            themes=themes, rolling=rolling, rolling_total=rolling_total,
+            rolling_weeks=rolling_weeks, flags=flags, entities=entities,
+            all_mentions=all_mentions, week_of=week_of,
+            swept_line=swept_line,
+            no_page_note=(
+                f"No page exists for {', '.join(no_page)}, so "
+                f"{'that line' if len(no_page) == 1 else 'those lines'} can never "
+                "appear above. The other review site is the only one covering "
+                f"{'it' if len(no_page) == 1 else 'them'}." if no_page else ""),
+            unrated_note=(
+                f"{', '.join(unrated)} {'has' if len(unrated) == 1 else 'have'} no "
+                "Glassdoor or AmbitionBox page, so absence here is not evidence of a "
+                "quiet week." if unrated else ""),
+            company_note=(
+                f"{plural(company_posts, 'item')} above "
+                f"{'is' if company_posts == 1 else 'are'} company page activity — the "
+                "employer posting about itself. Counted as coverage, excluded from net "
+                "sentiment: the group does not score itself." if company_posts else ""),
+            untagged_note=(
+                f"{plural(untagged, 'mention')} not yet sentiment-tagged, excluded from "
+                "the net sentiment figures." if untagged else ""),
+            quiet_note=quiet_week_note(len(now)),
+            same_day=(
+                "Same-day escalation covers the channels checked daily. "
+                + ", ".join(lagging)
+                + (" is" if len(lagging) == 1 else " are")
+                + " only read on the weekly sweep, so something posted there can be "
+                "up to a week old before it is seen. The platforms block automated "
+                "checking, so this is a limit of the sources, not of the process."
+                if lagging else ""),
+            data_link=data_link,
+            holdings_note=holdings,
+            scope_note=BOUNDARY_NOTE, trial_note=TRIAL_NOTE,
+            date_band=week_label)
+        return subject, broadsheet, "\n".join(t), stats
+
     return subject, "".join(h), "\n".join(t), stats
 
 
@@ -1110,6 +1515,9 @@ def main() -> int:
     parser.add_argument("--allow-gaps", action="store_true",
                         help="build even when reviews are still unread; the email "
                              "does not disclose the shortfall, so only for a mid-sweep look")
+    parser.add_argument("--style", choices=["plain", "broadsheet"], default="plain",
+                        help="broadsheet: the serif, 600px house format "
+                             "(same six deliverables, different skin)")
     parser.add_argument("--strict", action="store_true",
                         help="exit non-zero if any mention in the week is untagged")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
@@ -1122,7 +1530,7 @@ def main() -> int:
     week_of = H.monday_of(week_of)
 
     settings = H.load_yaml("settings")
-    subject, body_html, body_text, stats = build(week_of, settings)
+    subject, body_html, body_text, stats = build(week_of, settings, args.style)
 
     os.makedirs(args.out_dir, exist_ok=True)
     stem = f"digest-{week_of.isoformat()}"

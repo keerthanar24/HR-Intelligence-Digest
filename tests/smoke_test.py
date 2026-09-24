@@ -2713,9 +2713,80 @@ def test_the_sent_message_carries_the_deliverables() -> None:
               "docs.google.com" in body or "http" in body.split(six[-1])[1][:400])
 
 
+def test_broadsheet_is_a_skin_not_a_restructure() -> None:
+    """The house format must carry the same six deliverables, in order.
+
+    A restyle is exactly where a section goes quietly missing: the new
+    template is written section by section and one gets forgotten, and the
+    email still looks finished. So the six-deliverable check runs against
+    both styles, not just the default one.
+    """
+    print("broadsheet style")
+    settings = H.load_yaml("settings")
+    _s1, plain, text, _st = build_digest.build(WEEK, settings)
+    _s2, broad, text2, _st2 = build_digest.build(WEEK, settings, style="broadsheet")
+
+    six = ["Headline", "Rating Movement", "What&#x27;s New", "Themes",
+           "Red Flags", "Data Link"]
+    where = [broad.find(name) for name in six]
+    check("all six deliverables are in the broadsheet",
+          all(i >= 0 for i in where),
+          f"missing {[n for n, i in zip(six, where) if i < 0]}")
+    check("and in the brief's order", where == sorted(where))
+
+    check("the plain text body is identical either way", text == text2,
+          "the skin must not touch the text alternative")
+    check("the two HTML styles really do differ", plain != broad)
+
+    check("it uses the 600px email shell, not 900px",
+          'width="600"' in broad and "max-width:900px" not in broad)
+    check("and serif type throughout", "Georgia" in broad)
+
+    # The pattern worth borrowing: an entity with nothing this week still
+    # appears, with what was last recorded and when. Tested against the
+    # helper rather than the rendered page, because whether any entity
+    # happens to be silent depends on the fixture, not on the code.
+    history = [
+        {"entity": "westbury_kommerce", "post_date": "2026-08-12", "status": "reviewed",
+         "one_line_summary": "Says appraisals were deferred a second time"},
+        {"entity": "westbury_kommerce", "post_date": "2026-07-02", "status": "reviewed",
+         "one_line_summary": "older, should not win"},
+        {"entity": "rk_group", "post_date": "2026-08-20", "status": "out_of_scope",
+         "one_line_summary": "a marketplace complaint, correctly refused"},
+    ]
+    name, said, when = build_digest.last_known(
+        "westbury_kommerce", "Westbury Kommerce", history, WEEK)
+    check("a silent entity reports its most recent mention",
+          said.startswith("Says appraisals"), f"got {said!r}")
+    check("dated, so a reader knows how long it has been quiet",
+          when == "12 Aug", f"got {when!r}")
+
+    # An out-of-scope row is not something the group was "last known" for.
+    _n, said_rk, _w = build_digest.last_known("rk_group", "RK Group", history, WEEK)
+    check("an out-of-scope row is not counted as the last known item",
+          said_rk == "Nothing on record.", f"got {said_rk!r}")
+
+    _n, said_none, when_none = build_digest.last_known(
+        "robust_kommerce", "Robust Kommerce", history, WEEK)
+    check("an entity with no history at all says so",
+          said_none == "Nothing on record." and when_none == "")
+
+    check("and the block renders when there is something to show",
+          "Quiet this week" in build_digest.bs_quiet([(name, said, when)]))
+
+    # The Brief is derived, so it cannot contradict the sections below it.
+    heads = build_digest.headline_rows([], [], H.entity_names(), comparable=True)
+    lines = build_digest.brief_lines({"total": 0}, heads, [], [], None)
+    check("the Brief has three numbered lines", len(lines) == 3)
+    check("an empty week reads as quiet, not unswept",
+          "quiet week, not an unswept one" in lines[0], f"got {lines[0]}")
+    check("and no red flags is stated, not left blank",
+          "No red flags" in lines[2])
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()
