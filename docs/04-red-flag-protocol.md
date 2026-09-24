@@ -140,12 +140,22 @@ thing. Every digest now says which is which under section 5.
 
 | Channel | How a new item could be seen today | Lag |
 |---|---|---|
-| AmbitionBox, Glassdoor | `python3 scripts/daily_check.py` — the review count moving | same day, if the check is run |
+| AmbitionBox, Glassdoor | `python3 scripts/daily_check.py` — the review count moving | same day **only if the check is run**; otherwise up to 6 days |
+| Reddit, news, Quora, Indeed | the collector, run daily by the GitHub Action | same day |
+| **LinkedIn, X, YouTube, Google Reviews** | **nothing — only the weekly sweep** | **up to 6 days** |
 
-**"If the check is run" is now measured.** The daily Action prints the pages a person
-still has to open, and fails — so GitHub notifies — when nobody has checked one in more
-than two days. It cannot do the looking; those sites block scripted access. What it can
-do is stop the digest promising four people something nobody is delivering.
+### The first row is conditional, and the digest now says which way
+
+A route existing is not a route being walked. `H.count_route_is_live()` asks the data
+whether those pages have actually been opened since the last sweep, and section 5 names
+AmbitionBox and Glassdoor alongside the weekly channels when they have not — with the
+cause stated honestly, because "the platforms block automated checking" is true of
+LinkedIn and untrue of a two-minute count check nobody ran.
+
+The daily Action prints the pages a person still has to open, and fails — so GitHub
+notifies — when nobody has checked in **more than 7 days**. That threshold asserts only
+that the weekly sweep happened. Lower it to 1 or 2 if the daily habit starts, and the
+digest will upgrade its own wording as soon as the data supports it.
 
 When a count has moved:
 
@@ -153,10 +163,9 @@ When a count has moved:
 python3 scripts/daily_check.py --bump ambitionbox rk_world 52
 ```
 
-That now writes the new count and today's date into `data/ratings.csv`. Until recently it
-only printed, so nothing anywhere recorded that a check had happened.
-| Reddit, news, Quora, Indeed | the collector, run daily by the GitHub Action | same day |
-| **LinkedIn, X, YouTube, Google Reviews** | **nothing — only the weekly sweep** | **up to 6 days** |
+That writes the new count and today's date into `data/ratings.csv`, which is what makes
+the staleness measurable. Until recently it only printed, so nothing recorded that a
+check had happened at all.
 
 The four in bold block automated checking or have no feed, so this is a limit of the
 sources, not of the process. Two things narrow it, and neither is code:
