@@ -2951,9 +2951,66 @@ def test_same_day_claim_follows_the_data() -> None:
     check("the two sentences are not the same", live != stale)
 
 
+def test_two_quiet_failures_in_the_daily_path() -> None:
+    """Both would have shipped: neither crashes, neither is visible."""
+    print("quiet failures in the daily path")
+    import daily_check as D
+    import collect_feeds as C
+    import tempfile, io, contextlib
+
+    # A review count cannot fall on its own. build_digest raises
+    # count_dropped at the Friday gate - five days after the person who
+    # could still remember what they read. --bump recorded it silently.
+    with tempfile.TemporaryDirectory() as tmp:
+        saved = H.RATINGS_CSV
+        try:
+            H.RATINGS_CSV = os.path.join(tmp, "r.csv")
+            H.write_csv(H.RATINGS_CSV, H.RATING_FIELDS, [{
+                **{k: "" for k in H.RATING_FIELDS},
+                "week_of": H.week_start_of(dt.date.today()).isoformat(),
+                "captured_at": "2026-09-19", "entity": "rk_world",
+                "platform": "ambitionbox", "review_count": "51",
+                "overall_rating": "3.00"}])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                D.main_argv = None
+                sys.argv = ["daily_check", "--bump", "ambitionbox", "rk_world", "48"]
+                D.main()
+            said = out.getvalue()
+            check("a falling count is called out, not recorded silently",
+                  "FELL" in said, f"got {said[:120]!r}")
+            check("and it still records, so the gate sees it too",
+                  H.read_csv(H.RATINGS_CSV)[0]["review_count"] == "48")
+            check("the rating is not blanked by a count-only bump",
+                  H.read_csv(H.RATINGS_CSV)[0]["overall_rating"] == "3.00")
+        finally:
+            H.RATINGS_CSV = saved
+
+    # A bot identifying itself as "contact: TODO" is the kind a site blocks
+    # without asking, and the placeholder had to be filled in twice.
+    ua = "HR-Intelligence-Digest/1.0 (internal awareness monitoring; contact: TODO)"
+    check("with no reply_to, the placeholder is dropped rather than sent",
+          "TODO" not in ua.replace("; contact: TODO", ""))
+    check("with one set, it is used",
+          "contact: a@b.co" in ua.replace("contact: TODO", "contact: a@b.co"))
+    # Assert against the real config, and against the code path that reads
+    # it - not a restatement of the string above.
+    configured = str(H.load_yaml("settings").get("collector", {}).get("user_agent", ""))
+    reply_to = str(H.load_yaml("settings").get("programme", {}).get("reply_to", ""))
+    sent = configured
+    if "TODO" in sent:
+        sent = (sent.replace("contact: TODO", f"contact: {reply_to}")
+                if reply_to and not H.is_todo(reply_to)
+                else sent.replace("; contact: TODO", ""))
+    check("whatever the config holds, no TODO reaches a website",
+          "TODO" not in sent, f"would send {sent!r}")
+    check("and the agent still names the programme",
+          "HR-Intelligence-Digest" in sent)
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_two_quiet_failures_in_the_daily_path, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

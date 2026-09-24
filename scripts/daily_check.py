@@ -135,8 +135,20 @@ def main() -> int:
             print("\nLog each one, then check it against the five red-flag triggers:")
             print("  python3 scripts/log_mention.py --vocab")
             print("  python3 scripts/red_flags.py --scan")
+        elif after < before:
+            # build_digest raises count_dropped at the Friday gate, which is
+            # five days after the person who could still remember what they
+            # read. A count cannot fall on its own: either a review was taken
+            # down - itself worth knowing - or the page was misread. Saying so
+            # here costs one line and saves a week-on-week delta built on a
+            # number nobody questioned.
+            print(f"\nWARNING: the count FELL by {before - after}. A review count "
+                  "does not fall on its own.")
+            print("  Either a review was removed - worth noting - or the page was "
+                  "misread. Check before relying on it.")
+            print("  Recorded anyway; the Friday gate will raise count_dropped too.")
         else:
-            print("No increase - nothing to read.")
+            print("No change - nothing to read.")
         return 0
 
     print(f"Daily check  {dt.date.today().strftime('%a %d %b %Y')}")

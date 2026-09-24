@@ -432,7 +432,16 @@ def main() -> int:
     settings = H.load_yaml("settings")
     sources = H.load_yaml("sources")
     collector = settings.get("collector", {})
-    user_agent = collector.get("user_agent", "HR-Intelligence-Digest/1.0")
+    # A bot that identifies itself with "contact: TODO" is the kind a site
+    # blocks without asking. programme.reply_to is already the address the
+    # digest comes from, so use it rather than leaving a placeholder to be
+    # filled in twice.
+    user_agent = str(collector.get("user_agent", "HR-Intelligence-Digest/1.0"))
+    if "TODO" in user_agent:
+        reply_to = str(settings.get("programme", {}).get("reply_to", "")).strip()
+        user_agent = (user_agent.replace("contact: TODO", f"contact: {reply_to}")
+                      if reply_to and not H.is_todo(reply_to)
+                      else user_agent.replace("; contact: TODO", ""))
     timeout = int(collector.get("timeout_seconds", 20))
     reset_budget()
     delay = float(collector.get("delay_seconds", 2))
