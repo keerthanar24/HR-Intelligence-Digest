@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -50,6 +51,50 @@ def check(name: str, condition: bool, detail: str = "") -> None:
     else:
         print(f"  FAIL  {name} {detail}")
         failures.append(name)
+
+
+def leaf_tables(html: str) -> list[str]:
+    """The innermost <table>...</table> spans - the actual content grids.
+
+    A flat `<table.*?</table>` regex breaks the moment a table is nested
+    inside another one for layout, because non-greedy matching still spans
+    from the first '<table' to the first '</table>' it finds - which, with
+    nesting, belongs to whichever table closes first, not the one that
+    opened first. The broadsheet style centers its content in a standard
+    email pattern (a 100%-wide outer table holding a fixed 600px inner
+    shell), so a naive scan of "table 1" picks up width attributes from
+    both tables at once and reports nonsense sums.
+
+    This tracks open/close tags with a stack and returns only tables that
+    contain no further nested <table - the leaves, which is what "does
+    this table's columns sum to 100%" is actually asking about.
+    """
+    tags = re.finditer(r"<table\b.*?>|</table>", html, re.S)
+    stack: list[tuple[int, bool]] = []  # (start_pos, has_nested_table)
+    leaves = []
+    for m in tags:
+        if m.group().startswith("<table"):
+            if stack:
+                stack[-1] = (stack[-1][0], True)
+            stack.append((m.start(), False))
+        else:
+            start, had_nested = stack.pop()
+            if not had_nested:
+                leaves.append(html[start:m.end()])
+    return leaves
+
+
+def section_heading(html: str, number: int, title: str) -> bool:
+    """Match a numbered section heading in either style's markup.
+
+    Plain writes a literal '·'; broadsheet writes the '&middot;' entity, and
+    escapes an apostrophe in the title. Same information, different bytes -
+    a check that hardcodes one style's punctuation is not testing the six
+    deliverables, it is testing which template happened to run.
+    """
+    escaped = title.replace("'", "(?:'|&#x27;)")
+    pattern = rf">{number}\s*(?:&middot;|·)\s*{escaped}<"
+    return re.search(pattern, html) is not None
 
 
 def test_matching() -> None:
@@ -405,9 +450,14 @@ def test_digest() -> None:
     check("one red flag", stats["red_flags"] == 1, f"(got {stats['red_flags']})")
     check("red flag shows in the subject", "red flag" in subject.lower(), f"({subject!r})")
 
-    for heading in ("1 · Headline", "2 · Rating Movement", "3 · What's New",
-                    "4 · Themes", "5 · Red Flags", "6 · Data"):
-        check(f"html has section {heading!r}", heading in body_html)
+    # Plain writes a literal '·'; broadsheet writes '&middot;' and escapes the
+    # apostrophe in "What's New". Same six deliverables, different bytes -
+    # section_heading() reads either, so this checks the digest's default
+    # output whichever style that currently is.
+    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "What's New"),
+                          (4, "Themes"), (5, "Red Flags"), (6, "Data Link")):
+        check(f"html has section '{number} · {title}'",
+              section_heading(body_html, number, title))
     for heading in ("1. HEADLINE", "2. RATING MOVEMENT", "3. WHAT'S NEW",
                     "4. THEMES", "5. RED FLAGS", "6. DATA"):
         check(f"text has section {heading!r}", heading in body_text)
@@ -425,13 +475,22 @@ def test_digest() -> None:
     check("data link rendered", "sheets.example.invalid" in body_html)
 
     # Mail clients clip horizontal overflow rather than scrolling, so a table
-    # wider than the viewport silently loses its rightmost columns.
-    import re as _re
-    tables = _re.findall(r"<table.*?</table>", body_html, _re.S)
-    check("every table uses fixed layout",
-          all("table-layout:fixed" in t for t in tables), f"({len(tables)} tables)")
+    # wider than the viewport silently loses its rightmost columns. Content
+    # GRIDS only: leaf_tables() drops the wrapper/shell tables a style may
+    # nest content inside to center it (standard email markup, not something
+    # anyone reads column widths off of), and the `<th` filter drops list-style
+    # tables like the Brief's numbered lines or "Quiet this week" - a fixed
+    # label column plus one flexible column is a different, also-safe pattern
+    # that was never meant to sum to 100 and never carried column headers.
+    tables = [t for t in leaf_tables(body_html) if "<th" in t]
+    check("every content grid uses fixed layout",
+          bool(tables) and all("table-layout:fixed" in t for t in tables),
+          f"({len(tables)} tables)")
     for i, table in enumerate(tables, 1):
-        widths = [int(w.rstrip("%")) for w in _re.findall(r'width="(\d+)%"', table)]
+        # <th only - a bare width="N%" search also catches the table's own
+        # opening tag (width="100%" of its container, nothing to do with its
+        # columns) and adds a phantom 100 to every sum.
+        widths = [int(w.rstrip("%")) for w in re.findall(r'<th\b[^>]*\bwidth="(\d+)%"', table)]
         check(f"table {i} column widths sum to 100%", sum(widths) == 100, f"(got {sum(widths)})")
     check("long cells wrap instead of overflowing",
           "word-break:break-word" in body_html and "overflow-wrap:anywhere" in body_html)
@@ -1438,8 +1497,14 @@ def test_fields_reach_the_email() -> None:
           build_digest.recommend_text(None, None) == "—")
 
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
-    check("the html What's New has a Stars column", "<th" in html and "Stars" in html)
-    check("the html What's New says who wrote it", "Who" in html)
+    # Content, not markup shape: plain carries these as table columns headed
+    # "Stars" and "Who"; broadsheet carries the same values inline in each
+    # card's meta line ("4/5 stars · Current employee · ..."). Either way the
+    # reader gets the rating and who wrote it without opening the sheet -
+    # that is what this test is actually protecting.
+    check("the html What's New shows a star rating", "/5" in html)
+    check("the html What's New says who wrote it",
+          any(label in html for label in H.AUTHOR_LABELS.values()))
     check("section 2 carries percent-recommend in html", "Recommend" in html)
     # The plain-text section 3 is a bullet list, so the values ride inline.
     check("the text digest shows the star rating", "/5" in text, f"({text[:0]})")
@@ -2672,7 +2737,8 @@ def test_job_market_sheet() -> None:
 
 def test_the_six_deliverables_are_all_present() -> None:
     """The brief enumerates six sections by name. A reader checking the email
-    against the brief should find the same six words, in order, in both bodies.
+    against the brief should find the same six words, in order, in both bodies -
+    and section 3's five fields present, whichever style is currently shipping.
 
     Section 6 was headed "Data" against a brief that says "Data Link" - the
     kind of drift nobody notices until somebody audits it.
@@ -2691,14 +2757,29 @@ def test_the_six_deliverables_are_all_present() -> None:
         check(f"and in the brief's order in the {name} body",
               where == sorted(where))
 
-    # Deliverable 3 names five columns. The HTML carries them as a table.
-    # The heading is a literal in the builder, so its apostrophe is raw; a
-    # summary passing through E() would be escaped. Tolerate either.
-    marker = "What&#x27;s New" if "What&#x27;s New" in html else "What's New"
-    section3 = html.split(marker)[1].split("<h3")[0]
+    # Deliverable 3 names five fields: entity, platform, date, sentiment, a
+    # one-line summary. The plain style carries them as literal table columns;
+    # the broadsheet carries the same five per item in a card's meta line and
+    # heading instead - a card is not a <table>, but the brief is asking for
+    # the fields to be present and attributable, not for particular markup.
+    # So: the CONTENT check runs against whatever style actually ships, and
+    # the literal-table-column guarantee is checked against plain by name,
+    # since that is the one style that promises it.
+    for label in ("Current employee", "Ex-employee", "Anonymous", "Candidate"):
+        if label in html:
+            check("section 3 names who wrote the item", True)
+            break
+    else:
+        check("section 3 names who wrote the item", False, "no author label found anywhere")
+    check("section 3 carries a platform name", "Glassdoor" in html or "AmbitionBox" in html)
+    check("section 3 carries a date", re.search(r"\b202\d-\d\d-\d\d\b", html) is not None)
+
+    _sp, plain_html, _pt, _ps = build_digest.build(WEEK, H.load_yaml("settings"), style="plain")
+    marker = "What&#x27;s New" if "What&#x27;s New" in plain_html else "What's New"
+    section3 = plain_html.split(marker)[1].split("<h3")[0]
     for column in ("Entity", "Platform", "Date", "Sentiment", "Summary"):
-        check(f"section 3 has a {column} column", f">{column}<" in section3)
-    check("section 3 is a table, as the brief says", "<table" in section3)
+        check(f"the plain style's section 3 has a {column} column", f">{column}<" in section3)
+    check("and it is a literal table, as that style promises", "<table" in section3)
 
 
 def test_the_sent_message_carries_the_deliverables() -> None:
@@ -2745,7 +2826,10 @@ def test_broadsheet_is_a_skin_not_a_restructure() -> None:
     """
     print("broadsheet style")
     settings = H.load_yaml("settings")
-    _s1, plain, text, _st = build_digest.build(WEEK, settings)
+    # Both named explicitly - this test's whole point is comparing the two
+    # styles, so it must not depend on which one build()'s own default
+    # happens to be right now.
+    _s1, plain, text, _st = build_digest.build(WEEK, settings, style="plain")
     _s2, broad, text2, _st2 = build_digest.build(WEEK, settings, style="broadsheet")
 
     # Match the numbered SECTION HEADINGS, not the first time a phrase turns

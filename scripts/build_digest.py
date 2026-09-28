@@ -717,8 +717,14 @@ def bs_table(headers, rows, aligns, widths) -> str:
            'border="0" style="margin-top:6px;table-layout:fixed;border-collapse:collapse;">']
     out.append("<tr>")
     for head, align, width in zip(headers, aligns, widths):
+        # The % belongs on the HTML attribute, not just the CSS - matching
+        # h_table's convention. Some older mail clients honour the width
+        # attribute as a fallback when style is stripped, and width="32"
+        # with no unit reads as 32 pixels there, not 32 percent. Silently
+        # inconsistent with the plain style, and it defeats the one thing
+        # this markup exists to guarantee: a table that cannot overflow.
         out.append(
-            f'<th width="{width.rstrip("%")}" align="{align}" style="width:{width};'
+            f'<th width="{width}" align="{align}" style="width:{width};'
             f'padding:7px 8px 7px 0;font:700 10px/1.3 {SERIF};letter-spacing:.1em;'
             f'text-transform:uppercase;color:{BS["muted"]};'
             f'border-bottom:1px solid {BS["ink"]};">{head}</th>')
@@ -1019,7 +1025,8 @@ def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratin
     return "".join(p)
 
 
-def build(week_of: dt.date, settings: dict, style: str = "") -> tuple[str, str, str, dict]:
+def build(week_of: dt.date, settings: dict,
+          style: str = "broadsheet") -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
     platforms = H.platform_names()
@@ -1544,9 +1551,10 @@ def main() -> int:
     parser.add_argument("--allow-gaps", action="store_true",
                         help="build even when reviews are still unread; the email "
                              "does not disclose the shortfall, so only for a mid-sweep look")
-    parser.add_argument("--style", choices=["plain", "broadsheet"], default="plain",
-                        help="broadsheet: the serif, 600px house format "
-                             "(same six deliverables, different skin)")
+    parser.add_argument("--style", choices=["plain", "broadsheet"], default="broadsheet",
+                        help="broadsheet (default): the serif, 600px house format "
+                             "(same six deliverables, different skin). "
+                             "plain: the original table-only layout")
     parser.add_argument("--strict", action="store_true",
                         help="exit non-zero if any mention in the week is untagged")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
