@@ -21,6 +21,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import digest_exec  # noqa: E402
 import hrintel as H  # noqa: E402
 
 BOUNDARY_NOTE = (
@@ -1026,7 +1027,7 @@ def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratin
 
 
 def build(week_of: dt.date, settings: dict,
-          style: str = "broadsheet") -> tuple[str, str, str, dict]:
+          style: str = "executive") -> tuple[str, str, str, dict]:
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
     platforms = H.platform_names()
@@ -1491,6 +1492,16 @@ def build(week_of: dt.date, settings: dict,
     if flags:
         subject += f" · {len(flags)} red flag{'s' if len(flags) != 1 else ''}"
 
+    if style == "executive":
+        body, extra = digest_exec.render(
+            week_of=week_of, week_label=week_label, prev_label=H.fmt_week(prev_week),
+            baseline=bool(baseline), partial_notice=(notice if partial else ""),
+            entities=entities, platforms=platforms, now=now, prev=prev,
+            all_mentions=all_mentions, all_ratings=all_ratings, flags=flags,
+            lagging=lagging, data_link=data_link, holdings=holdings, settings=settings)
+        stats.update(extra)
+        return subject, body, "\n".join(t), stats
+
     if style == "broadsheet":
         # The same computed rows, set as a broadsheet. Notes are rebuilt as
         # plain sentences here rather than reusing the plain style's inline
@@ -1551,10 +1562,12 @@ def main() -> int:
     parser.add_argument("--allow-gaps", action="store_true",
                         help="build even when reviews are still unread; the email "
                              "does not disclose the shortfall, so only for a mid-sweep look")
-    parser.add_argument("--style", choices=["plain", "broadsheet"], default="broadsheet",
-                        help="broadsheet (default): the serif, 600px house format "
-                             "(same six deliverables, different skin). "
-                             "plain: the original table-only layout")
+    parser.add_argument("--style", choices=["executive", "plain", "broadsheet"],
+                        default="executive",
+                        help="executive (default): the leadership layout with week-on-week "
+                             "arrows, coverage and job-market signals. broadsheet: the serif "
+                             "house format. plain: the original table-only layout. All three "
+                             "carry the same six deliverables")
     parser.add_argument("--strict", action="store_true",
                         help="exit non-zero if any mention in the week is untagged")
     parser.add_argument("--out-dir", default=H.OUT_DIR)

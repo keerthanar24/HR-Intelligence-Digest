@@ -24,6 +24,16 @@ what keeps the other four options honest.
 
 Produce these from the tracking data before the meeting:
 
+Most of the list below is counted in one report, in the same layout as the digest:
+
+```bash
+python3 scripts/trial_summary.py            # interim until the 60 days are up
+```
+
+It covers coverage (weeks each channel was checked against weeks due), volume and
+sentiment, red flags, noise, recurring themes, rating movement and effort, and marks which
+of the decision signals below the data supports. The recommendation stays with the owner.
+
 1. **Volume.** Total mentions over 8 weeks, by entity and platform. How many weeks were empty?
 
    ```bash

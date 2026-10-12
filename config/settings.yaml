@@ -36,6 +36,9 @@ digest:
   rolling_theme_weeks: 4
   # Truncate one-line summaries in the What's New table to this many characters.
   summary_max_chars: 160
+  # Fewer scored mentions than this and a company's sentiment reads
+  # "Insufficient data" instead of a score. See docs/05-sentiment-and-themes.md.
+  min_scored_mentions: 2
 
 red_flags:
   # Same-day escalation. See docs/04-red-flag-protocol.md.

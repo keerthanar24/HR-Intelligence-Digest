@@ -27,6 +27,28 @@ is mixed. If you cannot decide in ten seconds, pick `mixed` and move on.
 Untagged rows are **excluded** from the net sentiment average, not counted as neutral, and the
 digest states how many were excluded. A blank tag is honest; a fake neutral is not.
 
+### How the digest reports it
+
+The six tags collapse to three classes in the email, so the same rule applies every week:
+
+| Class shown | Tags |
+|---|---|
+| **Positive** | `positive`, `very_positive` |
+| **Neutral** | `neutral`, `mixed` |
+| **Negative** | `negative`, `very_negative` |
+
+A company's overall label is the average score of its scored mentions that week:
+**+0.5 or above is Positive, −0.5 or below is Negative, anything between is Neutral.**
+
+Below `digest.min_scored_mentions` (default 2) scored mentions the label is **Insufficient
+data**, not a score. One review is one person's view; printing it as "Negative · −1.0" reads like
+a trend to a leadership audience. The breakdown ("1 negative") is still shown beside it.
+Week-on-week sentiment arrows appear only when both weeks have enough data.
+
+The employer's own posts are counted as mentions and labelled "Company post", but never scored
+(see "Who does not get scored" below). Untagged rows show as "Awaiting review" and stay out of
+every score until a person tags them.
+
 ### Anchors
 
 | Text | Tag | Why |

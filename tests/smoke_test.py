@@ -660,10 +660,16 @@ def test_send_guards() -> None:
     print("send guards")
     import send_digest
 
+    # Measured against the live config, whatever state it is in: every TODO
+    # address is held back and named, and nothing else is.
+    people = H.load_yaml("recipients").get("digest", [])
+    todo = [p_.get("name") for p_ in people if H.is_todo(p_.get("email", ""))]
     to, missing = send_digest.recipients("digest")
-    check("placeholder addresses are not treated as usable", to == [],
-          f"(got {to})")
-    check("the four are reported as missing", len(missing) == 4, f"(got {missing})")
+    check("placeholder addresses are not treated as usable",
+          not any("TODO" in t or "example.com" in t for t in to), f"(got {to})")
+    check("every placeholder is reported as missing", missing == todo,
+          f"(got {missing}, expected {todo})")
+    check("and every real address is kept", len(to) + len(missing) == len(people))
 
     message = send_digest.build_message(
         "Subject line", "<p>html body</p>", "text body",
@@ -2452,22 +2458,26 @@ def test_linkedin_post_date_from_url() -> None:
           L.published(1234567890123456789) is None)
 
 
-def test_job_market_stays_out_of_the_digest() -> None:
-    """Watched and recorded, but not a section of the weekly email.
+def test_job_market_reaches_the_digest() -> None:
+    """Job-market signals are reported, inside section 4, not as a seventh section.
 
-    docs/00-brief.md names job-market signals in its purpose and salaries as
-    in-scope content on the two review sites, but its six deliverables include
-    neither. They are things to WATCH. The figures live in market.csv and feed
-    the Month 2 review; the digest carries the six sections and nothing else.
+    Until October 2026 they were watched but kept out of the email. The trial
+    review against Sonal's requirements asked for interview experiences,
+    salary comments, hiring and exit feedback to be visible, so the executive
+    layout carries them under Themes. The plain text keeps the six sections
+    only.
     """
-    print("job market is watched, not reported")
+    print("job market is reported under themes")
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
-
-    for body, name in ((html, "html"), (text, "text")):
-        check(f"the {name} body does not carry a job market block",
-              "job market" not in body.lower(), "it is watched, not reported")
-        check(f"nor an open-roles column in the {name} body",
-              "open roles" not in body.lower())
+    check("the html body carries a job market block", "job market" in html.lower())
+    check("with an open-roles column", "open roles" in html.lower())
+    check("and the three candidate signals",
+          all(s in html for s in ("Interviews &amp; hiring", "Pay &amp; appraisals",
+                                  "Exits &amp; job security")))
+    themes = html.find(">4 &middot; Themes<")
+    flags = html.find(">5 &middot; Red Flags<")
+    check("inside section 4, before Red Flags",
+          0 <= themes < html.lower().find("job market") < flags)
 
     # Section 2 is "Glassdoor and AmbitionBox score updates per entity" and
     # nothing else - which is now the whole of what sits between 2 and 3.
@@ -2567,6 +2577,8 @@ def test_recipients_cannot_diverge_silently() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         copy = os.path.join(tmp, "recipients.yaml")
         shutil.copy(R.RECIPIENTS_YAML, copy)
+        sonal_before = [line for line in open(copy, encoding="utf-8")
+                        if "sonal" in line.lower() and "email" in line]
         original = R.RECIPIENTS_YAML
         try:
             R.RECIPIENTS_YAML = copy
@@ -2578,7 +2590,8 @@ def test_recipients_cannot_diverge_silently() -> None:
             check("the comments survive the rewrite",
                   "# Distribution list" in body and "POSH IC chair" in body)
             check("and only the matching address moved",
-                  body.count("m@rkgroup.biz") == 2 and "sonal@example.com" in body)
+                  body.count("m@rkgroup.biz") == 2
+                  and all(line in body for line in sonal_before))
             check("an unknown name changes nothing",
                   R.apply("Nobody At All", "x@y.co")[0] == 0)
         finally:
@@ -2772,7 +2785,8 @@ def test_the_six_deliverables_are_all_present() -> None:
     else:
         check("section 3 names who wrote the item", False, "no author label found anywhere")
     check("section 3 carries a platform name", "Glassdoor" in html or "AmbitionBox" in html)
-    check("section 3 carries a date", re.search(r"\b202\d-\d\d-\d\d\b", html) is not None)
+    check("section 3 carries a date",
+          re.search(r"\b202\d-\d\d-\d\d\b|posted \d{1,2} [A-Z][a-z]{2}\b", html) is not None)
 
     _sp, plain_html, _pt, _ps = build_digest.build(WEEK, H.load_yaml("settings"), style="plain")
     marker = "What&#x27;s New" if "What&#x27;s New" in plain_html else "What's New"
@@ -3094,7 +3108,7 @@ def test_two_quiet_failures_in_the_daily_path() -> None:
 
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_stays_out_of_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_two_quiet_failures_in_the_daily_path, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_reaches_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_two_quiet_failures_in_the_daily_path, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

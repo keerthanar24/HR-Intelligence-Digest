@@ -4,7 +4,7 @@
 WEEK ?= $(shell python3 -c "import sys;sys.path.insert(0,'scripts');import hrintel as H;print(H.last_complete_week())")
 PY   ?= python3
 
-.PHONY: help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek logmarket checkurls checkfeeds test clean
+.PHONY: trial help setup sheet alerts sweep import collect scan validate digest weekly auto logsweep logweek logmarket checkurls checkfeeds test clean
 
 help:
 	@echo "HR Intelligence Digest — week $(WEEK)"
@@ -28,6 +28,7 @@ help:
 	@echo "  make checkurls open every configured page and report dead links (one-off)"
 	@echo "  make checkfeeds test every enabled alert/RSS URL — run after adding one"
 	@echo "  make logweek   record the hours and what was new (do it the same Friday)"
+	@echo "  make trial     the 60-day trial evaluation (interim until the end)"
 	@echo "  make test      run the end-to-end smoke test"
 	@echo ""
 	@echo "Override the week:  make digest WEEK=2026-09-07"
@@ -109,3 +110,6 @@ test:
 
 clean:
 	rm -f out/digest-*.html out/digest-*.txt out/red-flag-*.txt
+
+trial:
+	$(PY) scripts/trial_summary.py
