@@ -251,7 +251,14 @@ def rating_cell(pair, week_of) -> tuple[str, bool]:
     before = H.to_float(prev.get("overall_rating"))
     diff = None if score is None or before is None else score - before
     since = fmt_day(prev.get("week_of"))
-    new_reviews = count - H.to_int(prev.get("review_count"), count)
+    before_count = H.to_int(prev.get("review_count"), count)
+    new_reviews = count - before_count
+    if new_reviews < 0:
+        # Review counts do not go down. A drop means the page was read a
+        # different way, or is not the page it was - so the score cannot be
+        # compared and must not be reported as a movement.
+        return (head + small(f"review count fell {before_count} &rarr; {count}: "
+                             "check this page", BAD[1]), False)
     extra = (f' &middot; +{new_reviews} reviews' if new_reviews > 0 else "")
     return (head + small(f"{arrow(diff, digits=2)} since {x(since)}{extra}"),
             diff is not None and abs(diff) >= 0.005)
