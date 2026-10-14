@@ -709,8 +709,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             th(x(platforms.get(pid, pid)), "right", f"{share}%") for pid in sites]
         if rec:
             head.append(th("Recommend", "right", f"{share}%"))
-        rec_note = (f" Recommend is {x(platforms.get(rec, rec))}&rsquo;s &ldquo;would "
-                    "recommend to a friend&rdquo;." if rec else "")
+        rec_note = (f" Recommend = {x(platforms.get(rec, rec))}." if rec else "")
     else:
         flat = [(eid, name, pid) for eid, name in names for pid in sites
                 if (eid, pid) in tracked]
@@ -726,20 +725,18 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                              last=last) + "</tr>")
         head = [th("Company", width="30%"), th("Site", width="22%"),
                 th("Rating", "right", "28%"), th("Recommend", "right", "20%")]
-        rec_note = " Recommend is shown where the site publishes it."
+        rec_note = ""
+    # "No page" already shows in the table, so absent pages need no sentence.
     page_note = ""
-    if absent:
-        page_note += f" No page exists for {x('; '.join(absent))}."
     if unrated:
-        page_note += (f" {x(', '.join(unrated))} {'has' if len(unrated) == 1 else 'have'} no "
-                      f"{x(any_site)} page, so absence here is not evidence of a quiet week.")
+        page_note += (f" {x(', '.join(unrated))}: no {x(any_site)} page &mdash; not evidence "
+                      "of a quiet week.")
     if shared:
         who_shared = sorted({entities.get(e, e) for e, _ in shared})
-        page_note += (f" &#9888; Mixed page: {x(', '.join(who_shared))}&rsquo;s pages also carry "
-                      "reviews from unrelated companies with the same name, so their overall "
-                      "figures are indicative only.")
+        page_note += (f" &#9888; {x(', '.join(who_shared))} pages include other firms of the "
+                      "same name.")
     p.append(row(table(head, rows)
-                 + note("Out of 5, number of reviews in brackets." + rec_note + page_note)))
+                 + note("Out of 5 (reviews)." + rec_note + page_note)))
 
     # 3 What's New
     p.append(section(3, "What's New", f"Every {'' if period else 'new '}review or post {span}. "
@@ -884,21 +881,17 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                             th("Found", width="18%"), th("Alert sent", "right", "22%")], rows)))
     else:
         p.append(row(box(f'<strong style="color:{INK};">None {span}.</strong> '
-                         f"{plural(len(now), 'mention')} checked for: a named individual, "
-                         "harassment or safety, non-payment, legal or regulatory action, or "
-                         "public traction.", (GOOD[0], "#4b5563"))))
-    alert_line = (f"Same-day alerts: the daily scan runs at 09:00 IST on the automatic "
-                  f"channels. ")
+                         f"{plural(len(now), 'mention')} checked for named people, harassment, "
+                         "non-payment, legal action or viral posts.", (GOOD[0], "#4b5563"))))
+    alert_line = "Same-day alerts: "
     if ready < needed:
-        alert_line += (f'<strong style="color:{BAD[1]};">Alert recipients set up: {ready} of '
-                       f"{needed}</strong> &mdash; until all {needed} have an address, a red "
-                       "flag cannot be emailed to them the same day.")
+        alert_line += (f'<strong style="color:{BAD[1]};">{ready} of {needed} recipients set '
+                       "up.</strong>")
     else:
-        alert_line += f"All {needed} alert recipients are set up."
+        alert_line += f"all {needed} recipients set up."
     if lagging:
         alert_line += (f" {x(', '.join(lagging))} {'is' if len(lagging) == 1 else 'are'} only "
-                       "read on the weekly sweep, so an issue there can be up to a week old "
-                       "when found.")
+                       "read on the weekly sweep.")
     p.append(row(note(alert_line, MUTED)))
 
     # Monitoring transparency, then 6 Data Link
@@ -918,10 +911,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                           th("Weeks checked" if period else "Status", width="32%"),
                           th("Last checked", "center", "20%"), th("Found", "right", "18%")],
                          crow)
-                 + note(f"{name_variants()} name variants searched across the four companies, "
-                        "including short forms and common misspellings. "
-                        "&ldquo;Not checked&rdquo; means nobody looked &mdash; it is not the "
-                        "same as nothing found."),
+                 + note(f"{name_variants()} name variants searched."
+                        + ("" if period else " &ldquo;Not checked&rdquo; means nobody looked.")),
                  pad="28px 32px 0 32px"))
 
     p.append(section(6, "Data Link", "Every mention, rating and check, with links to the "

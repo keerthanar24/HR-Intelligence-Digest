@@ -1482,9 +1482,10 @@ def test_absent_profile_is_disclosed() -> None:
         _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     finally:
         H.rated_profiles, H.absent_profiles = real_rated, real_absent
-    for name, body in (("html", html), ("text", text)):
-        check(f"the {name} digest discloses it",
-              "Robust Kommerce on AmbitionBox" in body)
+    check("the text digest discloses it", "Robust Kommerce on AmbitionBox" in text)
+    # The executive email shows it in the rating table's own cell instead.
+    check("the html digest discloses it",
+          "Robust Kommerce on AmbitionBox" in html or "No page" in html)
 
 
 def test_fields_reach_the_email() -> None:
