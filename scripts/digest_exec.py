@@ -397,6 +397,20 @@ def coverage(week_of, platforms, all_ratings, sweeps, now, settings):
     return out
 
 
+def found_late(all_mentions, week_of, now) -> list[dict]:
+    """In-scope items logged during this week whose post date falls earlier."""
+    first, last = week_of, week_of + dt.timedelta(days=6)
+    ids = {m.get("mention_id") for m in now}
+    out = []
+    for m in all_mentions:
+        if (m.get("status") or "") == "out_of_scope" or m.get("mention_id") in ids:
+            continue
+        found = H.parse_date(m.get("captured_at", ""))
+        if found and first <= found <= last and (m.get("week_of") or "") < week_of.isoformat():
+            out.append(m)
+    return out
+
+
 def rating_sites(cfg) -> list[str]:
     """Review sites that carry a rating, in the order the digest shows them.
 
@@ -675,9 +689,10 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # 3 What's New
     p.append(section(3, "What's New", "Every new review or post this week. Click a line to "
                      "open the original."))
-    if now:
-        items = []
-        ordered = sorted(now, key=lambda m: (m.get("post_date") or "", m.get("entity") or ""),
+
+    def item_rows(mentions):
+        out = []
+        ordered = sorted(mentions, key=lambda m: (m.get("post_date") or "", m.get("entity") or ""),
                          reverse=True)
         for m in ordered:
             cls = mention_class(m)
@@ -699,7 +714,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 x(who(m)),
                 f"{stars}/5" if 1 <= stars <= 5 else "",
             ]))
-            items.append(
+            out.append(
                 f'<tr><td style="padding:10px 0 10px 12px;border-left:3px solid {stripe};'
                 f'border-bottom:1px solid {RULE};">'
                 f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
@@ -707,8 +722,11 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 f'text-transform:uppercase;letter-spacing:.03em;color:{FAINT};">{meta}</td>'
                 f'<td valign="top" align="right" width="120">{mention_pill(m)}</td></tr></table>'
                 f'{body}</td></tr>')
-        p.append(row('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-                     f'border="0" style="border-collapse:collapse;">{"".join(items)}</table>'))
+        return ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
+                f'border="0" style="border-collapse:collapse;">{"".join(out)}</table>')
+
+    if now:
+        p.append(row(item_rows(now)))
     else:
         p.append(row(f'<div style="font:400 14px/1.6 {FONT};color:{INK};">Nothing new on any '
                      'checked channel this week.</div>'))
@@ -716,6 +734,16 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
              if not any(m.get("entity") == eid for m in now)]
     if quiet and now:
         p.append(row(note(f"Nothing new this week: {x(', '.join(quiet))}.")))
+
+    # Found this week but posted in a week already reported. Review sites
+    # publish late and pages get found late; without this list such an item
+    # belongs to a digest that has already gone out and is never seen.
+    late = found_late(all_mentions, week_of, now)
+    if late and not baseline:
+        p.append(row(subhead(f"Found this week, posted earlier ({len(late)})")
+                     + item_rows(late)
+                     + note("Counted in the week they were posted, so they do not change this "
+                            "week&rsquo;s figures above.")))
 
     # 4 Themes, then job-market signals
     p.append(section(4, "Themes", "What the comments were about, which companies they "

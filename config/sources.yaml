@@ -90,14 +90,13 @@ platforms:
       # specific statement. Stored in the canonical reviews form; the Overview
       # page carries no review list.
       #
-      # Withdrawn 2026-10-14 on the cross-check: Robust Kommerce Private
-      # Limited was incorporated on 10 Oct 2024 (CIN U47912KA2024PTC193836,
-      # Bangalore), and every review on E1882698 predates that or comes from
-      # Dubai and Fenton, UK (battery-management systems, welding). Its count
-      # also fell 7 -> 5 between sweeps. It is a different "Robust". No
-      # Glassdoor, AmbitionBox, Indeed or Naukri page for Robust Kommerce was
-      # found, so the entity is covered by LinkedIn and the feeds only.
-      robust_kommerce: "none"
+      # 2026-10-14: E1882698 ("Robust") was withdrawn - Robust Kommerce Pvt Ltd
+      # was incorporated on 10 Oct 2024 (CIN U47912KA2024PTC193836) and that
+      # page held older Dubai and UK reviews. The company's own page, found on
+      # the 14 Oct sweep, is E11238538: CEO Mallikharjuna Rao Ch (also named on
+      # rkgroup.biz), Bengaluru, 501-1000 staff, Myntra brand partner. Too few
+      # reviews for Glassdoor to show a score yet.
+      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Kommerce-Reviews-E11238538.htm"
       westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
     # Pages that exist but also carry reviews from unrelated employers with
     # the same name. They stay tracked - the Bengaluru reviews on them are
