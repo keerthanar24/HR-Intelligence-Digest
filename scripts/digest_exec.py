@@ -397,6 +397,29 @@ def coverage(week_of, platforms, all_ratings, sweeps, now, settings):
     return out
 
 
+def rating_sites(cfg) -> list[str]:
+    """Review sites that carry a rating, in the order the digest shows them.
+
+    digest.rating_site_order puts named sites first (Glassdoor before
+    AmbitionBox, as leadership asked); any other site with ratings in
+    config/sources.yaml follows in config order, so a new one appears without
+    a code change.
+    """
+    rated = [p["id"] for p in H.load_yaml("sources").get("platforms", [])
+             if "ratings" in (p.get("captures") or [])]
+    first = [pid for pid in (cfg.get("rating_site_order") or []) if pid in rated]
+    return first + [pid for pid in rated if pid not in first]
+
+
+def shared_pages() -> set[tuple[str, str]]:
+    """(entity, platform) pages that also carry another company's reviews."""
+    out = set()
+    for p in H.load_yaml("sources").get("platforms", []):
+        for eid in (p.get("shared_pages") or {}):
+            out.add((eid, p["id"]))
+    return out
+
+
 def alert_readiness():
     """(configured, total) red-flag recipients with a real address."""
     people = H.load_yaml("recipients").get("red_flag", [])
@@ -424,7 +447,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     market = H.read_csv(H.MARKET_CSV)
 
     counts_now, counts_prev = breakdown(now), breakdown(prev)
-    pairs = snapshot_pairs(all_ratings, week_of)
+    tracked = set(H.rated_profiles())
+    pairs = {k: v for k, v in snapshot_pairs(all_ratings, week_of).items() if k in tracked}
     rating_changes = sum(1 for (e, p), pair in pairs.items()
                          if rating_cell(pair, week_of)[1])
     rechecked = any(pair[0].get("week_of") == week_of.isoformat() for pair in pairs.values())
@@ -572,41 +596,81 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                        "is one person&rsquo;s view, not a trend. The company&rsquo;s own posts "
                        "are counted as mentions but never scored.")))
 
-    # 2 Rating Movement
-    p.append(section(2, "Rating Movement", "Star ratings on the two main employer review "
-                     "sites, with the change since the previous check."))
-    rows = []
+    # 2 Rating Movement - one column per review site in config/sources.yaml,
+    # so adding a site there (Indeed, Naukri, Google...) adds it here. Up to
+    # three sites fit as columns; beyond that each company gets one row per
+    # site, because a 640px email cannot hold more columns legibly.
+    sites = rating_sites(cfg)
     names = list(entities.items())
-    covered = {e for e, _ in H.rated_profiles()}
+    covered = {e for e, _ in tracked}
     unrated = [name for eid, name in names if eid not in covered]
     absent = [f"{entities.get(e, e)} on {platforms.get(pl, pl)}" for e, pl in H.absent_profiles()
               if entities.get(e) and entities.get(e) not in unrated]
+    shared = shared_pages()
+    site_names = " and ".join(platforms.get(pid, pid) for pid in sites) or "review"
+    any_site = " or ".join(platforms.get(pid, pid) for pid in sites) or "review-site"
+    p.append(section(2, "Rating Movement", f"Star ratings on {x(site_names)}, with the "
+                     "change since the previous check."))
+
+    def cell(eid, pid):
+        pair = pairs.get((eid, pid))
+        if not pair:
+            return f'<span style="color:{FAINT};">No page</span>'
+        out = rating_cell(pair, week_of)[0]
+        if (eid, pid) in shared:
+            out += small("&#9888; mixed page", WARN[1])
+        return out
+
+    recommenders = [pid for pid in sites if H.platform_publishes(pid, "recommend_pct")]
+    rows = []
+    if len(sites) <= 3:
+        rec = recommenders[0] if len(recommenders) == 1 else None
+        for i, (eid, name) in enumerate(names):
+            last = i == len(names) - 1
+            line = "<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
+            for pid in sites:
+                line += td(cell(eid, pid), "right", last=last)
+            if rec:
+                pair = pairs.get((eid, rec))
+                line += td(recommend_cell(pair, week_of) if pair else
+                           f'<span style="color:{FAINT};">&mdash;</span>', "right", last=last)
+            rows.append(line + "</tr>")
+        share = int(72 / (len(sites) + (1 if rec else 0)))
+        head = [th("Company", width="28%")] + [
+            th(x(platforms.get(pid, pid)), "right", f"{share}%") for pid in sites]
+        if rec:
+            head.append(th("Recommend", "right", f"{share}%"))
+        rec_note = (f" Recommend is {x(platforms.get(rec, rec))}&rsquo;s &ldquo;would "
+                    "recommend to a friend&rdquo;." if rec else "")
+    else:
+        flat = [(eid, name, pid) for eid, name in names for pid in sites
+                if (eid, pid) in tracked]
+        for i, (eid, name, pid) in enumerate(flat):
+            last = i == len(flat) - 1
+            first = i == 0 or flat[i - 1][0] != eid
+            pair = pairs.get((eid, pid))
+            rows.append("<tr>" + td(f"<strong>{x(name)}</strong>" if first else "", last=last)
+                        + td(x(platforms.get(pid, pid)), last=last)
+                        + td(cell(eid, pid), "right", last=last)
+                        + td(recommend_cell(pair, week_of) if pair and pid in recommenders
+                             else f'<span style="color:{FAINT};">&mdash;</span>', "right",
+                             last=last) + "</tr>")
+        head = [th("Company", width="30%"), th("Site", width="22%"),
+                th("Rating", "right", "28%"), th("Recommend", "right", "20%")]
+        rec_note = " Recommend is shown where the site publishes it."
     page_note = ""
     if absent:
         page_note += f" No page exists for {x('; '.join(absent))}."
     if unrated:
         page_note += (f" {x(', '.join(unrated))} {'has' if len(unrated) == 1 else 'have'} no "
-                      "Glassdoor or AmbitionBox page, so absence here is not evidence of a "
-                      "quiet week.")
-    for i, (eid, name) in enumerate(names):
-        last = i == len(names) - 1
-        cells = []
-        for pid in ("glassdoor", "ambitionbox"):
-            pair = pairs.get((eid, pid))
-            cells.append(rating_cell(pair, week_of)[0] if pair else
-                         f'<span style="color:{FAINT};">No page</span>')
-        gd = pairs.get((eid, "glassdoor"))
-        rows.append("<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
-                    + td(cells[0], "right", last=last) + td(cells[1], "right", last=last)
-                    + td(recommend_cell(gd, week_of) if gd else
-                         f'<span style="color:{FAINT};">&mdash;</span>', "right", last=last)
-                    + "</tr>")
-    p.append(row(table([th("Company", width="28%"),
-                        th(platforms.get("glassdoor", "Glassdoor"), "right", "26%"),
-                        th(platforms.get("ambitionbox", "AmbitionBox"), "right", "26%"),
-                        th("Recommend", "right", "20%")], rows)
-                 + note("Out of 5, number of reviews in brackets. Recommend is Glassdoor&rsquo;s "
-                        "&ldquo;would recommend to a friend&rdquo;." + page_note)))
+                      f"{x(any_site)} page, so absence here is not evidence of a quiet week.")
+    if shared:
+        who_shared = sorted({entities.get(e, e) for e, _ in shared})
+        page_note += (f" &#9888; Mixed page: {x(', '.join(who_shared))}&rsquo;s pages also carry "
+                      "reviews from unrelated companies with the same name, so their overall "
+                      "figures are indicative only.")
+    p.append(row(table(head, rows)
+                 + note("Out of 5, number of reviews in brackets." + rec_note + page_note)))
 
     # 3 What's New
     p.append(section(3, "What's New", "Every new review or post this week. Click a line to "

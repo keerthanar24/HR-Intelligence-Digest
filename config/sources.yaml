@@ -50,6 +50,14 @@ platforms:
       # "Robust Results" is not one of its names either - see entities.yaml.
       robust_kommerce: "none"
       westbury_kommerce: "https://www.ambitionbox.com/reviews/westbury-kommerce-reviews"
+    # See the note under glassdoor.shared_pages.
+    shared_pages:
+      rk_group: >-
+        The page is listed as Kolkata, Real Estate, and most reviews are from
+        New Delhi warehouse, pantry and kitchen staff mentioning train
+        operations - a railway catering firm, not this Bengaluru e-commerce
+        group. Bengaluru reviews (27 of 154 at the baseline) are the ones that
+        can be ours.
 
   - id: glassdoor
     name: Glassdoor
@@ -81,8 +89,25 @@ platforms:
       # Glassdoor page - the same employer id. Taken as confirmed on the second,
       # specific statement. Stored in the canonical reviews form; the Overview
       # page carries no review list.
-      robust_kommerce: "https://www.glassdoor.co.in/Reviews/Robust-Reviews-E1882698.htm"
+      #
+      # Withdrawn 2026-10-14 on the cross-check: Robust Kommerce Private
+      # Limited was incorporated on 10 Oct 2024 (CIN U47912KA2024PTC193836,
+      # Bangalore), and every review on E1882698 predates that or comes from
+      # Dubai and Fenton, UK (battery-management systems, welding). Its count
+      # also fell 7 -> 5 between sweeps. It is a different "Robust". No
+      # Glassdoor, AmbitionBox, Indeed or Naukri page for Robust Kommerce was
+      # found, so the entity is covered by LinkedIn and the feeds only.
+      robust_kommerce: "none"
       westbury_kommerce: "https://www.glassdoor.co.in/Reviews/Westbury-Kommerce-Reviews-E6166527.htm"
+    # Pages that exist but also carry reviews from unrelated employers with
+    # the same name. They stay tracked - the Bengaluru reviews on them are
+    # ours - but the digest marks every figure from them, because the overall
+    # rating and count include the other companies.
+    shared_pages:
+      rk_group: >-
+        Glassdoor merges several employers called RK Group: reviews from Lahore,
+        San Antonio (Texas) and Bengaluru sit on one page, under a Manufacturing
+        label. Only the Bengaluru reviews are this group's.
 
   - id: linkedin
     name: LinkedIn

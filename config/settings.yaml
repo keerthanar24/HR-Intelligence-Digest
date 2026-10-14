@@ -39,6 +39,9 @@ digest:
   # Fewer scored mentions than this and a company's sentiment reads
   # "Insufficient data" instead of a score. See docs/05-sentiment-and-themes.md.
   min_scored_mentions: 2
+  # Order of the review sites in section 2. Any other site with ratings in
+  # config/sources.yaml is added after these automatically.
+  rating_site_order: [glassdoor, ambitionbox]
 
 red_flags:
   # Same-day escalation. See docs/04-red-flag-protocol.md.

@@ -1016,9 +1016,11 @@ def test_unrated_entity_is_named() -> None:
     """
     print("unrated entity is named")
     entities = H.entity_names()
-    every = H.rated_profiles()
+    # Injected, not read from config: which entities have pages changes (the
+    # Robust Kommerce Glassdoor page was withdrawn in October 2026).
+    every = sorted((e, "glassdoor") for e in entities)
 
-    check("with the real source map nobody is unrated",
+    check("with a page for everyone, nobody is unrated",
           build_digest.unrated_entities(entities, every) == [],
           f"(got {build_digest.unrated_entities(entities, every)})")
 
@@ -1466,8 +1468,17 @@ def test_absent_profile_is_disclosed() -> None:
     check("an entity with a page on both platforms is not named",
           build_digest.missing_profiles(entities, platforms, absent=[]) == [])
 
-    # And it has to reach the reader, in both renderings.
-    _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    # And it has to reach the reader, in both renderings. Pages injected so
+    # the check does not depend on which profiles the live config holds.
+    real_rated, real_absent = H.rated_profiles, H.absent_profiles
+    try:
+        H.rated_profiles = lambda: sorted((e, p) for e in H.entity_names()
+                                          for p in ("ambitionbox", "glassdoor")
+                                          if (e, p) != ("robust_kommerce", "ambitionbox"))
+        H.absent_profiles = lambda: [("robust_kommerce", "ambitionbox")]
+        _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
+    finally:
+        H.rated_profiles, H.absent_profiles = real_rated, real_absent
     for name, body in (("html", html), ("text", text)):
         check(f"the {name} digest discloses it",
               "Robust Kommerce on AmbitionBox" in body)
@@ -2659,7 +2670,8 @@ def test_market_worksheet_urls() -> None:
     check("an absent page yields no derived URL",
           not any("ambitionbox" in url for url in robust.values()),
           f"got {robust}")
-    check("while the pages it does have are still derived", len(robust) == 3)
+    check("while the pages it does have are still derived",
+          "LinkedIn Jobs" in robust, f"got {robust}")
 
     # The digest reports the CHANGE, so a week counted from three platforms
     # against one counted from two reports a movement nobody made. Both counts
