@@ -533,14 +533,14 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         # in the document, and send_digest.py puts it straight into the email.
         '<meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<style>a{text-decoration:none;}@media only screen and (max-width:620px){'
+        '<style>a{text-decoration:none;}@media only screen and (max-width:900px){'
         '.shell{width:100%!important;}.pad{padding-left:18px!important;'
         'padding-right:18px!important;}.tile{display:block!important;width:100%!important;'
         'margin-bottom:8px!important;}}</style>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
         f'style="background:{RULE};"><tr><td align="center" style="padding:28px 12px;">'
-        '<table role="presentation" class="shell" width="640" cellpadding="0" cellspacing="0" '
-        'border="0" style="width:640px;max-width:100%;background:#ffffff;border-radius:10px;'
+        '<table role="presentation" class="shell" width="880" cellpadding="0" cellspacing="0" '
+        'border="0" style="width:880px;max-width:100%;background:#ffffff;border-radius:10px;'
         'overflow:hidden;">')
 
     # Header
@@ -668,7 +668,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # 2 Rating Movement - one column per review site in config/sources.yaml,
     # so adding a site there (Indeed, Naukri, Google...) adds it here. Up to
     # three sites fit as columns; beyond that each company gets one row per
-    # site, because a 640px email cannot hold more columns legibly.
+    # site, because an 880px email cannot hold more columns legibly.
     sites = rating_sites(cfg)
     names = list(entities.items())
     covered = {e for e, _ in tracked}
