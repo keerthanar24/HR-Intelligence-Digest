@@ -518,7 +518,7 @@ def sheet_contents(mentions, ratings, escalations, week_of):
         return ("Nothing has been logged for this week yet; the sheet still holds "
                 "every earlier week.")
     held = ", ".join(listed[:-1]) + (" and " if len(listed) > 1 else "") + listed[-1]
-    return f"For this week it holds {held}. Every earlier week is in the same tabs."
+    return f"It holds {held}, with every week in the same tabs."
 
 
 def unrated_entities(entities, profiles=None):
@@ -659,8 +659,28 @@ def source_link(mention):
 # Week 1 is a sixty-day baseline, not seven days. It lives in hrintel because
 # the digest is not the only thing that has to agree with it: the validator and
 # the effort log each got this wrong independently before it was shared.
-baseline_window = H.baseline_window
 mentions_in = H.mentions_in
+
+
+def period_window(week_of: dt.date, settings: dict):
+    """(first_day, last_day, days) for a week set up as a longer report.
+
+    digest.period_reports maps a week_of to a number of days: that Friday's
+    digest covers the whole stretch (the 60-day report that opens weekly
+    reporting) instead of seven days. Weeks after it go back to weekly.
+    """
+    reports = settings.get("digest", {}).get("period_reports") or {}
+    days = {str(k): v for k, v in reports.items()}.get(week_of.isoformat())
+    if not days:
+        return None
+    last = week_of + dt.timedelta(days=6)
+    return last - dt.timedelta(days=int(days) - 1), last, int(days)
+
+
+def baseline_window(week_of: dt.date, settings: dict):
+    """The multi-week window this digest covers - the week 1 baseline or a
+    configured period report - or None for an ordinary week."""
+    return H.baseline_window(week_of, settings) or period_window(week_of, settings)
 
 
 # --- broadsheet style -------------------------------------------------------
@@ -1040,6 +1060,7 @@ def build(week_of: dt.date, settings: dict,
 
     prev_week = week_of - dt.timedelta(days=7)
     baseline = baseline_window(week_of, settings)
+    is_period = bool(baseline) and not H.baseline_window(week_of, settings)
     if baseline:
         first, last, baseline_days = baseline
         now = [m for m in mentions_in(all_mentions, first, last)
@@ -1088,8 +1109,9 @@ def build(week_of: dt.date, settings: dict,
     if baseline:
         # Say what the period actually is. "Week of 19-25 Sep" over sixty days
         # of findings would misdate every row in section 3.
-        week_label = (f"{baseline_days}-day baseline, {H.day_month(baseline[0])} to "
-                      f"{H.day_month(baseline[1], year=True)}")
+        week_label = (f"{baseline_days}-day"
+                      f"{' report' if is_period else ' baseline'}, "
+                      f"{H.day_month(baseline[0])} to {H.day_month(baseline[1], year=True)}")
 
     # A week built before it has ended covers fewer than seven days. Say so:
     # three days read as seven would understate the week and distort every
@@ -1109,6 +1131,7 @@ def build(week_of: dt.date, settings: dict,
         "red_flags": len(flags),
         "week_label": week_label,
         "baseline": bool(baseline),
+        "period": is_period,
         "week_end": week_end,
         "coverage_gaps": len(gaps),
         "coverage_detail": gaps,
@@ -1132,7 +1155,7 @@ def build(week_of: dt.date, settings: dict,
 
     if partial:
         notice = (
-            (f'<strong>Baseline still open</strong> \u2014 complete to '
+            (f'<strong>{"Report" if is_period else "Baseline"} still open</strong> \u2014 complete to '
              f'{H.day_month(today)}. It closes {H.day_month(week_end)}; anything posted '
              'between now and then is not in here yet.')
             if baseline else
@@ -1340,7 +1363,7 @@ def build(week_of: dt.date, settings: dict,
         f"({vs_previous(net_now, net_prev, digits=2)} vs previous week)"
     )
     if partial and baseline:
-        t.append(f"BASELINE STILL OPEN - complete to {H.day_month(today)}. It closes "
+        t.append(f"{'REPORT' if is_period else 'BASELINE'} STILL OPEN - complete to {H.day_month(today)}. It closes "
                  f"{H.day_month(week_end)}; anything posted between now and then is "
                  "not in here yet.")
     elif partial:
@@ -1496,7 +1519,8 @@ def build(week_of: dt.date, settings: dict,
         body, extra = digest_exec.render(
             week_of=week_of, week_label=week_label, prev_label=H.fmt_week(prev_week),
             baseline=bool(baseline), partial_notice=(notice if partial else ""),
-            entities=entities, platforms=platforms, now=now, prev=prev,
+            period=baseline if is_period else None, entities=entities, platforms=platforms,
+            now=now, prev=prev,
             all_mentions=all_mentions, all_ratings=all_ratings, flags=flags,
             lagging=lagging, data_link=data_link, holdings=holdings, settings=settings)
         stats.update(extra)
@@ -1604,8 +1628,8 @@ def main() -> int:
         # The console said "PARTIAL WEEK - 4 of 7 days" while the email above
         # it said the baseline was still open. Two frames for one state is how
         # an operator stops believing either.
-        print(f"BASELINE STILL OPEN — it closes {H.day_month(stats['week_end'])}. "
-              "Fine to review now; send it once the baseline closes."
+        print(f"{'REPORT' if stats.get('period') else 'BASELINE'} STILL OPEN — it closes "
+              f"{H.day_month(stats['week_end'])}. Fine to review now; send it once it closes."
               if stats.get("baseline") else
               f"PARTIAL WEEK — {stats['days_elapsed']} of 7 days. Fine for a mid-week look; "
               "do not send it as the weekly digest.")

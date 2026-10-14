@@ -508,8 +508,11 @@ def test_digest() -> None:
         # The baseline week gets its own wording: "4 of 7 days" is the wrong
         # frame for a period that is sixty days long.
         if build_digest.baseline_window(running, settings):
+            # A configured period report (the 60-day report) says "Report".
+            word = "REPORT" if build_digest.period_window(running, settings) else "BASELINE"
             check("an open baseline says so, not 'partial week'",
-                  "BASELINE STILL OPEN" in part_text and "Baseline still open" in part_html)
+                  f"{word} STILL OPEN" in part_text
+                  and f"{word.capitalize()} still open" in part_html)
             check("and names the day it closes",
                   "It closes" in part_text and "It closes" in part_html)
             check("the subject says it is in progress", "IN PROGRESS" in part_subject,
