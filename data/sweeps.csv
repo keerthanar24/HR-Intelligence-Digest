@@ -14,7 +14,7 @@ week_of,platform,checked_at,checked_by,found,notes
 2026-10-03,quora,2026-10-09,collector,0,
 2026-10-03,reddit,2026-10-09,collector,0,
 2026-10-10,linkedin,2026-10-12,aryan,0,"All four company pages: no new posts in the last 7 days, so no comments to read."
-2026-10-10,news,2026-10-14,collector,0,
-2026-10-10,quora,2026-10-14,collector,0,
-2026-10-10,reddit,2026-10-14,collector,0,
+2026-10-10,news,2026-10-15,collector,0,
+2026-10-10,quora,2026-10-15,collector,0,
+2026-10-10,reddit,2026-10-15,collector,0,
 2026-10-10,x,2026-10-12,claude,0,"Web search of x.com/twitter.com for all four names (no X API token, so not the live logged-out search). Nothing employment-related. Only hits: unrelated companies sharing the name 'RK Group' (railway catering in Okhla, Delhi; a blockchain firm; a San Antonio caterer) and a 2022 post calling RK Worldinfocom a reseller of a fake product - customer-side, out of scope. Search engines index recent X posts poorly; treat as a partial check."
