@@ -634,7 +634,9 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         if not chips:
             chips = f'<span style="color:{FAINT};font-size:13px;">Nothing new</span>'
         label, colours, net = overall(mine, minimum)
-        shown = label + (f" &middot; {'0.0' if abs(net) < 0.05 else f'{net:+.1f}'}"
+        # Two decimals: +0.25 printed to one place came out as "+0.2" (round
+        # half to even), which nobody could reproduce from the chips.
+        shown = label + (f" &middot; {'0.00' if abs(net) < 0.005 else f'{net:+.2f}'}"
                          if net is not None and label not in
                          ("Insufficient data", "No reviews", "Not scored", "Awaiting review") else "")
         _, _, net_prev = overall(theirs, minimum)
