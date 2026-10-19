@@ -872,13 +872,29 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 colour = GOOD[1] if r["on_time"] else BAD[1]
                 sent = (f'{x(fmt_day(r["notified"]))}'
                         + small(f'<strong style="color:{colour};">{x(r["timing"])}</strong>'))
+            # A direct way to the review itself: its own link when we have one,
+            # otherwise the company's review page plus who wrote it and when,
+            # which is enough to find it there.
+            m = next((m for m in all_mentions if m.get("mention_id") == r["mention_id"]), {})
+            link = (m.get("url") or "").strip()
+            exact = bool(link)
+            link = link or H.profile_url(m.get("entity", ""), m.get("platform", ""))
+            who_when = " &middot; ".join(filter(None, [
+                x((m.get("role_or_dept") or "").strip()),
+                f"posted {x(fmt_day(m.get('post_date') or ''))}" if m.get("post_date") else ""]))
+            review = ((f'<a href="{x(link)}" style="color:{INK};font-weight:600;'
+                       f'text-decoration:underline;">Open review &rarr;</a>' if link else
+                       f'<span style="color:{FAINT};">No link</span>')
+                      + small(who_when + ("" if exact or not link else
+                                          " &middot; on the company review page")))
             rows.append("<tr>" + td(f'<strong>{x(r["entity"])}</strong>'
                                     + small(x(r["platform"])), last=last)
-                        + td(x(r["reason"]) + small(x(r["status"])), last=last)
-                        + td(x(fmt_day(r["raised"])), last=last)
+                        + td(x(r["reason"]) + small(f'{x(r["status"])} &middot; found '
+                                                    f'{x(fmt_day(r["raised"]))}'), last=last)
+                        + td(review, last=last)
                         + td(sent, "right", last=last) + "</tr>")
-        p.append(row(table([th("Company", width="30%"), th("Trigger", width="30%"),
-                            th("Found", width="18%"), th("Alert sent", "right", "22%")], rows)))
+        p.append(row(table([th("Company", width="22%"), th("Trigger", width="22%"),
+                            th("Review", width="36%"), th("Alert sent", "right", "20%")], rows)))
     else:
         p.append(row(box(f'<strong style="color:{INK};">None {span}.</strong> '
                          f"{plural(len(now), 'mention')} checked for named people, harassment, "
