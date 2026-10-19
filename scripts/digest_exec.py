@@ -883,7 +883,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 x((m.get("role_or_dept") or "").strip()),
                 f"posted {x(fmt_day(m.get('post_date') or ''))}" if m.get("post_date") else ""]))
             review = ((f'<a href="{x(link)}" style="color:{INK};font-weight:600;'
-                       f'text-decoration:underline;">Open review &rarr;</a>' if link else
+                       f'text-decoration:underline;">Open on {x(r["platform"])} &rarr;</a>' if link else
                        f'<span style="color:{FAINT};">No link</span>')
                       + small(who_when + ("" if exact or not link else
                                           " &middot; on the company review page")))
