@@ -454,8 +454,10 @@ def test_digest() -> None:
     # apostrophe in "What's New". Same six deliverables, different bytes -
     # section_heading() reads either, so this checks the digest's default
     # output whichever style that currently is.
-    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "What's New"),
-                          (4, "Themes"), (5, "Red Flags"), (6, "Data Link")):
+    # The executive email dropped What's New at leadership's request (the
+    # items live in the tracking sheet); the plain text keeps all six.
+    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "Themes"),
+                          (4, "Red Flags"), (5, "Data Link")):
         check(f"html has section '{number} · {title}'",
               section_heading(body_html, number, title))
     for heading in ("1. HEADLINE", "2. RATING MOVEMENT", "3. WHAT'S NEW",
@@ -464,8 +466,9 @@ def test_digest() -> None:
 
     # RK World: ambitionbox 3.4 -> 3.3 is the movement the digest must show.
     check("rating drop reported", "3.30" in body_html and "-0.10" in body_html)
+    shown = re.sub(r'href="[^"]*"', "", body_html)
     check("platform display names, not config ids",
-          "AmbitionBox" in body_html and "ambitionbox" not in body_html)
+          "AmbitionBox" in shown and "ambitionbox" not in shown)
     check("review count growth reported", "+3" in body_html or "+3" in body_text)
     check("boundary note present in both bodies",
           "Customer and product complaints are out of scope" in body_html
@@ -1523,9 +1526,9 @@ def test_fields_reach_the_email() -> None:
     # card's meta line ("4/5 stars · Current employee · ..."). Either way the
     # reader gets the rating and who wrote it without opening the sheet -
     # that is what this test is actually protecting.
-    check("the html What's New shows a star rating", "/5" in html)
-    check("the html What's New says who wrote it",
-          any(label in html for label in H.AUTHOR_LABELS.values()))
+    check("the text What's New shows a star rating", "/5" in text)
+    check("the text What's New says who wrote it",
+          any(label in text for label in H.AUTHOR_LABELS.values()))
     check("section 2 carries percent-recommend in html", "Recommend" in html)
     # The plain-text section 3 is a bullet list, so the values ride inline.
     check("the text digest shows the star rating", "/5" in text, f"({text[:0]})")
@@ -2488,10 +2491,10 @@ def test_job_market_reaches_the_digest() -> None:
     check("with an open-roles column", "open roles" in html.lower())
     check("and the three candidate signals",
           all(s in html for s in ("Interviews &amp; hiring", "Pay &amp; appraisals",
-                                  "Exits &amp; job security")))
-    themes = html.find(">4 &middot; Themes<")
-    flags = html.find(">5 &middot; Red Flags<")
-    check("inside section 4, before Red Flags",
+                                  "Exits &amp; layoffs", "Job security")))
+    themes = html.find(">3 &middot; Themes<")
+    flags = html.find(">4 &middot; Red Flags<")
+    check("inside Themes, before Red Flags",
           0 <= themes < html.lower().find("job market") < flags)
 
     # Section 2 is "Glassdoor and AmbitionBox score updates per entity" and
@@ -2776,13 +2779,15 @@ def test_the_six_deliverables_are_all_present() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     six = ["Headline", "Rating Movement", "What's New", "Themes",
            "Red Flags", "Data Link"]
+    five = [s for s in six if s != "What's New"]
 
     for body, name in ((html, "html"), (text, "text")):
         lowered = body.lower().replace("&#x27;", "'")
-        where = [lowered.find(s.lower()) for s in six]
+        wanted = five if name == "html" else six
+        where = [lowered.find(s.lower()) for s in wanted]
         check(f"all six are named in the {name} body",
               all(i >= 0 for i in where),
-              f"missing {[s for s, i in zip(six, where) if i < 0]}")
+              f"missing {[s for s, i in zip(wanted, where) if i < 0]}")
         check(f"and in the brief's order in the {name} body",
               where == sorted(where))
 
@@ -2795,14 +2800,14 @@ def test_the_six_deliverables_are_all_present() -> None:
     # the literal-table-column guarantee is checked against plain by name,
     # since that is the one style that promises it.
     for label in ("Current employee", "Ex-employee", "Anonymous", "Candidate"):
-        if label in html:
+        if label in text:
             check("section 3 names who wrote the item", True)
             break
     else:
         check("section 3 names who wrote the item", False, "no author label found anywhere")
-    check("section 3 carries a platform name", "Glassdoor" in html or "AmbitionBox" in html)
+    check("section 3 carries a platform name", "Glassdoor" in text or "AmbitionBox" in text)
     check("section 3 carries a date",
-          re.search(r"\b202\d-\d\d-\d\d\b|posted \d{1,2} [A-Z][a-z]{2}\b", html) is not None)
+          re.search(r"\b202\d-\d\d-\d\d\b|posted \d{1,2} [A-Z][a-z]{2}\b", text) is not None)
 
     _sp, plain_html, _pt, _ps = build_digest.build(WEEK, H.load_yaml("settings"), style="plain")
     marker = "What&#x27;s New" if "What&#x27;s New" in plain_html else "What's New"
@@ -2837,10 +2842,11 @@ def test_the_sent_message_carries_the_deliverables() -> None:
     for kind in ("plain", "html"):
         body = msg.get_body(preferencelist=(kind,)).get_content()
         lowered = body.lower().replace("&#x27;", "'")
-        where = [lowered.find(name.lower()) for name in six]
+        wanted = six if kind == "plain" else [n for n in six if n != "What's New"]
+        where = [lowered.find(name.lower()) for name in wanted]
         check(f"all six deliverables reach the {kind} part",
               all(i >= 0 for i in where),
-              f"missing {[n for n, i in zip(six, where) if i < 0]}")
+              f"missing {[n for n, i in zip(wanted, where) if i < 0]}")
         check(f"in the brief's order in the {kind} part", where == sorted(where))
         check(f"and the data link itself is in the {kind} part",
               "docs.google.com" in body or "http" in body.split(six[-1])[1][:400])

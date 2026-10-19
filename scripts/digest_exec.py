@@ -259,9 +259,9 @@ def rating_cell(pair, week_of) -> tuple[str, bool]:
         # compared and must not be reported as a movement.
         return (head + small(f"review count fell {before_count} &rarr; {count}: "
                              "check this page", BAD[1]), False)
-    extra = (f' &middot; +{new_reviews} reviews' if new_reviews > 0 else "")
-    return (head + small(f"{arrow(diff, digits=2)} since {x(since)}{extra}"),
-            diff is not None and abs(diff) >= 0.005)
+    if diff is None or abs(diff) < 0.005:
+        return head + small("No rating change"), False
+    return head + small(f"{arrow(diff, digits=2)} since {x(since)}"), True
 
 
 def recommend_cell(pair, week_of) -> str:
@@ -273,7 +273,8 @@ def recommend_cell(pair, week_of) -> str:
     if latest.get("week_of") == week_of.isoformat() and prev is not None:
         before = H.to_float(prev.get("recommend_pct"))
         if before is not None:
-            out += small(arrow(value - before, suffix="pp"))
+            out += small("No change" if abs(value - before) < 0.5 else
+                         arrow(value - before, suffix="pp"))
     return out
 
 
@@ -354,6 +355,49 @@ def theme_table(now, window, week_of, entities, limit, period=False):
     return rows, recurring, [(t, st, status(st), tone(st)) for t, st in current]
 
 
+TINT = {"pos": "#e8f5e9", "neg": "#fdecea", "neu": "#f7f8fa"}
+
+
+def tally_counts(t) -> str:
+    bits = []
+    if t["pos"]:
+        bits.append(f'<span style="color:{GOOD[1]};font-weight:700;">&#9650;{t["pos"]}</span>')
+    if t["neg"]:
+        bits.append(f'<span style="color:{BAD[1]};font-weight:700;">&#9660;{t["neg"]}</span>')
+    if t["neu"]:
+        bits.append(f'<span style="color:{MUTED};font-weight:700;">&#9679;{t["neu"]}</span>')
+    return " ".join(bits)
+
+
+def tally_td(t, last, bold=False) -> str:
+    """One shaded matrix cell: positive / negative / neutral counts."""
+    if not (t["pos"] + t["neg"] + t["neu"]):
+        return td(f'<span style="color:{FAINT};">&mdash;</span>', "center", last=last)
+    lean = "pos" if t["pos"] > t["neg"] else "neg" if t["neg"] > t["pos"] else "neu"
+    return (f'<td align="center" valign="top" style="padding:9px 4px;background:{TINT[lean]};'
+            f'font:{"700" if bold else "400"} 12.5px/1.45 {FONT};color:{INK};white-space:nowrap;'
+            f'border-bottom:{"0" if last else "1px solid #ffffff"};border-left:2px solid #ffffff;">'
+            f'{tally_counts(t)}</td>')
+
+
+def tally(mentions) -> dict:
+    out = {"pos": 0, "neg": 0, "neu": 0}
+    for m in mentions:
+        if H.is_company_voice(m):
+            continue
+        score = H.sentiment_score(m) or 0
+        out["pos" if score > 0 else "neg" if score < 0 else "neu"] += 1
+    return out
+
+
+def matrix_th(label, width, sub="") -> str:
+    """A sentence-case header for a narrow matrix column."""
+    return (f'<th align="center" width="{width}" style="padding:8px 4px;'
+            f'font:700 12px/1.3 {FONT};color:{INK};border-bottom:2px solid #e5e7eb;">'
+            f'{label}' + (f'<div style="font:600 11px/1.4 {FONT};color:{FAINT};padding-top:3px;">'
+                          f'{sub}</div>' if sub else "") + '</th>')
+
+
 def theme_matrix(current, entities) -> str:
     """Companies down the side, themes across the top.
 
@@ -362,28 +406,6 @@ def theme_matrix(current, entities) -> str:
     see at a glance both what a theme is about and where it is coming from.
     """
     names = list(entities.items())
-    tint = {"pos": "#e8f5e9", "neg": "#fdecea", "neu": "#f7f8fa"}
-
-    def counts(t):
-        bits = []
-        if t["pos"]:
-            bits.append(f'<span style="color:{GOOD[1]};font-weight:700;">&#9650;{t["pos"]}</span>')
-        if t["neg"]:
-            bits.append(f'<span style="color:{BAD[1]};font-weight:700;">&#9660;{t["neg"]}</span>')
-        if t["neu"]:
-            bits.append(f'<span style="color:{MUTED};font-weight:700;">&#9679;{t["neu"]}</span>')
-        return " ".join(bits)
-
-    def cell(t, last, bold=False):
-        n = t["pos"] + t["neg"] + t["neu"]
-        if not n:
-            return td(f'<span style="color:{FAINT};">&mdash;</span>', "center", last=last)
-        lean = "pos" if t["pos"] > t["neg"] else "neg" if t["neg"] > t["pos"] else "neu"
-        return (f'<td align="center" valign="top" style="padding:9px 4px;background:{tint[lean]};'
-                f'font:{"700" if bold else "400"} 12.5px/1.45 {FONT};color:{INK};white-space:nowrap;'
-                f'border-bottom:{"0" if last else "1px solid #ffffff"};border-left:2px solid #ffffff;">'
-                f'{counts(t)}</td>')
-
     labels = {"growth_learning": "Growth", "harassment_safety": "Harassment",
               "payroll_delay": "Payroll delay", "compensation": "Pay",
               "job_security": "Job security", "work_hours": "Work hours"}
@@ -409,7 +431,7 @@ def theme_matrix(current, entities) -> str:
                 t = {k: sum(c[k] for c in st["by_company"].values()) for k in empty}
             else:
                 t = st["by_company"].get(eid, empty)
-            line += cell(t, last, bold=is_all)
+            line += tally_td(t, last, bold=is_all)
         rows.append(line + "</tr>")
     return (table(head, rows)
             + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral or mixed "
@@ -456,7 +478,7 @@ def coverage(week_of, platforms, all_ratings, sweeps, now, settings):
         else:
             state = pill("Not checked", WARN, strong=False)
         out.append({
-            "name": platforms.get(pid, pid),
+            "name": platforms.get(pid, pid), "pid": pid,
             "state": state,
             "last": H.day_month(max(dates)) if dates else "never",
             "last_date": max(dates) if dates else None,
@@ -496,7 +518,7 @@ def period_coverage(period, week_of, platforms, all_ratings, sweeps, now, settin
             colours = GOOD if due and hit == len(due) else WARN if hit else BAD
             state = pill(f"{hit} of {len(due)} weeks", colours, strong=False)
         out.append({
-            "name": platforms.get(pid, pid), "state": state,
+            "name": platforms.get(pid, pid), "pid": pid, "state": state,
             "last": H.day_month(max(dates)) if dates else "never",
             "found": found.get(pid, 0), "checked": bool(hit),
             "how": "Manual" if pid in {q for _, q in H.rated_profiles()} or
@@ -652,40 +674,6 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     p.append(row('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
                  f'border="0"><tr>{gap.join(tiles)}</tr></table>', pad="22px 32px 0 32px"))
 
-    # In short - derived, never hand-written
-    said = []
-    if total:
-        parts = [f"{counts_now[k]} {k}" for k in ("positive", "negative", "neutral")
-                 if counts_now[k]]
-        if counts_now["company"]:
-            parts.append(plural(counts_now["company"], "company post"))
-        if counts_now["untagged"]:
-            parts.append(f"{counts_now['untagged']} awaiting review")
-        said.append(f"{plural(total, 'mention' if period else 'new mention')}"
-                    f"{' ' + span if period else ''} ({', '.join(parts)}).")
-    else:
-        said.append(f"No new mentions of the four companies {span}.")
-    if rechecked:
-        said.append(f"{plural(rating_changes, 'rating')} changed." if rating_changes
-                    else "No rating changes.")
-    else:
-        last = max((H.parse_date(pr[0].get("captured_at", "")) for pr in pairs.values()),
-                   default=None)
-        said.append("Glassdoor and AmbitionBox ratings were not re-checked this week"
-                    + (f" (last checked {H.day_month(last)})." if last else "."))
-    said.append(f"{plural(len(flags), 'red-flag alert')} - see section 5." if flags
-                else "Nothing tripped a red-flag trigger.")
-    if period:
-        never = [c["name"] for c in period_coverage(period, week_of, platforms, all_ratings,
-                                                    sweeps, now, settings)
-                 if not c["checked"] and "No company page" not in c["state"]]
-        if never:
-            said.append(f"Not checked {span}: {', '.join(never)}.")
-    elif not_checked:
-        said.append(f"Not checked this week: {', '.join(not_checked)}.")
-    p.append(row(f'<div style="font:400 14px/1.6 {FONT};color:{INK};"><strong>In short:</strong> '
-                 f'{x(" ".join(said))}</div>', pad="14px 32px 0 32px"))
-
     # 1 Headline - sentiment by company
     p.append(section(1, "Headline", f"Mentions and sentiment for each company {span}"
                      + ("" if baseline else ", against last week") + "."))
@@ -719,8 +707,21 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 f'<span style="color:{FAINT};">&mdash;</span>'
             move = small(f"mentions {count_move} &middot; sentiment {senti_move}", MUTED)
         last = i == len(groups) - 1
+        if is_total:
+            name_html = f"<strong>{x(name)}</strong>"
+        else:
+            links = [(platforms.get(pid, pid), H.profile_url(eid, pid))
+                     for pid in rating_sites(cfg)]
+            links = [(n, u) for n, u in links if u]
+            first = links[0][1] if links else ""
+            name_html = (f'<a href="{x(first)}" style="color:{INK};font-weight:600;'
+                         f'text-decoration:underline;">{x(name)}</a>' if first else x(name))
+            if links:
+                name_html += small(" &middot; ".join(
+                    f'<a href="{x(u)}" style="color:{MUTED};text-decoration:underline;">{x(n)}</a>'
+                    for n, u in links))
         rows.append("<tr>"
-                    + td(f"<strong>{x(name)}</strong>" if is_total else x(name), last=last)
+                    + td(name_html, last=last)
                     + td(str(len(mine)), "center", last=last, bold=is_total)
                     + td(chips, last=last)
                     + td(pill(shown, colours) + move, "right", last=last)
@@ -756,10 +757,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         pair = pairs.get((eid, pid))
         if not pair:
             return f'<span style="color:{FAINT};">No page</span>'
-        out = rating_cell(pair, week_of)[0]
-        if (eid, pid) in shared:
-            out += small("&#9888; mixed page", WARN[1])
-        return out
+        return rating_cell(pair, week_of)[0]
 
     recommenders = [pid for pid in sites if H.platform_publishes(pid, "recommend_pct")]
     rows = []
@@ -779,7 +777,9 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         head = [th("Company", width="28%")] + [
             th(x(platforms.get(pid, pid)), "right", f"{share}%") for pid in sites]
         if rec:
-            head.append(th("Recommend", "right", f"{share}%"))
+            head.append(th(f'Recommend<div style="font:600 11px/1.4 {FONT};text-transform:none;'
+                           f'letter-spacing:0;padding-top:2px;">on {x(platforms.get(rec, rec))}'
+                           '</div>', "right", f"{share}%"))
         rec_note = (f" Recommend = {x(platforms.get(rec, rec))}." if rec else "")
     else:
         flat = [(eid, name, pid) for eid, name in names for pid in sites
@@ -807,69 +807,11 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         page_note += (f" &#9888; {x(', '.join(who_shared))} pages include other firms of the "
                       "same name.")
     p.append(row(table(head, rows)
-                 + note("Out of 5 (reviews)." + rec_note + page_note)))
+                 + (note(f"{x(', '.join(unrated))}: no {x(any_site)} page &mdash; not evidence "
+                         "of a quiet week.") if unrated else "")))
 
-    # 3 What's New
-    p.append(section(3, "What's New", f"Every {'' if period else 'new '}review or post {span}. "
-                     "Click a line to open the original."))
-
-    def item_rows(mentions):
-        out = []
-        ordered = sorted(mentions, key=lambda m: (m.get("post_date") or "", m.get("entity") or ""),
-                         reverse=True)
-        for m in ordered:
-            cls = mention_class(m)
-            stripe = {"positive": GOOD[1], "negative": BAD[1], "neutral": FAINT,
-                      "company": "#d1d5db", "untagged": WARN[1]}[cls]
-            link = (m.get("url") or "").strip() or H.profile_url(m.get("entity", ""),
-                                                                   m.get("platform", ""))
-            text = (m.get("one_line_summary") or m.get("title_or_snippet")
-                    or "(no summary)").strip()
-            text = text if len(text) <= summary_max else text[:summary_max - 1].rstrip() + "…"
-            body = (f'<a href="{x(link)}" style="font:400 14px/1.5 {FONT};color:{INK};">'
-                    f'{x(text)}</a>' if link else
-                    f'<span style="font:400 14px/1.5 {FONT};color:{INK};">{x(text)}</span>')
-            stars = H.to_int(str(m.get("rating_given") or "").strip(), 0)
-            meta = " &middot; ".join(filter(None, [
-                x(entities.get(m.get("entity"), m.get("entity"))),
-                x(platforms.get(m.get("platform"), m.get("platform"))),
-                f"posted {x(fmt_day(m.get('post_date') or m.get('captured_at')))}",
-                x(who(m)),
-                f"{stars}/5" if 1 <= stars <= 5 else "",
-            ]))
-            out.append(
-                f'<tr><td style="padding:10px 0 10px 12px;border-left:3px solid {stripe};'
-                f'border-bottom:1px solid {RULE};">'
-                f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-                f'border="0"><tr><td valign="top" style="font:600 11px/1.4 {FONT};'
-                f'text-transform:uppercase;letter-spacing:.03em;color:{FAINT};">{meta}</td>'
-                f'<td valign="top" align="right" width="120">{mention_pill(m)}</td></tr></table>'
-                f'{body}</td></tr>')
-        return ('<table role="presentation" width="100%" cellpadding="0" cellspacing="0" '
-                f'border="0" style="border-collapse:collapse;">{"".join(out)}</table>')
-
-    if now:
-        p.append(row(item_rows(now)))
-    else:
-        p.append(row(f'<div style="font:400 14px/1.6 {FONT};color:{INK};">Nothing new on any '
-                     f'checked channel {span}.</div>'))
-    quiet = [name for eid, name in entities.items()
-             if not any(m.get("entity") == eid for m in now)]
-    if quiet and now:
-        p.append(row(note(f"Nothing {span}: {x(', '.join(quiet))}.")))
-
-    # Found this week but posted in a week already reported. Review sites
-    # publish late and pages get found late; without this list such an item
-    # belongs to a digest that has already gone out and is never seen.
-    late = found_late(all_mentions, week_of, now)
-    if late and not baseline:
-        p.append(row(subhead(f"Found this week, posted earlier ({len(late)})")
-                     + item_rows(late)
-                     + note("Counted in the week they were posted, so they do not change this "
-                            "week&rsquo;s figures above.")))
-
-    # 4 Themes, then job-market signals
-    p.append(section(4, "Themes", "What the comments were about, company by company."))
+    # 3 Themes, then job-market signals
+    p.append(section(3, "Themes", "What the comments were about, company by company."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
     for offset in range(rolling_weeks):
@@ -889,46 +831,51 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             f"{t.replace('_', ' ').capitalize()} ({plural(s['total'], 'mention')} across "
             f"{len(s['weeks'])} weeks)" for t, s in recurring)), MUTED)))
 
-    # Job market and candidate signals
-    sig_counts = []
-    for label, themes in SIGNALS:
-        hits = [m for m in now if themes & set(H.split_themes(m.get("themes", "")))]
-        sig_counts.append(f"{x(label)}: <strong>{len(hits)}</strong>")
+    # Job market and candidate signals: one row per company, one column per
+    # signal, each counted positive / negative / neutral like the theme matrix.
     latest_market = {}
     for r in sorted(market, key=lambda r: r.get("week_of", "")):
         if (r.get("week_of") or "") <= (week_of + dt.timedelta(days=6)).isoformat():
             latest_market.setdefault(r.get("entity"), []).append(r)
+    signals = [("Interviews &amp; hiring", {"interview", "onboarding"}),
+               ("Pay &amp; appraisals", {"compensation", "appraisal", "payroll_delay"}),
+               ("Exits &amp; layoffs", {"exits", "layoffs"}),
+               ("Job security", {"job_security"})]
     mrows = []
-    for i, (eid, name) in enumerate(names):
-        snaps = latest_market.get(eid, [])
-        last = i == len(names) - 1
-        if not snaps:
-            mrows.append("<tr>" + td(x(name), last=last)
-                         + td(f'<span style="color:{FAINT};">not recorded</span>', "right",
-                              last=last) + td("", "right", last=last) + "</tr>")
-            continue
-        cur = snaps[-1]
-        before = snaps[-2] if len(snaps) > 1 else None
-        roles = H.to_int(cur.get("open_roles"), 0)
-        move = (arrow(roles - H.to_int(before.get("open_roles"), 0), up_is_good=None)
-                if before else f'<span style="color:{FAINT};">first count</span>')
-        stale = cur.get("week_of") != week_of.isoformat()
-        when = fmt_day(cur.get("captured_at") or cur.get("week_of"))
-        mrows.append("<tr>" + td(x(name), last=last) + td(f"<strong>{roles}</strong>", "right",
-                                                            last=last)
-                     + td(move + (small(f"as of {x(when)}", WARN[1] if stale else FAINT)),
-                          "right", last=last) + "</tr>")
+    groups = names + [("__all__", "All companies")]
+    for i, (eid, name) in enumerate(groups):
+        last = i == len(groups) - 1
+        is_all = eid == "__all__"
+        mine = now if is_all else [m for m in now if m.get("entity") == eid]
+        if is_all:
+            roles_total = sum(H.to_int(v[-1].get("open_roles"), 0) for v in latest_market.values())
+            roles_html = f"<strong>{roles_total}</strong>"
+        else:
+            snaps = latest_market.get(eid, [])
+            if snaps:
+                cur, before = snaps[-1], (snaps[-2] if len(snaps) > 1 else None)
+                roles = H.to_int(cur.get("open_roles"), 0)
+                move = (arrow(roles - H.to_int(before.get("open_roles"), 0), up_is_good=None)
+                        if before else f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}")
+                roles_html = f"<strong>{roles}</strong>" + small(move)
+            else:
+                roles_html = f'<span style="color:{FAINT};">not recorded</span>'
+        line = ("<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
+                + td(roles_html, "center", last=last))
+        for _label, themes in signals:
+            line += tally_td(tally(m for m in mine
+                                   if themes & set(H.split_themes(m.get("themes", "")))),
+                             last, bold=is_all)
+        mrows.append(line + "</tr>")
     p.append(row(subhead("Job market &amp; candidate signals")
-                 + f'<div style="font:400 13.5px/1.6 {FONT};color:{INK};padding-bottom:8px;">'
-                 + " &nbsp;&middot;&nbsp; ".join(sig_counts) + "</div>"
-                 + table([th("Company", width="44%"), th("Open roles", "right", "22%"),
-                          th("Change", "right", "34%")], mrows)
-                 + note("Interview experiences, salary comments, hiring posts and exit "
-                        f"feedback are counted from the mentions {span}; open roles from "
-                        "the company jobs pages on Glassdoor, AmbitionBox and LinkedIn.")))
+                 + table([th("Company", width="24%"), matrix_th("Open roles", "16%")]
+                         + [matrix_th(label, "15%") for label, _ in signals], mrows)
+                 + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral "
+                        f"&mdash; reviews and posts {span} that talk about each topic. Open roles "
+                        "from the company jobs pages on Glassdoor, AmbitionBox and LinkedIn.")))
 
     # 5 Red Flags
-    p.append(section(5, "Red Flags", "Serious issues that are escalated the same day, "
+    p.append(section(4, "Red Flags", "Serious issues that are escalated the same day, "
                      "separately from this digest."))
     if flags:
         rows = []
@@ -981,25 +928,44 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # Monitoring transparency, then 6 Data Link
     if period:
         cover = period_coverage(period, week_of, platforms, all_ratings, sweeps, now, settings)
+    absent = set(H.absent_profiles())
+    no_page_anywhere = {c["pid"] for c in cover if "No company page" in c["state"]}
     crow = []
+    totals = collections.Counter()
     for i, c in enumerate(cover):
-        last = i == len(cover) - 1
-        crow.append("<tr>" + td(x(c["name"]) + small(c["how"]), last=last)
-                    + td(c["state"], last=last)
-                    + td(x(c["last"]), "center", last=last)
-                    + td(str(c["found"]) if c["checked"] else
-                         f'<span style="color:{FAINT};">&mdash;</span>', "right", last=last)
-                    + "</tr>")
+        last = False
+        pid = c["pid"]
+        line = "<tr>" + td(f"<strong>{x(c['name'])}</strong>" + small(c["how"]), last=last)
+        for eid, _ in names:
+            if pid in no_page_anywhere or (eid, pid) in absent:
+                line += td(f'<span style="color:{FAINT};font-size:12px;">no page</span>',
+                           "center", last=last)
+                continue
+            n = sum(1 for m in now if m.get("entity") == eid and m.get("platform") == pid)
+            totals[eid] += n
+            line += td(f"<strong>{n}</strong>" if n else f'<span style="color:{FAINT};">0</span>',
+                       "center", last=last)
+        total = sum(1 for m in now if m.get("platform") == pid)
+        line += td(f"<strong>{total}</strong>", "center", last=last)
+        line += td(c["state"] + small(f"last {x(c['last'])}"), "right", last=last)
+        crow.append(line + "</tr>")
+    crow.append("<tr>" + td("<strong>All channels</strong>", last=True)
+                + "".join(td(f"<strong>{totals[eid]}</strong>", "center", last=True)
+                          for eid, _ in names)
+                + td(f"<strong>{len(now)}</strong>", "center", last=True)
+                + td("", last=True) + "</tr>")
+    share = 11
     p.append(row(subhead(f"Monitoring {span}")
-                 + table([th("Channel", width="30%"),
-                          th("Weeks checked" if period else "Status", width="32%"),
-                          th("Last checked", "center", "20%"), th("Found", "right", "18%")],
+                 + table([th("Channel", width="20%")]
+                         + [matrix_th(x(name), f"{share}%") for _, name in names]
+                         + [matrix_th("All", "9%"),
+                            th("Weeks checked" if period else "Checked", "right", "27%")],
                          crow)
-                 + note(f"{name_variants()} name variants searched."
-                        + ("" if period else " &ldquo;Not checked&rdquo; means nobody looked.")),
+                 + note(f"Mentions found on each channel, by company. {name_variants()} name "
+                        "variants searched."),
                  pad="28px 32px 0 32px"))
 
-    p.append(section(6, "Data Link", "Every mention, rating and check, with links to the "
+    p.append(section(5, "Data Link", "Every mention, rating and check, with links to the "
                      "originals."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'
