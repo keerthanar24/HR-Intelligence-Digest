@@ -286,7 +286,9 @@ def theme_table(now, window, week_of, entities, limit, period=False):
     this_week = week_of.isoformat()
     prev_week = (week_of - dt.timedelta(days=7)).isoformat()
     stats = collections.defaultdict(lambda: {"now": 0, "prev": 0, "weeks": set(),
-                                             "total": 0, "companies": set(), "scores": []})
+                                             "total": 0, "companies": set(), "scores": [],
+                                             "by_company": collections.defaultdict(
+                                                 lambda: {"pos": 0, "neg": 0, "neu": 0})})
     for m in window:
         for theme in H.split_themes(m.get("themes", "")):
             s = stats[theme]
@@ -298,6 +300,9 @@ def theme_table(now, window, week_of, entities, limit, period=False):
         score = None if H.is_company_voice(m) else H.sentiment_score(m)
         for theme in H.split_themes(m.get("themes", "")):
             s = stats[theme]
+            if not H.is_company_voice(m):
+                tally = s["by_company"][m.get("entity")]
+                tally["pos" if (score or 0) > 0 else "neg" if (score or 0) < 0 else "neu"] += 1
             s["now"] += 1
             s["companies"].add(entities.get(m.get("entity"), m.get("entity")))
             if score is not None:
@@ -346,7 +351,63 @@ def theme_table(now, window, week_of, entities, limit, period=False):
     recurring = sorted(((t, s) for t, s in stats.items()
                         if s["total"] >= 2 and len(s["weeks"]) >= 2),
                        key=lambda ts: (-ts[1]["total"], ts[0]))
-    return rows, recurring
+    return rows, recurring, [(t, st, status(st), tone(st)) for t, st in current]
+
+
+def theme_matrix(current, entities) -> str:
+    """Themes down the side, companies across the top.
+
+    Each cell shows how many positive, negative and neutral mentions that
+    company had on that theme, shaded by which way it leans, so a reader can
+    see at a glance both what a theme is about and where it is coming from.
+    """
+    names = list(entities.items())
+    tint = {"pos": "#e8f5e9", "neg": "#fdecea", "neu": "#f7f8fa"}
+
+    def counts(t):
+        bits = []
+        if t["pos"]:
+            bits.append(f'<span style="color:{GOOD[1]};font-weight:700;">&#9650;{t["pos"]}</span>')
+        if t["neg"]:
+            bits.append(f'<span style="color:{BAD[1]};font-weight:700;">&#9660;{t["neg"]}</span>')
+        if t["neu"]:
+            bits.append(f'<span style="color:{MUTED};font-weight:700;">&#9679;{t["neu"]}</span>')
+        return " ".join(bits)
+
+    def cell(t, last, bold=False):
+        n = t["pos"] + t["neg"] + t["neu"]
+        if not n:
+            return td(f'<span style="color:{FAINT};">&mdash;</span>', "center", last=last)
+        lean = "pos" if t["pos"] > t["neg"] else "neg" if t["neg"] > t["pos"] else "neu"
+        return (f'<td align="center" valign="top" style="padding:9px 4px;background:{tint[lean]};'
+                f'font:{"700" if bold else "400"} 13px/1.45 {FONT};color:{INK};'
+                f'border-bottom:{"0" if last else "1px solid #ffffff"};border-left:2px solid #ffffff;">'
+                f'{counts(t)}</td>')
+
+    rows = []
+    for i, (theme, st, status_html, tone_html) in enumerate(current):
+        last = i == len(current) - 1
+        total = {"pos": 0, "neg": 0, "neu": 0}
+        label = {"growth_learning": "Growth &amp; learning",
+                 "harassment_safety": "Harassment / safety",
+                 "payroll_delay": "Payroll delay"}.get(theme, x(theme.replace("_", " ").capitalize()))
+        line = "<tr>" + td(f'<strong>{label}</strong>'
+                           + small(tone_html), last=last)
+        for eid, _ in names:
+            t = st["by_company"].get(eid, {"pos": 0, "neg": 0, "neu": 0})
+            for k in total:
+                total[k] += t[k]
+            line += cell(t, last)
+        line += cell(total, last, bold=True) + td(status_html, "right", last=last) + "</tr>"
+        rows.append(line)
+    share = int(52 / max(1, len(names)))
+    head = ([th("Theme", width="20%")]
+            + [th(x(name), "center", f"{share}%") for _, name in names]
+            + [th("All", "center", "12%"), th("Status", "right", "16%")])
+    return (table(head, rows)
+            + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral or mixed "
+                   "&mdash; number of mentions. Shading shows which way each company leans on "
+                   "that theme. Company posts are not counted."))
 
 
 def coverage(week_of, platforms, all_ratings, sweeps, now, settings):
@@ -800,8 +861,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                             "week&rsquo;s figures above.")))
 
     # 4 Themes, then job-market signals
-    p.append(section(4, "Themes", "What the comments were about, which companies they "
-                     "concern, and whether the theme is new, increasing or recurring."))
+    p.append(section(4, "Themes", "What the comments were about, by company, and whether "
+                     "each theme is new, increasing or recurring."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
     for offset in range(rolling_weeks):
@@ -809,12 +870,10 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     window = [m for m in window if (m.get("status") or "") != "out_of_scope"]
     if baseline:
         window = list(now)
-    theme_rows, recurring = theme_table(now, window, week_of, entities, max_themes,
-                                        period=bool(period))
+    theme_rows, recurring, current = theme_table(now, window, week_of, entities,
+                                                 max(max_themes, 8), period=bool(period))
     if theme_rows:
-        p.append(row(table([th("Theme", width="24%"), th("Companies", width="30%"),
-                            th("Mentions" if period else "This week", "center", "13%"), th("Status", width="20%"),
-                            th("Tone", "right", "13%")], theme_rows)))
+        p.append(row(theme_matrix(current, entities)))
     else:
         p.append(row(f'<div style="font:400 14px/1.6 {FONT};color:{INK};">No themes {span} '
                      '&mdash; nothing tagged to group.</div>'))
