@@ -947,19 +947,16 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                        "center", last=last)
         total = sum(1 for m in now if m.get("platform") == pid)
         line += td(f"<strong>{total}</strong>", "center", last=last)
-        line += td(c["state"] + small(f"last {x(c['last'])}"), "right", last=last)
         crow.append(line + "</tr>")
     crow.append("<tr>" + td("<strong>All channels</strong>", last=True)
                 + "".join(td(f"<strong>{totals[eid]}</strong>", "center", last=True)
                           for eid, _ in names)
-                + td(f"<strong>{len(now)}</strong>", "center", last=True)
-                + td("", last=True) + "</tr>")
-    share = 11
+                + td(f"<strong>{len(now)}</strong>", "center", last=True) + "</tr>")
+    share = 15
     p.append(row(subhead(f"Monitoring {span}")
-                 + table([th("Channel", width="20%")]
+                 + table([th("Channel", width="24%")]
                          + [matrix_th(x(name), f"{share}%") for _, name in names]
-                         + [matrix_th("All", "9%"),
-                            th("Weeks checked" if period else "Checked", "right", "27%")],
+                         + [matrix_th("All", f"{76 - share * len(names)}%")],
                          crow)
                  + note(f"Mentions found on each channel, by company. {name_variants()} name "
                         "variants searched."),
