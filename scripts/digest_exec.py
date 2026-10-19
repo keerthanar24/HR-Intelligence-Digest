@@ -355,7 +355,7 @@ def theme_table(now, window, week_of, entities, limit, period=False):
 
 
 def theme_matrix(current, entities) -> str:
-    """Themes down the side, companies across the top.
+    """Companies down the side, themes across the top.
 
     Each cell shows how many positive, negative and neutral mentions that
     company had on that theme, shaded by which way it leans, so a reader can
@@ -380,34 +380,42 @@ def theme_matrix(current, entities) -> str:
             return td(f'<span style="color:{FAINT};">&mdash;</span>', "center", last=last)
         lean = "pos" if t["pos"] > t["neg"] else "neg" if t["neg"] > t["pos"] else "neu"
         return (f'<td align="center" valign="top" style="padding:9px 4px;background:{tint[lean]};'
-                f'font:{"700" if bold else "400"} 13px/1.45 {FONT};color:{INK};'
+                f'font:{"700" if bold else "400"} 12.5px/1.45 {FONT};color:{INK};white-space:nowrap;'
                 f'border-bottom:{"0" if last else "1px solid #ffffff"};border-left:2px solid #ffffff;">'
                 f'{counts(t)}</td>')
 
+    labels = {"growth_learning": "Growth", "harassment_safety": "Harassment",
+              "payroll_delay": "Payroll delay", "compensation": "Pay",
+              "job_security": "Job security", "work_hours": "Work hours"}
+    share = int(82 / max(1, len(current)))
+    head = [th("Company", width=f"{100 - share * len(current)}%")]
+    for theme, st, _status, tone_html in current:
+        label = labels.get(theme, x(theme.replace("_", " ").capitalize()))
+        # Theme names in sentence case: uppercase with letter-spacing overran
+        # the narrow columns.
+        head.append(f'<th align="center" width="{share}%" style="padding:8px 4px;'
+                    f'font:700 12px/1.3 {FONT};color:{INK};border-bottom:2px solid #e5e7eb;">'
+                    f'{label}<div style="font:600 11px/1.4 {FONT};padding-top:3px;">{tone_html}'
+                    '</div></th>')
+    empty = {"pos": 0, "neg": 0, "neu": 0}
     rows = []
-    for i, (theme, st, status_html, tone_html) in enumerate(current):
-        last = i == len(current) - 1
-        total = {"pos": 0, "neg": 0, "neu": 0}
-        label = {"growth_learning": "Growth &amp; learning",
-                 "harassment_safety": "Harassment / safety",
-                 "payroll_delay": "Payroll delay"}.get(theme, x(theme.replace("_", " ").capitalize()))
-        line = "<tr>" + td(f'<strong>{label}</strong>'
-                           + small(tone_html), last=last)
-        for eid, _ in names:
-            t = st["by_company"].get(eid, {"pos": 0, "neg": 0, "neu": 0})
-            for k in total:
-                total[k] += t[k]
-            line += cell(t, last)
-        line += cell(total, last, bold=True) + td(status_html, "right", last=last) + "</tr>"
-        rows.append(line)
-    share = int(52 / max(1, len(names)))
-    head = ([th("Theme", width="20%")]
-            + [th(x(name), "center", f"{share}%") for _, name in names]
-            + [th("All", "center", "12%"), th("Status", "right", "16%")])
+    groups = names + [("__all__", "All companies")]
+    for i, (eid, name) in enumerate(groups):
+        last = i == len(groups) - 1
+        is_all = eid == "__all__"
+        line = "<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
+        for theme, st, _status, _tone in current:
+            if is_all:
+                t = {k: sum(c[k] for c in st["by_company"].values()) for k in empty}
+            else:
+                t = st["by_company"].get(eid, empty)
+            line += cell(t, last, bold=is_all)
+        rows.append(line + "</tr>")
     return (table(head, rows)
             + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral or mixed "
                    "&mdash; number of mentions. Shading shows which way each company leans on "
-                   "that theme. Company posts are not counted."))
+                   "that theme; the word under each theme is its overall tone. Company posts are "
+                   "not counted."))
 
 
 def coverage(week_of, platforms, all_ratings, sweeps, now, settings):
@@ -861,8 +869,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                             "week&rsquo;s figures above.")))
 
     # 4 Themes, then job-market signals
-    p.append(section(4, "Themes", "What the comments were about, by company, and whether "
-                     "each theme is new, increasing or recurring."))
+    p.append(section(4, "Themes", "What the comments were about, company by company."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
     for offset in range(rolling_weeks):
