@@ -572,10 +572,6 @@ def alert_readiness():
     return len(ready), len(people)
 
 
-def name_variants() -> int:
-    return sum(len(e.get("aliases") or []) for e in H.load_yaml("entities").get("entities", []))
-
-
 # --- the email ------------------------------------------------------------------
 
 
@@ -731,10 +727,10 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                          "awaiting review and left out of the scores until a person reads "
                          f"{'it' if pending == 1 else 'them'}.", WARN[1]) if pending else "")
     p.append(row(table([th("Company", width="27%"), th("Mentions", "center", "13%"),
-                        th("What was said", width="30%"), th("Overall", "right", "30%")],
+                        th("What was said", width="30%"), th("Overall score", "right", "30%")],
                        rows)
                  + pending_note
-                 + note("Score = average of reviews (+1 positive, 0 neutral, &minus;1 negative); "
+                 + note("Overall score = average of reviews (+1 positive, 0 neutral, &minus;1 negative); "
                         f"under {minimum} reviews reads <em>Insufficient data</em>.")))
 
     # 2 Rating Movement - one column per review site in config/sources.yaml,
@@ -953,13 +949,11 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                           for eid, _ in names)
                 + td(f"<strong>{len(now)}</strong>", "center", last=True) + "</tr>")
     share = 15
-    p.append(row(subhead(f"Monitoring {span}")
+    p.append(row(subhead(f"Number of mentions {span}")
                  + table([th("Channel", width="24%")]
                          + [matrix_th(x(name), f"{share}%") for _, name in names]
                          + [matrix_th("All", f"{76 - share * len(names)}%")],
-                         crow)
-                 + note(f"Mentions found on each channel, by company. {name_variants()} name "
-                        "variants searched."),
+                         crow),
                  pad="28px 32px 0 32px"))
 
     p.append(section(5, "Data Link", "Every mention, rating and check, with links to the "
