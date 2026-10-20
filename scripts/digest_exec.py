@@ -24,6 +24,7 @@ import datetime as dt
 import html
 
 import hrintel as H
+import summary_sheet as S
 
 E = html.escape
 FONT = "-apple-system,Segoe UI,Roboto,Arial,sans-serif"
@@ -951,14 +952,15 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                          crow),
                  pad="28px 32px 0 32px"))
 
-    p.append(section(5, "Data Link", "Every mention, rating and check, with links to the "
-                     "originals."))
+    sheet_rows = len(S.rows_for(now))
+    p.append(section(5, "Data Link", f"Every review {span}, newest first, with a link to each."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'
          f'color:#ffffff;font:600 13px/1 {FONT};padding:11px 20px;border-radius:6px;">'
-         'Open tracking sheet &rarr;</a>' if data_link and not H.is_todo(data_link) else
-         f'<span style="color:{BAD[1]};">Tracking sheet link not set.</span>')
-        + note(x(holdings)), pad="12px 32px 28px 32px"))
+         'Open the sheet &rarr;</a>' if data_link and not H.is_todo(data_link) else
+         f'<span style="color:{BAD[1]};">Sheet link not set.</span>')
+        + note(f"{plural(sheet_rows, 'review')}: date, company, site, stars, sentiment, themes, "
+               "what was said and any red flag."), pad="12px 32px 28px 32px"))
 
     p.append(f'<tr><td class="pad" style="background:{PANEL};padding:14px 32px;'
              f'border-top:1px solid #e5e7eb;"><div style="font:400 11.5px/1.6 {FONT};'
