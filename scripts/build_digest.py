@@ -1047,7 +1047,10 @@ def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratin
 
 
 def build(week_of: dt.date, settings: dict,
-          style: str = "executive") -> tuple[str, str, str, dict]:
+          style: str = "executive", window: tuple | None = None) -> tuple[str, str, str, dict]:
+    """window=(first_day, last_day) builds a report over those dates instead of
+    the week - week_of is then the week holding last_day, which supplies the
+    ratings and checks the report is read against."""
     digest_cfg = settings.get("digest", {})
     entities = H.entity_names()
     platforms = H.platform_names()
@@ -1059,8 +1062,12 @@ def build(week_of: dt.date, settings: dict,
     escalations = H.read_csv(H.ESCALATIONS_CSV)
 
     prev_week = week_of - dt.timedelta(days=7)
-    baseline = baseline_window(week_of, settings)
-    is_period = bool(baseline) and not H.baseline_window(week_of, settings)
+    if window:
+        baseline = (window[0], window[1], (window[1] - window[0]).days + 1)
+        is_period = True
+    else:
+        baseline = baseline_window(week_of, settings)
+        is_period = bool(baseline) and not H.baseline_window(week_of, settings)
     if baseline:
         first, last, baseline_days = baseline
         now = [m for m in mentions_in(all_mentions, first, last)
@@ -1112,6 +1119,8 @@ def build(week_of: dt.date, settings: dict,
         week_label = (f"{baseline_days}-day"
                       f"{' report' if is_period else ' baseline'}, "
                       f"{H.day_month(baseline[0])} to {H.day_month(baseline[1], year=True)}")
+        if window:
+            week_label = f"Report, {H.day_month(window[0])} to {H.day_month(window[1], year=True)}"
 
     # A week built before it has ended covers fewer than seven days. Say so:
     # three days read as seven would understate the week and distort every
@@ -1120,6 +1129,11 @@ def build(week_of: dt.date, settings: dict,
     week_end = week_of + dt.timedelta(days=6)
     days_elapsed = min(7, max(0, (today - week_of).days + 1)) if today <= week_end else 7
     partial = days_elapsed < 7
+    if window:
+        # A chosen range is complete once its last day has come; the week it
+        # ends in being unfinished does not make the range partial.
+        week_end = window[1]
+        partial = window[1] > today
 
     stats = {
         "partial": partial,
@@ -1519,7 +1533,8 @@ def build(week_of: dt.date, settings: dict,
         body, extra = digest_exec.render(
             week_of=week_of, week_label=week_label, prev_label=H.fmt_week(prev_week),
             baseline=bool(baseline), partial_notice=(notice if partial else ""),
-            period=baseline if is_period else None, entities=entities, platforms=platforms,
+            period=baseline if is_period else None, custom=bool(window),
+            entities=entities, platforms=platforms,
             now=now, prev=prev,
             all_mentions=all_mentions, all_ratings=all_ratings, flags=flags,
             lagging=lagging, data_link=data_link, holdings=holdings, settings=settings)
@@ -1594,8 +1609,20 @@ def main() -> int:
                              "carry the same six deliverables")
     parser.add_argument("--strict", action="store_true",
                         help="exit non-zero if any mention in the week is untagged")
+    parser.add_argument("--from", dest="first", help="with --to: report on this date range "
+                        "(YYYY-MM-DD) instead of one week")
+    parser.add_argument("--to", dest="last", help="last day of the --from range")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
     args = parser.parse_args()
+
+    window = None
+    if args.first or args.last:
+        first, last = H.parse_date(args.first or ""), H.parse_date(args.last or "")
+        if not first or not last or first > last:
+            print("--from and --to need two dates, YYYY-MM-DD, in order", file=sys.stderr)
+            return 2
+        window = (first, last)
+        args.week = last.isoformat()
 
     week_of = H.parse_date(args.week) if args.week else H.last_complete_week()
     if week_of is None:
@@ -1604,10 +1631,11 @@ def main() -> int:
     week_of = H.monday_of(week_of)
 
     settings = H.load_yaml("settings")
-    subject, body_html, body_text, stats = build(week_of, settings, args.style)
+    subject, body_html, body_text, stats = build(week_of, settings, args.style, window=window)
 
     os.makedirs(args.out_dir, exist_ok=True)
-    stem = f"digest-{week_of.isoformat()}"
+    stem = (f"digest-{window[0].isoformat()}-to-{window[1].isoformat()}" if window
+            else f"digest-{week_of.isoformat()}")
     html_path = os.path.join(args.out_dir, stem + ".html")
     text_path = os.path.join(args.out_dir, stem + ".txt")
     with open(html_path, "w", encoding="utf-8") as fh:

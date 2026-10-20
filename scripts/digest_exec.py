@@ -240,7 +240,7 @@ def rating_cell(pair, week_of) -> tuple[str, bool]:
     latest, prev = pair
     score = H.to_float(latest.get("overall_rating"))
     count = H.to_int(latest.get("review_count"), -1)
-    this_week = latest.get("week_of") == week_of.isoformat()
+    this_week = (latest.get("week_of") or "") >= week_of.isoformat()
     head = (f'<strong>{score:.2f}</strong>' if score is not None else "&mdash;")
     if count >= 0:
         head += f' <span style="color:{FAINT};font-size:12px;">({count})</span>'
@@ -271,7 +271,7 @@ def recommend_cell(pair, week_of) -> str:
     if value is None:
         return f'<span style="color:{FAINT};">&mdash;</span>'
     out = f"{value:.0f}%"
-    if latest.get("week_of") == week_of.isoformat() and prev is not None:
+    if (latest.get("week_of") or "") >= week_of.isoformat() and prev is not None:
         before = H.to_float(prev.get("recommend_pct"))
         if before is not None:
             out += small("No change" if abs(value - before) < 0.5 else
@@ -577,7 +577,7 @@ def alert_readiness():
 
 
 def render(*, week_of, week_label, prev_label, baseline, partial_notice, entities, platforms,
-           now, prev, period=None, all_mentions, all_ratings, flags, lagging, data_link, holdings,
+           now, prev, period=None, custom=False, all_mentions, all_ratings, flags, lagging, data_link, holdings,
            settings) -> tuple[str, dict]:
     cfg = settings.get("digest", {})
     minimum = int(cfg.get("min_scored_mentions", 2))
@@ -590,9 +590,11 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     counts_now, counts_prev = breakdown(now), breakdown(prev)
     tracked = set(H.rated_profiles())
     pairs = {k: v for k, v in snapshot_pairs(all_ratings, week_of).items() if k in tracked}
+    # Ratings count as current if read in the week the period opens or later.
+    read_from = H.monday_of(period[0]) if period else week_of
     rating_changes = sum(1 for (e, p), pair in pairs.items()
-                         if rating_cell(pair, week_of)[1])
-    rechecked = any(pair[0].get("week_of") == week_of.isoformat() for pair in pairs.values())
+                         if rating_cell(pair, read_from)[1])
+    rechecked = any((pair[0].get("week_of") or "") >= read_from.isoformat() for pair in pairs.values())
     cover = coverage(week_of, platforms, all_ratings, sweeps, now, settings)
     not_checked = [c["name"] for c in cover if c["due"] and not c["checked"]]
     checked_dates = [c["last_date"] for c in cover if c["last_date"]]
@@ -601,6 +603,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     compare = not baseline
     # The words for the period this email covers.
     span = f"in the last {period[2]} days" if period else "this week"
+    if custom:
+        span = f"from {H.day_month(period[0])} to {H.day_month(period[1])}"
     if period:
         # Rating movement across the whole period: the latest reading against
         # the first one taken inside it.
@@ -613,7 +617,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                             key=lambda r: (r.get("week_of", ""), r.get("captured_at", "")))
             if inside:
                 pairs[key] = (latest, inside[0])
-        rating_changes = sum(1 for pair in pairs.values() if rating_cell(pair, week_of)[1])
+        rating_changes = sum(1 for pair in pairs.values() if rating_cell(pair, read_from)[1])
 
     p: list[str] = []
     p.append(
@@ -754,7 +758,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         pair = pairs.get((eid, pid))
         if not pair:
             return f'<span style="color:{FAINT};">No page</span>'
-        return rating_cell(pair, week_of)[0]
+        return rating_cell(pair, read_from)[0]
 
     recommenders = [pid for pid in sites if H.platform_publishes(pid, "recommend_pct")]
     rows = []
@@ -767,7 +771,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 line += td(cell(eid, pid), "right", last=last)
             if rec:
                 pair = pairs.get((eid, rec))
-                line += td(recommend_cell(pair, week_of) if pair else
+                line += td(recommend_cell(pair, read_from) if pair else
                            f'<span style="color:{FAINT};">&mdash;</span>', "right", last=last)
             rows.append(line + "</tr>")
         share = int(72 / (len(sites) + (1 if rec else 0)))
@@ -788,7 +792,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             rows.append("<tr>" + td(f"<strong>{x(name)}</strong>" if first else "", last=last)
                         + td(x(platforms.get(pid, pid)), last=last)
                         + td(cell(eid, pid), "right", last=last)
-                        + td(recommend_cell(pair, week_of) if pair and pid in recommenders
+                        + td(recommend_cell(pair, read_from) if pair and pid in recommenders
                              else f'<span style="color:{FAINT};">&mdash;</span>', "right",
                              last=last) + "</tr>")
         head = [th("Company", width="30%"), th("Site", width="22%"),
@@ -833,7 +837,9 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # Open roles are a snapshot of what is advertised now, not a count over the
     # window, so a period report takes the latest one even if it was counted
     # after the window closed.
-    market_cutoff = (dt.date.today() if period else week_of + dt.timedelta(days=6)).isoformat()
+    # A chosen date range reads the count as of its own last day.
+    market_cutoff = (period[1] if custom else dt.date.today() if period
+                     else week_of + dt.timedelta(days=6)).isoformat()
     latest_market = {}
     for r in sorted(market, key=lambda r: r.get("week_of", "")):
         if (r.get("week_of") or "") <= market_cutoff:
@@ -859,7 +865,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 if before:
                     diff = roles - H.to_int(before.get("open_roles"), 0)
                     since = f"since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
-                    move = (arrow(diff, up_is_good=None) + " " + since) if diff else f"No change {since}"
+                    move = (arrow(diff, up_is_good=None) + " " + since) if diff else "No change"
                 else:
                     move = f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}"
                 roles_html = f"<strong>{roles}</strong>" + small(move)
@@ -956,14 +962,17 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  pad="28px 32px 0 32px"))
 
     sheet_rows = len(S.rows_for(now))
-    p.append(section(5, "Data Link", f"Every review {span}, newest first, with a link to each."))
+    p.append(section(5, "Data Link", "Every review, newest first, with a link to each." if custom
+                     else f"Every review {span}, newest first, with a link to each."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'
          f'color:#ffffff;font:600 13px/1 {FONT};padding:11px 20px;border-radius:6px;">'
          'Open the sheet &rarr;</a>' if data_link and not H.is_todo(data_link) else
          f'<span style="color:{BAD[1]};">Sheet link not set.</span>')
-        + note(f"{plural(sheet_rows, 'review')}: date, company, site, stars, sentiment, themes, "
-               "what was said and any red flag."), pad="12px 32px 28px 32px"))
+        + note((f"{plural(sheet_rows, 'review')} in this report. Each row has the date, company, "
+                "site, stars, sentiment, themes, what was said and any red flag." if custom else
+                f"{plural(sheet_rows, 'review')}: date, company, site, stars, sentiment, themes, "
+                "what was said and any red flag.")), pad="12px 32px 28px 32px"))
 
     p.append(f'<tr><td class="pad" style="background:{PANEL};padding:14px 32px;'
              f'border-top:1px solid #e5e7eb;"><div style="font:400 11.5px/1.6 {FONT};'
