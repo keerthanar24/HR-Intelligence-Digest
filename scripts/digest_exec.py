@@ -856,9 +856,12 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             if snaps:
                 cur, before = snaps[-1], (snaps[-2] if len(snaps) > 1 else None)
                 roles = H.to_int(cur.get("open_roles"), 0)
-                move = (arrow(roles - H.to_int(before.get("open_roles"), 0), up_is_good=None)
-                        + f" since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
-                        if before else f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}")
+                if before:
+                    diff = roles - H.to_int(before.get("open_roles"), 0)
+                    since = f"since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
+                    move = (arrow(diff, up_is_good=None) + " " + since) if diff else f"No change {since}"
+                else:
+                    move = f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}"
                 roles_html = f"<strong>{roles}</strong>" + small(move)
             else:
                 roles_html = f'<span style="color:{FAINT};">not recorded</span>'
