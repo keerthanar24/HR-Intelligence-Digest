@@ -1116,9 +1116,11 @@ def build(week_of: dt.date, settings: dict,
     if baseline:
         # Say what the period actually is. "Week of 19-25 Sep" over sixty days
         # of findings would misdate every row in section 3.
-        week_label = (f"{baseline_days}-day"
-                      f"{' report' if is_period else ' baseline'}, "
-                      f"{H.day_month(baseline[0])} to {H.day_month(baseline[1], year=True)}")
+        # A configured period report is the catch-up that opens weekly
+        # reporting, so it is called a baseline report: "60-day report" read
+        # as the end-of-trial review, which is a different thing.
+        week_label = (("Baseline report, " if is_period else f"{baseline_days}-day baseline, ")
+                      + f"{H.day_month(baseline[0])} to {H.day_month(baseline[1], year=True)}")
         if window:
             week_label = f"Report, {H.day_month(window[0])} to {H.day_month(window[1], year=True)}"
 

@@ -908,6 +908,24 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     signals = [("Interviews &amp; hiring", {"interview", "onboarding"}),
                ("Pay &amp; appraisals", {"compensation", "appraisal", "payroll_delay"}),
                ("Exits &amp; layoffs", {"exits", "layoffs"})]
+    def salary_cell(snaps):
+        """Salary entries the review sites hold - a count, never a figure. A
+        company-wide median would average unrelated roles; the count says how
+        much pay data employees have shared, and whether that is growing."""
+        counted = [r for r in snaps if (r.get("salary_entries") or "").strip()]
+        if not counted:
+            return f'<span style="color:{FAINT};">&mdash;</span>'
+        cur = counted[-1]
+        n = H.to_int(cur.get("salary_entries"), 0)
+        before = counted[-2] if len(counted) > 1 else None
+        if before:
+            diff = n - H.to_int(before.get("salary_entries"), 0)
+            since = f"since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
+            move = (arrow(diff, up_is_good=None) + " " + since) if diff else "No change"
+        else:
+            move = f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}"
+        return f"<strong>{n}</strong>" + small(move)
+
     mrows = []
     groups = names + [("__all__", "All companies")]
     for i, (eid, name) in enumerate(groups):
@@ -917,7 +935,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         if is_all:
             roles_total = sum(H.to_int(v[-1].get("open_roles"), 0) for v in latest_market.values())
             roles_html = f"<strong>{roles_total}</strong>"
+            salaries = [H.to_int(r.get("salary_entries"), 0) for v in latest_market.values()
+                        for r in [next((r for r in reversed(v)
+                                        if (r.get("salary_entries") or "").strip()), {})] if r]
+            salary_html = (f"<strong>{sum(salaries)}</strong>" if salaries else
+                           f'<span style="color:{FAINT};">&mdash;</span>')
         else:
+            salary_html = salary_cell(latest_market.get(eid, []))
             snaps = latest_market.get(eid, [])
             if snaps:
                 cur, before = snaps[-1], (snaps[-2] if len(snaps) > 1 else None)
@@ -932,20 +956,23 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             else:
                 roles_html = f'<span style="color:{FAINT};">not recorded</span>'
         line = ("<tr>" + td(f'<strong class="cn">{x(name)}</strong>', last=last)
-                + td(roles_html, "center", last=last))
+                + td(roles_html, "center", last=last)
+                + td(salary_html, "center", last=last))
         for _label, themes in signals:
             line += tally_td(tally(m for m in mine
                                    if themes & set(H.split_themes(m.get("themes", "")))),
                              last, bold=is_all)
         mrows.append(line + "</tr>")
     p.append(row(subhead("Job market &amp; candidate signals")
-                 + table([th("Company", width="24%"), matrix_th("Open roles", "16%")]
-                         + [matrix_th(label, f"{60 // len(signals)}%") for label, _ in signals],
+                 + table([th("Company", width="22%"), matrix_th("Open roles", "15%"),
+                          matrix_th("Salary entries", "15%")]
+                         + [matrix_th(label, f"{48 // len(signals)}%") for label, _ in signals],
                          mrows)
                  + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral "
                         f"&mdash; reviews and posts {span} that talk about each topic. Open roles "
                         "are counted by hand from the company jobs pages on Glassdoor, AmbitionBox "
-                        "and LinkedIn.")))
+                        "and LinkedIn. Salary entries = how many salaries employees have posted on "
+                        "AmbitionBox (a count, not pay levels).")))
 
     # 5 Red Flags
     p.append(section(5, "Red Flags", "Serious issues, alerted separately from "
@@ -1003,11 +1030,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # same, so the run date is what tells the two apart.
     run_cutoff = min(period[1] if period else week_of + dt.timedelta(days=6),
                      dt.date.today()).isoformat()
-    last_run = {}
+    last_run, by_hand = {}, {}
     for sw in sweeps:
-        if (sw.get("checked_by") or "") == "collector" and (sw.get("checked_at") or "") <= run_cutoff:
-            pid_ = sw.get("platform")
-            last_run[pid_] = max(last_run.get(pid_, ""), sw.get("checked_at") or "")
+        if (sw.get("checked_at") or "") > run_cutoff:
+            continue
+        pid_ = sw.get("platform")
+        seen = last_run if (sw.get("checked_by") or "") == "collector" else by_hand
+        seen[pid_] = max(seen.get(pid_, ""), sw.get("checked_at") or "")
     crow = []
     totals = collections.Counter()
     for i, c in enumerate(cover):
@@ -1015,8 +1044,11 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         pid = c["pid"]
         how = c["how"]
         if how == "Automatic":
-            how += (f" &middot; ran {x(fmt_day(last_run[pid]))}" if last_run.get(pid)
-                    else " &middot; not running")
+            # A channel whose collector is off but which was searched by hand
+            # says so: "not running" alone reads as unchecked.
+            how = (f"Automatic &middot; ran {x(fmt_day(last_run[pid]))}" if last_run.get(pid) else
+                   f"Searched by hand &middot; {x(fmt_day(by_hand[pid]))}" if by_hand.get(pid)
+                   else "Automatic &middot; not running")
         line = "<tr>" + td(f"<strong>{x(c['name'])}</strong>" + small(how), last=last)
         for eid, _ in names:
             if pid in no_page_anywhere or (eid, pid) in absent:
@@ -1058,7 +1090,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     p.append(f'<tr><td class="pad" style="background:{PANEL};padding:14px 32px;'
              f'border-top:1px solid #e5e7eb;"><div style="font:400 11.5px/1.6 {FONT};'
              f'color:{FAINT};">Public, employment-related commentary only. Customer and product '
-             'complaints are out of scope. Confidential.</div></td></tr>')
+             'complaints are out of scope, and no individual&rsquo;s personal social media '
+             'accounts are monitored. Confidential.</div></td></tr>')
     p.append("</table></td></tr></table>")
 
     extra = {
