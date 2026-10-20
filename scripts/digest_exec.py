@@ -214,16 +214,6 @@ def who(m: dict) -> str:
     return "Author unknown"
 
 
-def mention_pill(m: dict) -> str:
-    cls = mention_class(m)
-    label = {
-        "positive": ("Positive", GOOD), "negative": ("Negative", BAD),
-        "neutral": ("Neutral", NEUTRAL), "company": ("Not scored", OFF),
-        "untagged": ("Awaiting review", WARN),
-    }[cls]
-    return pill(label[0], label[1], strong=False)
-
-
 # --- the data each section needs -----------------------------------------------
 
 
@@ -838,41 +828,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  + (note(f"{x(', '.join(unrated))}: no {x(any_site)} page &mdash; not evidence "
                          "of a quiet week.") if unrated else "")))
 
-    # 3 What's New - one line per review or post, newest first, each linked to
-    # the original. The sheet keeps the full record; this is what a reader
-    # scans to see what was actually said.
-    p.append(section(3, "What's New", f"Every review or post {span}, newest first."))
-    if now:
-        new_rows = []
-        ordered = sorted(now, key=lambda m: (m.get("post_date") or m.get("captured_at") or "",
-                                             m.get("entity") or ""), reverse=True)
-        for i, m in enumerate(ordered):
-            last = i == len(ordered) - 1
-            link = (m.get("url") or "").strip() or H.profile_url(m.get("entity", ""),
-                                                                   m.get("platform", ""))
-            text = (m.get("one_line_summary") or m.get("title_or_snippet")
-                    or "(no summary)").strip()
-            text = text if len(text) <= summary_max else text[:summary_max - 1].rstrip() + "…"
-            said = (f'<a href="{x(link)}" style="color:{INK};text-decoration:underline;">'
-                    f'{x(text)}</a>' if link else x(text))
-            new_rows.append("<tr>"
-                            + td(x(fmt_day(m.get("post_date") or m.get("captured_at") or "")),
-                                 last=last)
-                            + td(f"<strong>{x(entities.get(m.get('entity'), m.get('entity')))}"
-                                 "</strong>" + small(x(platforms.get(m.get("platform"),
-                                                                     m.get("platform")))),
-                                 last=last)
-                            + td(mention_pill(m), last=last)
-                            + td(said, last=last) + "</tr>")
-        p.append(row(table([th("Posted", width="12%"), th("Company", width="22%"),
-                            th("Sentiment", width="16%"), th("What was said", width="50%")],
-                           new_rows)))
-    else:
-        p.append(row(box(f'<strong style="color:{INK};">Nothing new {span}.</strong> '
-                         "No review or post was found on any checked channel.")))
-
-    # 4 Themes, then job-market signals
-    p.append(section(4, "Themes", f"The {min(max_themes, 4)} most-mentioned topics, company by "
+    # 3 Themes, then job-market signals
+    p.append(section(3, "Themes", f"The {min(max_themes, 4)} most-mentioned topics, company by "
                      "company."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
@@ -974,8 +931,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                         "and LinkedIn. Salary entries = how many salaries employees have posted on "
                         "AmbitionBox (a count, not pay levels).")))
 
-    # 5 Red Flags
-    p.append(section(5, "Red Flags", "Serious issues, alerted separately from "
+    # 4 Red Flags
+    p.append(section(4, "Red Flags", "Serious issues, alerted separately from "
                      "this digest."))
     if flags:
         rows = []
@@ -1075,7 +1032,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  pad="28px 32px 0 32px"))
 
     sheet_rows = len(S.rows_for(now))
-    p.append(section(6, "Data Link", "Every review, newest first, with a link to each." if custom
+    p.append(section(5, "Data Link", "Every review, newest first, with a link to each." if custom
                      else f"Every review {span}, newest first, with a link to each."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'

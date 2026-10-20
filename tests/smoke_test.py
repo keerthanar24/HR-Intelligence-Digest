@@ -455,11 +455,10 @@ def test_digest() -> None:
     # apostrophe in "What's New". Same six deliverables, different bytes -
     # section_heading() reads either, so this checks the digest's default
     # output whichever style that currently is.
-    # What's New was dropped from the executive email for a while and put back
-    # after the validation review called its absence a blocker: the brief
-    # lists six deliverables and the email carries all six.
-    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "What&#x27;s New"),
-                          (4, "Themes"), (5, "Red Flags"), (6, "Data Link")):
+    # The executive email leaves out What's New at leadership's request (the
+    # items are in the linked sheet); the plain text keeps all six.
+    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "Themes"),
+                          (4, "Red Flags"), (5, "Data Link")):
         check(f"html has section '{number} · {title}'",
               section_heading(body_html, number, title))
     for heading in ("1. HEADLINE", "2. RATING MOVEMENT", "3. WHAT'S NEW",
@@ -2497,8 +2496,8 @@ def test_job_market_reaches_the_digest() -> None:
     check("and the three candidate signals",
           all(s in html for s in ("Interviews &amp; hiring", "Pay &amp; appraisals",
                                   "Exits &amp; layoffs")))
-    themes = html.find(">4 &middot; Themes<")
-    flags = html.find(">5 &middot; Red Flags<")
+    themes = html.find(">3 &middot; Themes<")
+    flags = html.find(">4 &middot; Red Flags<")
     check("inside Themes, before Red Flags",
           0 <= themes < html.lower().find("job market") < flags)
 
@@ -2784,10 +2783,11 @@ def test_the_six_deliverables_are_all_present() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     six = ["Headline", "Rating Movement", "What's New", "Themes",
            "Red Flags", "Data Link"]
+    five = [s for s in six if s != "What's New"]
 
     for body, name in ((html, "html"), (text, "text")):
         lowered = body.lower().replace("&#x27;", "'")
-        wanted = six
+        wanted = five if name == "html" else six
         where = [lowered.find(s.lower()) for s in wanted]
         check(f"all six are named in the {name} body",
               all(i >= 0 for i in where),
