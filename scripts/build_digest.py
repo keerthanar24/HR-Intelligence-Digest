@@ -1047,7 +1047,8 @@ def broadsheet_html(*, week_label, baseline, partial_notice, stats, heads, ratin
 
 
 def build(week_of: dt.date, settings: dict,
-          style: str = "executive", window: tuple | None = None) -> tuple[str, str, str, dict]:
+          style: str = "executive", window: tuple | None = None,
+          title: str = "Report") -> tuple[str, str, str, dict]:
     """window=(first_day, last_day) builds a report over those dates instead of
     the week - week_of is then the week holding last_day, which supplies the
     ratings and checks the report is read against."""
@@ -1122,7 +1123,7 @@ def build(week_of: dt.date, settings: dict,
         week_label = (("Baseline report, " if is_period else f"{baseline_days}-day baseline, ")
                       + f"{H.day_month(baseline[0])} to {H.day_month(baseline[1], year=True)}")
         if window:
-            week_label = f"Report, {H.day_month(window[0])} to {H.day_month(window[1], year=True)}"
+            week_label = f"{title}, {H.day_month(window[0])} to {H.day_month(window[1], year=True)}"
 
     # A week built before it has ended covers fewer than seven days. Say so:
     # three days read as seven would understate the week and distort every
@@ -1614,6 +1615,8 @@ def main() -> int:
     parser.add_argument("--from", dest="first", help="with --to: report on this date range "
                         "(YYYY-MM-DD) instead of one week")
     parser.add_argument("--to", dest="last", help="last day of the --from range")
+    parser.add_argument("--title", default="Report",
+                        help="with --from/--to: what the range is called, e.g. 'Baseline report'")
     parser.add_argument("--out-dir", default=H.OUT_DIR)
     args = parser.parse_args()
 
@@ -1633,7 +1636,8 @@ def main() -> int:
     week_of = H.monday_of(week_of)
 
     settings = H.load_yaml("settings")
-    subject, body_html, body_text, stats = build(week_of, settings, args.style, window=window)
+    subject, body_html, body_text, stats = build(week_of, settings, args.style, window=window,
+                                                 title=args.title)
 
     os.makedirs(args.out_dir, exist_ok=True)
     stem = (f"digest-{window[0].isoformat()}-to-{window[1].isoformat()}" if window
