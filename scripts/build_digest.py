@@ -394,7 +394,7 @@ def red_flag_rows(mentions, escalations, entities, platforms):
         else:
             delay = (notified - raised).days
             on_time = delay <= 0
-            timing = "same day" if on_time else f"{delay} day(s) late"
+            timing = "same day" if on_time else f"{plural(delay, 'day')} late"
 
         rows.append(
             {

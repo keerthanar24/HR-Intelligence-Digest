@@ -13,6 +13,7 @@ No network, no writes outside a temporary directory.
 from __future__ import annotations
 
 import argparse
+from html import escape as html_escape
 import datetime as dt
 import os
 import re
@@ -454,10 +455,11 @@ def test_digest() -> None:
     # apostrophe in "What's New". Same six deliverables, different bytes -
     # section_heading() reads either, so this checks the digest's default
     # output whichever style that currently is.
-    # The executive email dropped What's New at leadership's request (the
-    # items live in the tracking sheet); the plain text keeps all six.
-    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "Themes"),
-                          (4, "Red Flags"), (5, "Data Link")):
+    # What's New was dropped from the executive email for a while and put back
+    # after the validation review called its absence a blocker: the brief
+    # lists six deliverables and the email carries all six.
+    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "What&#x27;s New"),
+                          (4, "Themes"), (5, "Red Flags"), (6, "Data Link")):
         check(f"html has section '{number} · {title}'",
               section_heading(body_html, number, title))
     for heading in ("1. HEADLINE", "2. RATING MOVEMENT", "3. WHAT'S NEW",
@@ -2371,7 +2373,7 @@ def test_red_flag_sla() -> None:
 
     lt = build_digest.red_flag_rows([mention("M-1")], late, entities, platforms)[0]
     check("a late escalation is not marked on time", not lt["on_time"])
-    check("the delay is stated in days", lt["timing"] == "3 day(s) late", f"(got {lt['timing']})")
+    check("the delay is stated in days", lt["timing"] == "3 days late", f"(got {lt['timing']})")
 
     ns = build_digest.red_flag_rows([mention("M-1")], unsent, entities, platforms)[0]
     check("an unsent escalation says so loudly",
@@ -2384,7 +2386,7 @@ def test_red_flag_sla() -> None:
           f"(got {none_logged['raised']}/{none_logged['on_time']})")
 
     # And the rendering has to surface it, not just the data.
-    for rows, expected in ((same_day, "same day"), (late, "3 day(s) late"), (unsent, "NOT YET SENT")):
+    for rows, expected in ((same_day, "same day"), (late, "3 days late"), (unsent, "NOT YET SENT")):
         flags = build_digest.red_flag_rows([mention("M-1")], rows, entities, platforms)
         cell = build_digest.alert_cell(flags[0])
         check(f"the alert cell shows {expected!r}", expected in cell, f"(got {cell})")
@@ -2491,11 +2493,12 @@ def test_job_market_reaches_the_digest() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     check("the html body carries a job market block", "job market" in html.lower())
     check("with an open-roles column", "open roles" in html.lower())
+    # Job security is a theme already; the job market table no longer repeats it.
     check("and the three candidate signals",
           all(s in html for s in ("Interviews &amp; hiring", "Pay &amp; appraisals",
-                                  "Exits &amp; layoffs", "Job security")))
-    themes = html.find(">3 &middot; Themes<")
-    flags = html.find(">4 &middot; Red Flags<")
+                                  "Exits &amp; layoffs")))
+    themes = html.find(">4 &middot; Themes<")
+    flags = html.find(">5 &middot; Red Flags<")
     check("inside Themes, before Red Flags",
           0 <= themes < html.lower().find("job market") < flags)
 
@@ -2781,11 +2784,10 @@ def test_the_six_deliverables_are_all_present() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     six = ["Headline", "Rating Movement", "What's New", "Themes",
            "Red Flags", "Data Link"]
-    five = [s for s in six if s != "What's New"]
 
     for body, name in ((html, "html"), (text, "text")):
         lowered = body.lower().replace("&#x27;", "'")
-        wanted = five if name == "html" else six
+        wanted = six
         where = [lowered.find(s.lower()) for s in wanted]
         check(f"all six are named in the {name} body",
               all(i >= 0 for i in where),
@@ -2988,6 +2990,31 @@ def test_an_escalation_reaches_section_5() -> None:
           "a raised, recorded, unsent flag is the worst row in the digest")
     check("and the HTML says so in red",
           "not recorded as sent" in build_digest.alert_cell(unsent[0]))
+
+    # The email says what the review alleges, and never who wrote it: on a
+    # small team a job title and department can identify the reviewer.
+    # Run against the real data: its two flagged reviews both carry a role.
+    saved = H.MENTIONS_CSV, H.ESCALATIONS_CSV, H.RATINGS_CSV
+    data = os.path.join(ROOT, "data")
+    H.MENTIONS_CSV, H.ESCALATIONS_CSV, H.RATINGS_CSV = (
+        os.path.join(data, "mentions.csv"), os.path.join(data, "escalations.csv"),
+        os.path.join(data, "ratings.csv"))
+    try:
+        _s, html, _t, _st = build_digest.build(dt.date(2026, 10, 10), H.load_yaml("settings"))
+        flagged = [m for m in H.read_csv(H.MENTIONS_CSV) if m.get("red_flag") == "yes"]
+    finally:
+        H.MENTIONS_CSV, H.ESCALATIONS_CSV, H.RATINGS_CSV = saved
+    flags_html = html.split("Red Flags", 1)[-1].split("Number of mentions", 1)[0]
+    check("the real data has flagged reviews to check", len(flagged) >= 1)
+    for m in flagged:
+        role = (m.get("role_or_dept") or "").strip()
+        if role:
+            check(f"{m['mention_id']}: the reviewer's role stays out of the email",
+                  html_escape(role) not in flags_html and role not in flags_html)
+        summary = (m.get("one_line_summary") or "").strip()
+        if summary and flags_html.count("<tr") > 1:
+            check(f"{m['mention_id']}: and what it alleges is there",
+                  html_escape(summary[:40]) in flags_html)
 
 
 def test_daily_check_records_and_reports_staleness() -> None:

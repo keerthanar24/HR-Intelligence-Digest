@@ -102,7 +102,7 @@ def draft_alert(row: dict, settings: dict, recipients: dict) -> str:
         f"To: {to}",
         f"Subject: [RED FLAG] {entity} — {reason} — {row.get('post_date') or row.get('captured_at','')}",
         "",
-        "Flagging for awareness under the HR Intelligence trial. This is a same-day",
+        "Flagging for awareness under the HR Intelligence trial. This is a",
         f"notification, not an assessment — please acknowledge within {sla} hours.",
         "",
         f"Entity      : {entity}",
@@ -111,7 +111,8 @@ def draft_alert(row: dict, settings: dict, recipients: dict) -> str:
         f"Trigger     : {reason}",
         f"Author type : {row.get('author_type') or 'unknown'}",
         f"Reference   : {row.get('mention_id','')}",
-        f"Source      : {row.get('url','')}",
+        f"Source      : {row.get('url') or H.profile_url(row.get('entity', ''), row.get('platform', ''))}"
+        + ("" if row.get("url") else " (company review page - find it by the posted date)"),
         "",
         "What was posted",
         f"  {row.get('one_line_summary') or row.get('title_or_snippet','')}",

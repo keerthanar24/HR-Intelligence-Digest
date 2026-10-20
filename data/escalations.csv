@@ -1,3 +1,3 @@
 escalation_id,raised_at,week_of,mention_id,entity,platform,url,severity,reason,notified,notified_at,owner,action_taken,status,closed_at
-E-2026-001,2026-10-19,2026-09-12,M-20260912-001,westbury_kommerce,ambitionbox,https://www.ambitionbox.com/reviews/westbury-kommerce-reviews,high,names_individual,"Mahendra, Sonal, Ramesh, Akshay",,aryan,"Alert drafted, not yet sent",open,
+E-2026-001,2026-10-19,2026-09-12,M-20260912-001,westbury_kommerce,ambitionbox,https://www.ambitionbox.com/reviews/westbury-kommerce-reviews,high,names_individual,"Mahendra, Sonal, Ramesh, Akshay",2026-10-20,aryan,"Alert drafted, not yet sent Alert emailed to Sonal 2026-10-20 (the only red-flag recipient with an address; Mahendra, Ramesh, Akshay still unset).",open,
 E-2026-002,2026-10-19,2026-09-12,M-20260912-002,rk_group,ambitionbox,https://www.ambitionbox.com/reviews/r-dot-k-dot-group-reviews,high,harassment_or_safety,"Mahendra, Sonal, Ramesh, Akshay",,aryan,"Alert drafted, not yet sent",open,

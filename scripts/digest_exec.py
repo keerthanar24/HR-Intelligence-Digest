@@ -22,6 +22,7 @@ from __future__ import annotations
 import collections
 import datetime as dt
 import html
+import re
 
 import hrintel as H
 import summary_sheet as S
@@ -36,6 +37,11 @@ BAD = ("#fdecea", "#b91c1c")
 NEUTRAL = ("#f3f4f6", "#4b5563")
 OFF = ("#f9fafb", "#9ca3af")
 WARN = ("#fff7e6", "#8a6d3b")
+
+# Scores and star ratings resting on fewer reviews than this are marked "low
+# volume": two reviews can move a score from +1.00 to 0.00, and the reader
+# should know that before acting on it.
+LOW_VOLUME = 5
 
 # Mention-level classification. Shared with docs/05-sentiment-and-themes.md.
 CLASS_OF = {
@@ -236,7 +242,16 @@ def snapshot_pairs(all_ratings, week_of):
 
 
 def rating_cell(pair, week_of) -> tuple[str, bool]:
-    """(html, changed_this_week) for one entity on one review site."""
+    """(html, changed_this_week) for one entity on one review site, marked low
+    volume when the rating rests on only a few reviews."""
+    html_, changed = _rating_cell(pair, week_of)
+    count = H.to_int(pair[0].get("review_count"), -1)
+    if 0 <= count < LOW_VOLUME:
+        html_ += small("low volume", WARN[1])
+    return html_, changed
+
+
+def _rating_cell(pair, week_of) -> tuple[str, bool]:
     latest, prev = pair
     score = H.to_float(latest.get("overall_rating"))
     count = H.to_int(latest.get("review_count"), -1)
@@ -375,7 +390,7 @@ def tally_td(t, last, bold=False) -> str:
     if not (t["pos"] + t["neg"] + t["neu"]):
         return td(f'<span style="color:{FAINT};">&mdash;</span>', "center", last=last)
     lean = "pos" if t["pos"] > t["neg"] else "neg" if t["neg"] > t["pos"] else "neu"
-    return (f'<td align="center" valign="top" style="padding:9px 4px;background:{TINT[lean]};'
+    return (f'<td class="tc" align="center" valign="top" style="padding:9px 4px;background:{TINT[lean]};'
             f'font:{"700" if bold else "400"} 12.5px/1.45 {FONT};color:{INK};white-space:nowrap;'
             f'border-bottom:{"0" if last else "1px solid #ffffff"};border-left:2px solid #ffffff;">'
             f'{tally_counts(t)}</td>')
@@ -410,12 +425,17 @@ def theme_matrix(current, entities) -> str:
     labels = {"growth_learning": "Growth", "harassment_safety": "Harassment",
               "payroll_delay": "Payroll delay", "compensation": "Pay",
               "job_security": "Job security", "work_hours": "Work hours"}
-    share = int(82 / max(1, len(current)))
+    # The company column keeps a quarter of the width: narrower, and a name
+    # like "Westbury Kommerce" splits mid-word on a phone.
+    share = int(76 / max(1, len(current)))
     head = [th("Company", width=f"{100 - share * len(current)}%")]
     for theme, st, _status, tone_html in current:
         label = labels.get(theme, x(theme.replace("_", " ").capitalize()))
         # Theme names in sentence case: uppercase with letter-spacing overran
-        # the narrow columns.
+        # the narrow columns. Long words get a soft hyphen, so on a phone
+        # "Management" breaks as "Manage-ment" inside its own column.
+        label = re.sub(r"\b([A-Za-z]{6})([A-Za-z]{4,})\b",
+                       lambda m: f"{m.group(1)}&shy;{m.group(2)}", label)
         head.append(f'<th align="center" width="{share}%" style="padding:8px 4px;'
                     f'font:700 12px/1.3 {FONT};color:{INK};border-bottom:2px solid #e5e7eb;">'
                     f'{label}<div style="font:600 11px/1.4 {FONT};padding-top:3px;">{tone_html}'
@@ -426,7 +446,7 @@ def theme_matrix(current, entities) -> str:
     for i, (eid, name) in enumerate(groups):
         last = i == len(groups) - 1
         is_all = eid == "__all__"
-        line = "<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
+        line = "<tr>" + td(f'<strong class="cn">{x(name)}</strong>', last=last)
         for theme, st, _status, _tone in current:
             if is_all:
                 t = {k: sum(c[k] for c in st["by_company"].values()) for k in empty}
@@ -628,7 +648,9 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         '<style>a{text-decoration:none;}@media only screen and (max-width:900px){'
         '.shell{width:100%!important;}.pad{padding-left:18px!important;'
         'padding-right:18px!important;}.tile{display:block!important;width:100%!important;'
-        'margin-bottom:8px!important;}}</style>'
+        'margin-bottom:8px!important;}.cn{font-size:12.5px!important;}'
+        '.tc{font-size:11px!important;padding-left:2px!important;padding-right:2px!important;}}'
+        '</style>'
         f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" '
         f'style="background:{RULE};"><tr><td align="center" style="padding:28px 12px;">'
         '<table role="presentation" class="shell" width="880" cellpadding="0" cellspacing="0" '
@@ -685,7 +707,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         mine = now if is_total else [m for m in now if m.get("entity") == eid]
         theirs = prev if is_total else [m for m in prev if m.get("entity") == eid]
         c = breakdown(mine)
-        chips = "".join(pill(f"{c[k]} {lbl}", col, strong=False) for k, lbl, col in (
+        chips = "".join(pill(f"{c[k]} {lbl}{'s' if k == 'company' and c[k] != 1 else ''}", col,
+                             strong=False) for k, lbl, col in (
             ("positive", "positive", GOOD), ("neutral", "neutral", NEUTRAL),
             ("negative", "negative", BAD), ("company", "company post", OFF),
             ("untagged", "awaiting review", WARN)) if c[k])
@@ -698,7 +721,10 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                          if net is not None and label not in
                          ("Insufficient data", "No reviews", "Not scored", "Awaiting review") else "")
         _, _, net_prev = overall(theirs, minimum)
-        move = ""
+        scored_n = len([m for m in H.scored_rows(mine) if H.sentiment_score(m) is not None])
+        move = (small("low volume", WARN[1])
+                if minimum <= scored_n < LOW_VOLUME and label in ("Positive", "Negative", "Neutral")
+                else "")
         if compare:
             count_move = arrow(len(mine) - len(theirs), up_is_good=None)
             enough = (label not in ("Insufficient data", "No reviews", "Not scored", "Awaiting review")
@@ -706,7 +732,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                       ("Insufficient data", "No reviews", "Not scored", "Awaiting review"))
             senti_move = arrow(net - net_prev, digits=1) if enough else \
                 f'<span style="color:{FAINT};">&mdash;</span>'
-            move = small(f"mentions {count_move} &middot; sentiment {senti_move}", MUTED)
+            move += small(f"mentions {count_move} &middot; sentiment {senti_move}", MUTED)
         last = i == len(groups) - 1
         if is_total:
             name_html = f"<strong>{x(name)}</strong>"
@@ -718,7 +744,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             name_html = (f'<a href="{x(first)}" style="color:{INK};font-weight:600;'
                          f'text-decoration:underline;">{x(name)}</a>' if first else x(name))
             if links:
-                name_html += small(" &middot; ".join(
+                name_html += small("Review pages: " + " &middot; ".join(
                     f'<a href="{x(u)}" style="color:{MUTED};text-decoration:underline;">{x(n)}</a>'
                     for n, u in links))
         rows.append("<tr>"
@@ -736,7 +762,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                        rows)
                  + pending_note
                  + note("Overall score = average of reviews (+1 positive, 0 neutral, &minus;1 negative); "
-                        f"under {minimum} reviews reads <em>Insufficient data</em>.")))
+                        f"under {minimum} reviews reads <em>Insufficient data</em>, under "
+                        f"{LOW_VOLUME} is marked low volume. Tagged by hand.")))
 
     # 2 Rating Movement - one column per review site in config/sources.yaml,
     # so adding a site there (Indeed, Naukri, Google...) adds it here. Up to
@@ -811,8 +838,42 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  + (note(f"{x(', '.join(unrated))}: no {x(any_site)} page &mdash; not evidence "
                          "of a quiet week.") if unrated else "")))
 
-    # 3 Themes, then job-market signals
-    p.append(section(3, "Themes", "What the comments were about, company by company."))
+    # 3 What's New - one line per review or post, newest first, each linked to
+    # the original. The sheet keeps the full record; this is what a reader
+    # scans to see what was actually said.
+    p.append(section(3, "What's New", f"Every review or post {span}, newest first."))
+    if now:
+        new_rows = []
+        ordered = sorted(now, key=lambda m: (m.get("post_date") or m.get("captured_at") or "",
+                                             m.get("entity") or ""), reverse=True)
+        for i, m in enumerate(ordered):
+            last = i == len(ordered) - 1
+            link = (m.get("url") or "").strip() or H.profile_url(m.get("entity", ""),
+                                                                   m.get("platform", ""))
+            text = (m.get("one_line_summary") or m.get("title_or_snippet")
+                    or "(no summary)").strip()
+            text = text if len(text) <= summary_max else text[:summary_max - 1].rstrip() + "…"
+            said = (f'<a href="{x(link)}" style="color:{INK};text-decoration:underline;">'
+                    f'{x(text)}</a>' if link else x(text))
+            new_rows.append("<tr>"
+                            + td(x(fmt_day(m.get("post_date") or m.get("captured_at") or "")),
+                                 last=last)
+                            + td(f"<strong>{x(entities.get(m.get('entity'), m.get('entity')))}"
+                                 "</strong>" + small(x(platforms.get(m.get("platform"),
+                                                                     m.get("platform")))),
+                                 last=last)
+                            + td(mention_pill(m), last=last)
+                            + td(said, last=last) + "</tr>")
+        p.append(row(table([th("Posted", width="12%"), th("Company", width="22%"),
+                            th("Sentiment", width="16%"), th("What was said", width="50%")],
+                           new_rows)))
+    else:
+        p.append(row(box(f'<strong style="color:{INK};">Nothing new {span}.</strong> '
+                         "No review or post was found on any checked channel.")))
+
+    # 4 Themes, then job-market signals
+    p.append(section(4, "Themes", f"The {min(max_themes, 4)} most-mentioned topics, company by "
+                     "company."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
     for offset in range(rolling_weeks):
@@ -821,7 +882,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     if baseline:
         window = list(now)
     theme_rows, recurring, current = theme_table(now, window, week_of, entities,
-                                                 max(max_themes, 8), period=bool(period))
+                                                 max_themes, period=bool(period))
     if theme_rows:
         p.append(row(theme_matrix(current, entities)))
     else:
@@ -846,8 +907,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             latest_market.setdefault(r.get("entity"), []).append(r)
     signals = [("Interviews &amp; hiring", {"interview", "onboarding"}),
                ("Pay &amp; appraisals", {"compensation", "appraisal", "payroll_delay"}),
-               ("Exits &amp; layoffs", {"exits", "layoffs"}),
-               ("Job security", {"job_security"})]
+               ("Exits &amp; layoffs", {"exits", "layoffs"})]
     mrows = []
     groups = names + [("__all__", "All companies")]
     for i, (eid, name) in enumerate(groups):
@@ -871,7 +931,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 roles_html = f"<strong>{roles}</strong>" + small(move)
             else:
                 roles_html = f'<span style="color:{FAINT};">not recorded</span>'
-        line = ("<tr>" + td(f"<strong>{x(name)}</strong>", last=last)
+        line = ("<tr>" + td(f'<strong class="cn">{x(name)}</strong>', last=last)
                 + td(roles_html, "center", last=last))
         for _label, themes in signals:
             line += tally_td(tally(m for m in mine
@@ -880,13 +940,15 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         mrows.append(line + "</tr>")
     p.append(row(subhead("Job market &amp; candidate signals")
                  + table([th("Company", width="24%"), matrix_th("Open roles", "16%")]
-                         + [matrix_th(label, "15%") for label, _ in signals], mrows)
+                         + [matrix_th(label, f"{60 // len(signals)}%") for label, _ in signals],
+                         mrows)
                  + note("&#9650; positive &nbsp; &#9660; negative &nbsp; &#9679; neutral "
                         f"&mdash; reviews and posts {span} that talk about each topic. Open roles "
-                        "from the company jobs pages on Glassdoor, AmbitionBox and LinkedIn.")))
+                        "are counted by hand from the company jobs pages on Glassdoor, AmbitionBox "
+                        "and LinkedIn.")))
 
     # 5 Red Flags
-    p.append(section(4, "Red Flags", "Serious issues, alerted separately from "
+    p.append(section(5, "Red Flags", "Serious issues, alerted separately from "
                      "this digest."))
     if flags:
         rows = []
@@ -898,29 +960,34 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 colour = GOOD[1] if r["on_time"] else BAD[1]
                 sent = (f'{x(fmt_day(r["notified"]))}'
                         + small(f'<strong style="color:{colour};">{x(r["timing"])}</strong>'))
-            # A direct way to the review itself: its own link when we have one,
-            # otherwise the company's review page plus who wrote it and when,
-            # which is enough to find it there.
+            # What the review says, in one neutral line (names are already
+            # redacted in the summary), and a way to the review itself. The
+            # reviewer's job title and department are left out: on a small team
+            # they can identify the person, and the brief rules out tracking
+            # individuals. The posted date is enough to find it on the page.
             m = next((m for m in all_mentions if m.get("mention_id") == r["mention_id"]), {})
             link = (m.get("url") or "").strip()
             exact = bool(link)
             link = link or H.profile_url(m.get("entity", ""), m.get("platform", ""))
-            who_when = " &middot; ".join(filter(None, [
-                x((m.get("role_or_dept") or "").strip()),
-                f"posted {x(fmt_day(m.get('post_date') or ''))}" if m.get("post_date") else ""]))
-            review = ((f'<a href="{x(link)}" style="color:{INK};font-weight:600;'
-                       f'text-decoration:underline;">Open on {x(r["platform"])} &rarr;</a>' if link else
-                       f'<span style="color:{FAINT};">No link</span>')
-                      + small(who_when + ("" if exact or not link else
-                                          " &middot; on the company review page")))
+            text = (m.get("one_line_summary") or "").strip()
+            text = text if len(text) <= summary_max else text[:summary_max - 1].rstrip() + "…"
+            when = f"posted {x(fmt_day(m.get('post_date') or ''))}" if m.get("post_date") else ""
+            review = ((f'<div style="font:400 13.5px/1.5 {FONT};color:{INK};">{x(text)}</div>'
+                       if text else "")
+                      + (f'<a href="{x(link)}" style="color:{INK};font-weight:600;'
+                         f'text-decoration:underline;font-size:13px;">Open on {x(r["platform"])} '
+                         '&rarr;</a>' if link else f'<span style="color:{FAINT};">No link</span>')
+                      + small(when + ("" if exact or not link else
+                                      " &middot; on the company review page")))
             rows.append("<tr>" + td(f'<strong>{x(r["entity"])}</strong>'
                                     + small(x(r["platform"])), last=last)
                         + td(x(r["reason"]) + small(f'{x(r["status"])} &middot; found '
                                                     f'{x(fmt_day(r["raised"]))}'), last=last)
                         + td(review, last=last)
                         + td(sent, "right", last=last) + "</tr>")
-        p.append(row(table([th("Company", width="22%"), th("Trigger", width="22%"),
-                            th("Review", width="36%"), th("Alert sent", "right", "20%")], rows)))
+        p.append(row(table([th("Company", width="20%"), th("Trigger", width="18%"),
+                            th("What it says", width="44%"), th("Alert sent", "right", "18%")],
+                           rows)))
     else:
         p.append(row(box(f'<strong style="color:{INK};">None {span}.</strong> '
                          f"{plural(len(now), 'mention')} checked for named people, harassment, "
@@ -931,12 +998,26 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         cover = period_coverage(period, week_of, platforms, all_ratings, sweeps, now, settings)
     absent = set(H.absent_profiles())
     no_page_anywhere = {c["pid"] for c in cover if "No company page" in c["state"]}
+    # When each automatic channel last ran. A row of zeros from a collector
+    # that ran reads as a quiet period; from one that never ran it reads the
+    # same, so the run date is what tells the two apart.
+    run_cutoff = min(period[1] if period else week_of + dt.timedelta(days=6),
+                     dt.date.today()).isoformat()
+    last_run = {}
+    for sw in sweeps:
+        if (sw.get("checked_by") or "") == "collector" and (sw.get("checked_at") or "") <= run_cutoff:
+            pid_ = sw.get("platform")
+            last_run[pid_] = max(last_run.get(pid_, ""), sw.get("checked_at") or "")
     crow = []
     totals = collections.Counter()
     for i, c in enumerate(cover):
         last = False
         pid = c["pid"]
-        line = "<tr>" + td(f"<strong>{x(c['name'])}</strong>" + small(c["how"]), last=last)
+        how = c["how"]
+        if how == "Automatic":
+            how += (f" &middot; ran {x(fmt_day(last_run[pid]))}" if last_run.get(pid)
+                    else " &middot; not running")
+        line = "<tr>" + td(f"<strong>{x(c['name'])}</strong>" + small(how), last=last)
         for eid, _ in names:
             if pid in no_page_anywhere or (eid, pid) in absent:
                 line += td(f'<span style="color:{FAINT};font-size:12px;">no page</span>',
@@ -962,7 +1043,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  pad="28px 32px 0 32px"))
 
     sheet_rows = len(S.rows_for(now))
-    p.append(section(5, "Data Link", "Every review, newest first, with a link to each." if custom
+    p.append(section(6, "Data Link", "Every review, newest first, with a link to each." if custom
                      else f"Every review {span}, newest first, with a link to each."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'
