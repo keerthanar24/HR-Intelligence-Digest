@@ -1803,10 +1803,12 @@ def test_same_day_promise_is_qualified() -> None:
           set(walked) < set(unwalked))
 
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
-    for name, body in (("html", html), ("text", text)):
-        check(f"the {name} digest says so under Red Flags",
-              "only read on the weekly sweep" in body)
-        check(f"the {name} digest names LinkedIn as lagging", "LinkedIn" in body)
+    # The email dropped the line (the reader found it noise) and with it the
+    # same-day promise it qualified; the plain-text record keeps both.
+    check("the text digest says so under Red Flags", "only read on the weekly sweep" in text)
+    check("the text digest names LinkedIn as lagging", "LinkedIn" in text)
+    check("the html digest no longer promises same-day escalation",
+          "only read on the weekly sweep" not in html and "escalated the same day" not in html)
     check("and attributes the lag to one cause or the other",
           "limit of the sources" in text or "the process, not the sources" in text)
 

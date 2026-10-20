@@ -829,9 +829,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
 
     # Job market and candidate signals: one row per company, one column per
     # signal, each counted positive / negative / neutral like the theme matrix.
+    # Open roles are a snapshot of what is advertised now, not a count over the
+    # window, so a period report takes the latest one even if it was counted
+    # after the window closed.
+    market_cutoff = (dt.date.today() if period else week_of + dt.timedelta(days=6)).isoformat()
     latest_market = {}
     for r in sorted(market, key=lambda r: r.get("week_of", "")):
-        if (r.get("week_of") or "") <= (week_of + dt.timedelta(days=6)).isoformat():
+        if (r.get("week_of") or "") <= market_cutoff:
             latest_market.setdefault(r.get("entity"), []).append(r)
     signals = [("Interviews &amp; hiring", {"interview", "onboarding"}),
                ("Pay &amp; appraisals", {"compensation", "appraisal", "payroll_delay"}),
@@ -852,6 +856,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 cur, before = snaps[-1], (snaps[-2] if len(snaps) > 1 else None)
                 roles = H.to_int(cur.get("open_roles"), 0)
                 move = (arrow(roles - H.to_int(before.get("open_roles"), 0), up_is_good=None)
+                        + f" since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
                         if before else f"as of {x(fmt_day(cur.get('captured_at') or cur.get('week_of')))}")
                 roles_html = f"<strong>{roles}</strong>" + small(move)
             else:
@@ -871,8 +876,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                         "from the company jobs pages on Glassdoor, AmbitionBox and LinkedIn.")))
 
     # 5 Red Flags
-    p.append(section(4, "Red Flags", "Serious issues that are escalated the same day, "
-                     "separately from this digest."))
+    p.append(section(4, "Red Flags", "Serious issues, alerted separately from "
+                     "this digest."))
     if flags:
         rows = []
         for i, r in enumerate(flags):
@@ -910,16 +915,6 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         p.append(row(box(f'<strong style="color:{INK};">None {span}.</strong> '
                          f"{plural(len(now), 'mention')} checked for named people, harassment, "
                          "non-payment, legal action or viral posts.", (GOOD[0], "#4b5563"))))
-    alert_line = "Same-day alerts: "
-    if ready < needed:
-        alert_line += (f'<strong style="color:{BAD[1]};">{ready} of {needed} recipients set '
-                       "up.</strong>")
-    else:
-        alert_line += f"all {needed} recipients set up."
-    if lagging:
-        alert_line += (f" {x(', '.join(lagging))} {'is' if len(lagging) == 1 else 'are'} only "
-                       "read on the weekly sweep.")
-    p.append(row(note(alert_line, MUTED)))
 
     # Monitoring transparency, then 6 Data Link
     if period:
