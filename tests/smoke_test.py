@@ -1514,7 +1514,7 @@ def test_fields_reach_the_email() -> None:
     check("percent-recommend shows on its own in week 1",
           build_digest.recommend_text(64, None) == "64%")
     check("and carries its movement once there is a week before it",
-          build_digest.recommend_text(64, 61) == "64% (+3pp)")
+          build_digest.recommend_text(64, 61) == "64% (+3%)")
     check("zero percent is a number, not a blank",
           build_digest.recommend_text(0, None) == "0%")
     check("a platform that does not publish it reads as a dash",

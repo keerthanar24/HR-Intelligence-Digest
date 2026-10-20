@@ -274,7 +274,7 @@ def recommend_cell(pair, week_of) -> str:
         before = H.to_float(prev.get("recommend_pct"))
         if before is not None:
             out += small("No change" if abs(value - before) < 0.5 else
-                         arrow(value - before, suffix="pp"))
+                         arrow(value - before, suffix="%"))
     return out
 
 

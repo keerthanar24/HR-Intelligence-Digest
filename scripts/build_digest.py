@@ -157,13 +157,13 @@ def author_text(mention) -> str:
 
 
 def recommend_text(current, previous) -> str:
-    """'64%', or '64% (+3pp)' once there is a week to compare against."""
+    """'64%', or '64% (+3%)' once there is a week to compare against."""
     if current is None:
         return "—"
     shown = f"{current:.0f}%"
     if previous is None:
         return shown
-    move = delta_text(current, previous, suffix="pp")
+    move = delta_text(current, previous, suffix="%")
     return shown if move in ("n/a", "no change") else f"{shown} ({move})"
 
 
@@ -202,7 +202,7 @@ def rating_rows(ratings, week_of, entities, platforms):
                 # The change rides in the same cell: an eighth column does not
                 # fit an email table, and the figure is useless without it.
                 "recommend": recommend_text(rec_now, rec_prev),
-                "recommend_delta": delta_text(rec_now, rec_prev, suffix="pp"),
+                "recommend_delta": delta_text(rec_now, rec_prev, suffix="%"),
                 "since": prev.get("week_of") if prev else "first snapshot",
             }
         )
