@@ -217,11 +217,15 @@ def who(m: dict) -> str:
 # --- the data each section needs -----------------------------------------------
 
 
-def snapshot_pairs(all_ratings, week_of):
-    """{(entity, platform): (latest, previous)} using snapshots up to this week."""
+def snapshot_pairs(all_ratings, week_of, until=None):
+    """{(entity, platform): (latest, previous)} using snapshots up to this week,
+    or, with `until`, only those read on or before that day - so a report that
+    ends on the 10th does not show a reading taken on the 12th."""
     last_day = (week_of + dt.timedelta(days=6)).isoformat()
     by_key = collections.defaultdict(list)
     for r in all_ratings:
+        if until and (r.get("captured_at") or r.get("week_of") or "") > until.isoformat():
+            continue
         if (r.get("week_of") or "") <= last_day:
             by_key[(r.get("entity"), r.get("platform"))].append(r)
     out = {}
@@ -599,7 +603,9 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
 
     counts_now, counts_prev = breakdown(now), breakdown(prev)
     tracked = set(H.rated_profiles())
-    pairs = {k: v for k, v in snapshot_pairs(all_ratings, week_of).items() if k in tracked}
+    pairs = {k: v for k, v in snapshot_pairs(all_ratings, week_of,
+                                             until=period[1] if custom else None).items()
+             if k in tracked}
     # Ratings count as current if read in the week the period opens or later.
     read_from = H.monday_of(period[0]) if period else week_of
     rating_changes = sum(1 for (e, p), pair in pairs.items()
@@ -774,7 +780,12 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     def cell(eid, pid):
         pair = pairs.get((eid, pid))
         if not pair:
-            return f'<span style="color:{FAINT};">No page</span>'
+            # A page that exists but was first read after this report's end
+            # date is not the same as no page.
+            read_later = any(r.get("entity") == eid and r.get("platform") == pid
+                             for r in all_ratings)
+            return (f'<span style="color:{FAINT};">Not read yet</span>' if read_later else
+                    f'<span style="color:{FAINT};">No page</span>')
         return rating_cell(pair, read_from)[0]
 
     recommenders = [pid for pid in sites if H.platform_publishes(pid, "recommend_pct")]
