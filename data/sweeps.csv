@@ -22,6 +22,6 @@ week_of,platform,checked_at,checked_by,found,notes
 2026-10-17,quora,2026-10-23,collector,0,
 2026-10-17,reddit,2026-10-23,collector,0,
 2026-10-17,x,2026-10-20,claude,0,"Web search of x.com/twitter.com for all four names (no X API token, so not the live search). Nothing employment-related. Only hits: unrelated firms sharing the names (RK Group railway catering in Okhla; RK HR Management, Ahmedabad; WestburyUK orangeries; Westbury Comms). Search engines index recent X posts poorly; treat as a partial check."
-2026-10-24,news,2026-10-27,collector,0,
-2026-10-24,quora,2026-10-27,collector,0,
-2026-10-24,reddit,2026-10-27,collector,0,
+2026-10-24,news,2026-10-28,collector,0,
+2026-10-24,quora,2026-10-28,collector,0,
+2026-10-24,reddit,2026-10-28,collector,0,
