@@ -235,17 +235,17 @@ def snapshot_pairs(all_ratings, week_of, until=None):
     return out
 
 
-def rating_cell(pair, week_of) -> tuple[str, bool]:
+def rating_cell(pair, week_of, quiet=False) -> tuple[str, bool]:
     """(html, changed_this_week) for one entity on one review site, marked low
     volume when the rating rests on only a few reviews."""
-    html_, changed = _rating_cell(pair, week_of)
+    html_, changed = _rating_cell(pair, week_of, quiet)
     count = H.to_int(pair[0].get("review_count"), -1)
     if 0 <= count < LOW_VOLUME:
         html_ += small("low volume", WARN[1])
     return html_, changed
 
 
-def _rating_cell(pair, week_of) -> tuple[str, bool]:
+def _rating_cell(pair, week_of, quiet=False) -> tuple[str, bool]:
     latest, prev = pair
     score = H.to_float(latest.get("overall_rating"))
     count = H.to_int(latest.get("review_count"), -1)
@@ -255,6 +255,10 @@ def _rating_cell(pair, week_of) -> tuple[str, bool]:
         head += f' <span style="color:{FAINT};font-size:12px;">({count})</span>'
     if not this_week:
         when = fmt_day(latest.get("captured_at") or latest.get("week_of"))
+        # A date-range report with no reading inside it states that plainly;
+        # the weekly digest flags it, because there a missed check is a gap.
+        if quiet:
+            return head + small(f"No new reading since {x(when)}"), False
         return head + small(f"not re-checked ({x(when)})", WARN[1]), False
     if prev is None:
         return head + small("first reading"), False
@@ -609,11 +613,14 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     # Ratings count as current if read in the week the period opens or later.
     read_from = H.monday_of(period[0]) if period else week_of
     rating_changes = sum(1 for (e, p), pair in pairs.items()
-                         if rating_cell(pair, read_from)[1])
+                         if rating_cell(pair, read_from, quiet=custom)[1])
     rechecked = any((pair[0].get("week_of") or "") >= read_from.isoformat() for pair in pairs.values())
     cover = coverage(week_of, platforms, all_ratings, sweeps, now, settings)
     not_checked = [c["name"] for c in cover if c["due"] and not c["checked"]]
     checked_dates = [c["last_date"] for c in cover if c["last_date"]]
+    if custom:
+        # A report on a closed range says when it was last checked within it.
+        checked_dates = [d for d in checked_dates if d <= period[1]]
     last_monitored = max(checked_dates) if checked_dates else None
     ready, needed = alert_readiness()
     compare = not baseline
@@ -633,7 +640,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                             key=lambda r: (r.get("week_of", ""), r.get("captured_at", "")))
             if inside:
                 pairs[key] = (latest, inside[0])
-        rating_changes = sum(1 for pair in pairs.values() if rating_cell(pair, read_from)[1])
+        rating_changes = sum(1 for pair in pairs.values() if rating_cell(pair, read_from, quiet=custom)[1])
 
     p: list[str] = []
     p.append(
@@ -786,7 +793,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                              for r in all_ratings)
             return (f'<span style="color:{FAINT};">Not read yet</span>' if read_later else
                     f'<span style="color:{FAINT};">No page</span>')
-        return rating_cell(pair, read_from)[0]
+        return rating_cell(pair, read_from, quiet=custom)[0]
 
     recommenders = [pid for pid in sites if H.platform_publishes(pid, "recommend_pct")]
     rows = []
@@ -886,6 +893,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         cur = counted[-1]
         n = H.to_int(cur.get("salary_entries"), 0)
         before = counted[-2] if len(counted) > 1 else None
+        if custom and (cur.get("captured_at") or cur.get("week_of") or "") < period[0].isoformat():
+            before = None
         if before:
             diff = n - H.to_int(before.get("salary_entries"), 0)
             since = f"since {x(fmt_day(before.get('captured_at') or before.get('week_of')))}"
@@ -913,6 +922,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
             snaps = latest_market.get(eid, [])
             if snaps:
                 cur, before = snaps[-1], (snaps[-2] if len(snaps) > 1 else None)
+                if custom and (cur.get("captured_at") or cur.get("week_of") or "") < period[0].isoformat():
+                    before = None   # counted before this range: a level, not news
                 roles = H.to_int(cur.get("open_roles"), 0)
                 if before:
                     diff = roles - H.to_int(before.get("open_roles"), 0)
