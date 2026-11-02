@@ -693,7 +693,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         tile(counts_now["positive"], "Positive", colour=GOOD[1]),
         tile(counts_now["negative"], "Negative", colour=BAD[1] if counts_now["negative"] else INK),
         tile(rating_changes, "Rating changes",
-             "" if rechecked else f'<span style="color:{WARN[1]};">not re-checked</span>'),
+             "" if rechecked or custom else f'<span style="color:{WARN[1]};">not re-checked</span>'),
         tile(len(flags), "Red-flag alerts", colour=BAD[1] if flags else GOOD[1],
              bg=BAD[0] if flags else GOOD[0]),
     ]
