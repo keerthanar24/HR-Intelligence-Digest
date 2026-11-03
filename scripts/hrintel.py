@@ -32,6 +32,10 @@ RATINGS_CSV = os.path.join(DATA_DIR, "ratings.csv")
 ESCALATIONS_CSV = os.path.join(DATA_DIR, "escalations.csv")
 WEEKLY_LOG_CSV = os.path.join(DATA_DIR, "weekly_log.csv")
 SWEEPS_CSV = os.path.join(DATA_DIR, "sweeps.csv")
+# One row per run of the daily scan. The sweep log keeps one date per week and
+# channel, so each run overwrote the last and the report showed the latest
+# date a WEEK row changed, not the latest day monitoring ran.
+DAILY_RUNS_CSV = os.path.join(DATA_DIR, "daily_runs.csv")
 MARKET_CSV = os.path.join(DATA_DIR, "market.csv")
 
 MENTION_FIELDS = [

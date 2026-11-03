@@ -20,6 +20,7 @@ are computed; this file only decides how they are shown.
 from __future__ import annotations
 
 import collections
+import os
 import datetime as dt
 import html
 import re
@@ -666,6 +667,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     cover = coverage(week_of, platforms, all_ratings, sweeps, now, settings)
     not_checked = [c["name"] for c in cover if c["due"] and not c["checked"]]
     checked_dates = [c["last_date"] for c in cover if c["last_date"]]
+    # The daily scan of the automatic channels is monitoring too.
+    cap = period[1] if custom else week_of + dt.timedelta(days=6)
+    daily_runs = sorted(d for d in (H.parse_date(r.get("run_date", ""))
+                                    for r in (H.read_csv(H.DAILY_RUNS_CSV)
+                                              if os.path.exists(H.DAILY_RUNS_CSV) else []))
+                        if d and d <= min(cap, dt.date.today()))
+    checked_dates += daily_runs[-1:]
     if custom:
         # A report on a closed range says when it was last checked within it.
         checked_dates = [d for d in checked_dates if d <= period[1]]
@@ -1056,6 +1064,10 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         pid_ = sw.get("platform")
         seen = last_run if (sw.get("checked_by") or "") == "collector" else by_hand
         seen[pid_] = max(seen.get(pid_, ""), sw.get("checked_at") or "")
+    # Each logged daily run is a run of every automatic channel.
+    if daily_runs:
+        for pid_ in list(last_run):
+            last_run[pid_] = max(last_run[pid_], daily_runs[-1].isoformat())
     # A review logged by a person is a read of that page too.
     for r in all_ratings + [m for m in all_mentions
                             if (m.get("captured_by") or "") not in ("collector", "")]:

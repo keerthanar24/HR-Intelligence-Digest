@@ -30,6 +30,9 @@ jobs:
           X_BEARER_TOKEN: ${{ secrets.X_BEARER_TOKEN }}
         run: python scripts/collect_feeds.py || true
 
+      - name: Log today's run
+        run: echo "$(date -u +%F),daily-red-flag-scan" >> data/daily_runs.csv
+
       - name: Commit anything new
         run: |
           git config user.name  "hr-intel-bot"
