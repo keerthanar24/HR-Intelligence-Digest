@@ -540,6 +540,7 @@ def period_coverage(period, week_of, platforms, all_ratings, sweeps, now, settin
             "name": platforms.get(pid, pid), "pid": pid, "state": state,
             "last": H.day_month(max(dates)) if dates else "never",
             "found": found.get(pid, 0), "checked": bool(hit),
+            "hit": hit, "due_weeks": len(due),
             "how": "Manual" if pid in {q for _, q in H.rated_profiles()} or
                    p.get("collection") not in ("feed", "api", "alert") else "Automatic",
         })
@@ -594,8 +595,55 @@ def alert_readiness():
 # --- the email ------------------------------------------------------------------
 
 
+NOT_SCORED = ("Insufficient data", "No reviews", "Not scored", "Awaiting review")
+
+
+def trend_line(now, prev, minimum, compare, prev_desc) -> str:
+    """One sentence on whether sentiment improved or declined.
+
+    The brief asks for the direction, not just this period's counts: ten
+    positive mentions says nothing about whether things got better. The group
+    score is set against the previous period's, and the line says plainly when
+    there is nothing to compare or too little to tell.
+    """
+    label, _, net = overall(now, minimum)
+    label_prev, _, net_prev = overall(prev, minimum)
+    if not compare:
+        text = ("<strong>Sentiment trend:</strong> no earlier period was monitored, so there is "
+                "nothing to compare with yet. Later reports say whether sentiment improved or "
+                "declined against the period before.")
+        return box(text)
+    if label in NOT_SCORED or label_prev in NOT_SCORED:
+        n_now = len([m for m in H.scored_rows(now) if H.sentiment_score(m) is not None])
+        n_prev = len([m for m in H.scored_rows(prev) if H.sentiment_score(m) is not None])
+        text = (f"<strong>Sentiment trend: too few reviews to tell.</strong> "
+                f"{plural(n_now, 'scored review')} in this period and {n_prev} in "
+                f"{prev_desc}; a direction needs at least {minimum} in each.")
+        return box(text)
+    diff = net - net_prev
+    if abs(diff) < 0.005:
+        word, colours = "Unchanged", (PANEL, INK)
+    elif diff > 0:
+        word, colours = "Improved", (GOOD[0], GOOD[1])
+    else:
+        word, colours = "Declined", (BAD[0], BAD[1])
+    text = (f'<strong style="color:{colours[1]};">Sentiment trend: {word}.</strong> '
+            f"Group score {net:+.2f}, against {net_prev:+.2f} in {prev_desc}.")
+    return box(text, (colours[0], "#4b5563"))
+
+
+def mention_pill(m: dict) -> str:
+    cls = mention_class(m)
+    label = {
+        "positive": ("Positive", GOOD), "negative": ("Negative", BAD),
+        "neutral": ("Neutral", NEUTRAL), "company": ("Company post", OFF),
+        "untagged": ("Awaiting review", WARN),
+    }[cls]
+    return pill(label[0], label[1], strong=False)
+
+
 def render(*, week_of, week_label, prev_label, baseline, partial_notice, entities, platforms,
-           now, prev, period=None, custom=False, all_mentions, all_ratings, flags, lagging, data_link, holdings,
+           now, prev, period=None, custom=False, comparable=None, prev_span="", all_mentions, all_ratings, flags, lagging, data_link, holdings,
            settings) -> tuple[str, dict]:
     cfg = settings.get("digest", {})
     minimum = int(cfg.get("min_scored_mentions", 2))
@@ -623,7 +671,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         checked_dates = [d for d in checked_dates if d <= period[1]]
     last_monitored = max(checked_dates) if checked_dates else None
     ready, needed = alert_readiness()
-    compare = not baseline
+    # Weekly digests compare with the week before. A report over a stretch of
+    # days compares with the same number of days just before it, when those
+    # were monitored (build_digest decides; prev_span names them).
+    compare = (not baseline) if comparable is None else bool(comparable)
+    prev_desc = (f"the previous {period[2]} days ({x(prev_span)})" if period and prev_span
+                 else "last week")
+    vs_short = "prev. period" if period else "last wk"
     # The words for the period this email covers.
     span = f"in the last {period[2]} days" if period else "this week"
     if custom:
@@ -662,7 +716,8 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
 
     # Header
     heading = (f"{x(week_label)}" if baseline else f"Week of {x(week_label)}")
-    vs = "" if baseline else f" &middot; compared with {x(prev_label)}"
+    vs = ("" if not compare else
+          f" &middot; compared with {x(prev_span) if prev_span else x(prev_label)}")
     monitored = (f"Last monitored {H.day_month(last_monitored, year=True)}"
                  if last_monitored else "Not yet monitored")
     p.append(
@@ -689,7 +744,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     total, total_prev = len(now), len(prev)
     tiles = [
         tile(total, "Mentions" if period else "New mentions",
-             arrow(total - total_prev, up_is_good=None) + " vs last wk" if compare else ""),
+             arrow(total - total_prev, up_is_good=None) + f" vs {vs_short}" if compare else ""),
         tile(counts_now["positive"], "Positive", colour=GOOD[1]),
         tile(counts_now["negative"], "Negative", colour=BAD[1] if counts_now["negative"] else INK),
         tile(rating_changes, "Rating changes",
@@ -702,7 +757,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
 
     # 1 Headline - sentiment by company
     p.append(section(1, "Headline", f"Mentions and sentiment for each company {span}"
-                     + ("" if baseline else ", against last week") + "."))
+                     + (f", against {prev_desc}" if compare else "") + "."))
     rows = []
     groups = list(entities.items()) + [("__group__", "Group total")]
     for i, (eid, name) in enumerate(groups):
@@ -760,6 +815,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
     pending_note = (note(f"{plural(pending, 'mention')} not yet sentiment-tagged &mdash; shown as "
                          "awaiting review and left out of the scores until a person reads "
                          f"{'it' if pending == 1 else 'them'}.", WARN[1]) if pending else "")
+    p.append(row(trend_line(now, prev, minimum, compare, prev_desc), pad="14px 32px 0 32px"))
     p.append(row(table([th("Company", width="27%"), th("Mentions", "center", "13%"),
                         th("What was said", width="30%"), th("Overall score", "right", "30%")],
                        rows)
@@ -846,8 +902,41 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  + (note(f"{x(', '.join(unrated))}: no {x(any_site)} page &mdash; not evidence "
                          "of a quiet week.") if unrated else "")))
 
-    # 3 Themes, then job-market signals
-    p.append(section(3, "Themes", f"The {min(max_themes, 4)} most-mentioned topics, company by "
+    # 3 What's New - one line per review or post, newest first, each linked to
+    # the original: company, site, date, sentiment and what was said. The
+    # sheet keeps the full record; this is what a reader scans in the email.
+    p.append(section(3, "What's New", f"Every review or post {span}, newest first."))
+    if now:
+        new_rows = []
+        ordered = sorted(now, key=lambda m: (m.get("post_date") or m.get("captured_at") or "",
+                                             m.get("entity") or ""), reverse=True)
+        for i, m in enumerate(ordered):
+            last = i == len(ordered) - 1
+            link = (m.get("url") or "").strip() or H.profile_url(m.get("entity", ""),
+                                                                   m.get("platform", ""))
+            text = (m.get("one_line_summary") or m.get("title_or_snippet")
+                    or "(no summary)").strip()
+            text = text if len(text) <= summary_max else text[:summary_max - 1].rstrip() + "…"
+            said = (f'<a href="{x(link)}" style="color:{INK};text-decoration:underline;">'
+                    f'{x(text)}</a>' if link else x(text))
+            new_rows.append("<tr>"
+                            + td(x(fmt_day(m.get("post_date") or m.get("captured_at") or "")),
+                                 last=last)
+                            + td(f"<strong>{x(entities.get(m.get('entity'), m.get('entity')))}"
+                                 "</strong>" + small(x(platforms.get(m.get("platform"),
+                                                                     m.get("platform")))),
+                                 last=last)
+                            + td(mention_pill(m), last=last)
+                            + td(said, last=last) + "</tr>")
+        p.append(row(table([th("Posted", width="12%"), th("Company", width="22%"),
+                            th("Sentiment", width="16%"), th("What was said", width="50%")],
+                           new_rows)))
+    else:
+        p.append(row(box(f'<strong style="color:{INK};">Nothing new {span}.</strong> '
+                         "No review or post was found on any checked channel.")))
+
+    # 4 Themes, then job-market signals
+    p.append(section(4, "Themes", f"The {min(max_themes, 4)} most-mentioned topics, company by "
                      "company."))
     start = week_of - dt.timedelta(days=7 * (rolling_weeks - 1))
     window = []
@@ -954,7 +1043,27 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                         "AmbitionBox (a count, not pay levels).")))
 
     # 4 Red Flags
-    p.append(section(4, "Red Flags", "Serious issues, alerted separately from "
+    # When each automatic channel last ran. A row of zeros from a collector
+    # that ran reads as a quiet period; from one that never ran it reads the
+    # same, so the run date is what tells the two apart. By-hand reads come
+    # from the sweep log and from rating snapshots, which a person takes.
+    run_cutoff = min(period[1] if period else week_of + dt.timedelta(days=6),
+                     dt.date.today()).isoformat()
+    last_run, by_hand = {}, {}
+    for sw in sweeps:
+        if (sw.get("checked_at") or "") > run_cutoff:
+            continue
+        pid_ = sw.get("platform")
+        seen = last_run if (sw.get("checked_by") or "") == "collector" else by_hand
+        seen[pid_] = max(seen.get(pid_, ""), sw.get("checked_at") or "")
+    # A review logged by a person is a read of that page too.
+    for r in all_ratings + [m for m in all_mentions
+                            if (m.get("captured_by") or "") not in ("collector", "")]:
+        when = (r.get("captured_at") or "")[:10]
+        if when and when <= run_cutoff:
+            by_hand[r.get("platform")] = max(by_hand.get(r.get("platform"), ""), when)
+
+    p.append(section(5, "Red Flags", "Serious issues, alerted separately from "
                      "this digest."))
     if flags:
         rows = []
@@ -964,8 +1073,13 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                 sent = f'<strong style="color:{BAD[1]};">Not yet sent</strong>'
             else:
                 colour = GOOD[1] if r["on_time"] else BAD[1]
+                everyone = {str(q.get("name", "")).strip()
+                            for q in H.load_yaml("recipients").get("red_flag", [])}
+                got = {n.strip() for n in (r.get("sent_to") or "").split(",") if n.strip()}
                 sent = (f'{x(fmt_day(r["notified"]))}'
-                        + small(f'<strong style="color:{colour};">{x(r["timing"])}</strong>'))
+                        + small(f'<strong style="color:{colour};">{x(r["timing"])}</strong>')
+                        + (small(f'to {x(", ".join(sorted(got)))} only', WARN[1])
+                           if got and everyone - got else ""))
             # What the review says, in one neutral line (names are already
             # redacted in the summary), and a way to the review itself. The
             # reviewer's job title and department are left out: on a small team
@@ -998,31 +1112,40 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
         p.append(row(box(f'<strong style="color:{INK};">None {span}.</strong> '
                          f"{plural(len(now), 'mention')} checked for named people, harassment, "
                          "non-payment, legal action or viral posts.", (GOOD[0], "#4b5563"))))
+    # How quickly a red flag reaches the four of you: which channels are
+    # scanned every day, which a person reads, and when each last happened.
+    auto_days = [d for d in last_run.values() if d]
+    review_days = [by_hand.get(q, "") for q in ("ambitionbox", "glassdoor")]
+    review_days = [d for d in review_days if d]
+    p.append(row(note(
+        "<strong>Alert timing:</strong> Reddit, news and Quora are scanned automatically "
+        "every morning at 09:00 IST"
+        + (f" (last scan {x(fmt_day(max(auto_days)))})" if auto_days else "")
+        + ". AmbitionBox, Glassdoor and LinkedIn block automated access, so a person reads them"
+        + (f" (last read {x(fmt_day(max(review_days)))})" if review_days else "")
+        + ". A confirmed red flag is emailed the day it is found, not held for this digest; "
+        "<em>Alert sent</em> shows when each went.", MUTED), pad="6px 32px 0 32px"))
 
     # Monitoring transparency, then 6 Data Link
     if period:
         cover = period_coverage(period, week_of, platforms, all_ratings, sweeps, now, settings)
     absent = set(H.absent_profiles())
     no_page_anywhere = {c["pid"] for c in cover if "No company page" in c["state"]}
-    # When each automatic channel last ran. A row of zeros from a collector
-    # that ran reads as a quiet period; from one that never ran it reads the
-    # same, so the run date is what tells the two apart.
-    run_cutoff = min(period[1] if period else week_of + dt.timedelta(days=6),
-                     dt.date.today()).isoformat()
-    last_run, by_hand = {}, {}
-    for sw in sweeps:
-        if (sw.get("checked_at") or "") > run_cutoff:
-            continue
-        pid_ = sw.get("platform")
-        seen = last_run if (sw.get("checked_by") or "") == "collector" else by_hand
-        seen[pid_] = max(seen.get(pid_, ""), sw.get("checked_at") or "")
     crow = []
     totals = collections.Counter()
     for i, c in enumerate(cover):
         last = False
         pid = c["pid"]
         how = c["how"]
-        if how == "Automatic":
+        if how == "Manual":
+            # Listing a channel is not the same as checking it: say when a
+            # person last did, and how many of the weeks due were covered.
+            when = by_hand.get(pid, "")
+            weeks = (f" &middot; {c['hit']} of {plural(c['due_weeks'], 'week')}"
+                     if period and c.get("due_weeks") else "")
+            how = (f"By hand &middot; checked {x(fmt_day(when))}{weeks}" if when else
+                   f'<span style="color:{WARN[1]};">By hand &middot; not checked</span>')
+        elif how == "Automatic":
             # A channel whose collector is off but which was searched by hand
             # says so: "not running" alone reads as unchecked.
             how = (f"Automatic &middot; ran {x(fmt_day(last_run[pid]))}" if last_run.get(pid) else
@@ -1054,7 +1177,7 @@ def render(*, week_of, week_label, prev_label, baseline, partial_notice, entitie
                  pad="28px 32px 0 32px"))
 
     sheet_rows = len(S.rows_for(now))
-    p.append(section(5, "Data Link", "Every review, newest first, with a link to each." if custom
+    p.append(section(6, "Data Link", "Every review, newest first, with a link to each." if custom
                      else f"Every review {span}, newest first, with a link to each."))
     p.append(row(
         (f'<a href="{x(data_link)}" style="display:inline-block;background:{INK};'

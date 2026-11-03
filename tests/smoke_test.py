@@ -455,10 +455,10 @@ def test_digest() -> None:
     # apostrophe in "What's New". Same six deliverables, different bytes -
     # section_heading() reads either, so this checks the digest's default
     # output whichever style that currently is.
-    # The executive email leaves out What's New at leadership's request (the
-    # items are in the linked sheet); the plain text keeps all six.
-    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "Themes"),
-                          (4, "Red Flags"), (5, "Data Link")):
+    # What's New is back in the executive email: the brief asks for every
+    # review in the email body, not only in the linked sheet.
+    for number, title in ((1, "Headline"), (2, "Rating Movement"), (3, "What's New"),
+                          (4, "Themes"), (5, "Red Flags"), (6, "Data Link")):
         check(f"html has section '{number} · {title}'",
               section_heading(body_html, number, title))
     for heading in ("1. HEADLINE", "2. RATING MOVEMENT", "3. WHAT'S NEW",
@@ -2496,8 +2496,8 @@ def test_job_market_reaches_the_digest() -> None:
     check("and the three candidate signals",
           all(s in html for s in ("Interviews &amp; hiring", "Pay &amp; appraisals",
                                   "Exits &amp; layoffs")))
-    themes = html.find(">3 &middot; Themes<")
-    flags = html.find(">4 &middot; Red Flags<")
+    themes = html.find(">4 &middot; Themes<")
+    flags = html.find(">5 &middot; Red Flags<")
     check("inside Themes, before Red Flags",
           0 <= themes < html.lower().find("job market") < flags)
 
@@ -2783,11 +2783,9 @@ def test_the_six_deliverables_are_all_present() -> None:
     _subject, html, text, _stats = build_digest.build(WEEK, H.load_yaml("settings"))
     six = ["Headline", "Rating Movement", "What's New", "Themes",
            "Red Flags", "Data Link"]
-    five = [s for s in six if s != "What's New"]
-
     for body, name in ((html, "html"), (text, "text")):
         lowered = body.lower().replace("&#x27;", "'")
-        wanted = five if name == "html" else six
+        wanted = six
         where = [lowered.find(s.lower()) for s in wanted]
         check(f"all six are named in the {name} body",
               all(i >= 0 for i in where),
@@ -2846,7 +2844,7 @@ def test_the_sent_message_carries_the_deliverables() -> None:
     for kind in ("plain", "html"):
         body = msg.get_body(preferencelist=(kind,)).get_content()
         lowered = body.lower().replace("&#x27;", "'")
-        wanted = six if kind == "plain" else [n for n in six if n != "What's New"]
+        wanted = six
         where = [lowered.find(name.lower()) for name in wanted]
         check(f"all six deliverables reach the {kind} part",
               all(i >= 0 for i in where),
@@ -3183,9 +3181,60 @@ def test_summary_sheet_keeps_only_what_a_reader_needs() -> None:
           rows[1][S.COLUMNS.index("Link")].startswith("https://www.ambitionbox.com/"))
 
 
+def test_sentiment_direction_is_stated() -> None:
+    """The brief asks whether sentiment improved or declined, not just the counts.
+
+    A report over a stretch of days is compared with the same number of days
+    before it - but only when monitoring covered those days, or every finding
+    would read as an increase over days nobody read.
+    """
+    print("sentiment direction")
+    import digest_exec as X
+
+    pos = {"sentiment": "positive", "status": "reviewed"}
+    neg = {"sentiment": "negative", "status": "reviewed"}
+    line = X.trend_line([pos, pos, neg], [neg, neg, pos], 2, True, "last week")
+    check("a better score reads Improved", "Improved" in line, line)
+    line = X.trend_line([neg, neg, pos], [pos, pos, neg], 2, True, "last week")
+    check("a worse score reads Declined", "Declined" in line, line)
+    line = X.trend_line([pos], [neg, neg], 2, True, "last week")
+    check("too few reviews says so instead of guessing", "too few" in line, line)
+    line = X.trend_line([pos, pos], [], 2, False, "")
+    check("a first report says there is nothing to compare", "nothing to compare" in line, line)
+
+    settings = H.load_yaml("settings")
+    start = build_digest.monitoring_start(settings)
+    check("monitoring has a start date", start is not None)
+    if start:
+        first = start + dt.timedelta(days=14)
+        _s, html, _t, _st = build_digest.build(H.week_start_of(first + dt.timedelta(days=6)),
+                                               settings, window=(first, first + dt.timedelta(days=6)))
+        check("a range after monitoring began is compared with the days before",
+              "Sentiment trend" in html and "compared with" in html)
+        _s, html, _t, _st = build_digest.build(H.week_start_of(start + dt.timedelta(days=6)),
+                                               settings, window=(start, start + dt.timedelta(days=6)))
+        check("a range at the very start is not compared with unread days",
+              "nothing to compare" in html and "compared with" not in html)
+
+
+def test_an_unsent_alert_is_raised_daily() -> None:
+    """A confirmed red flag with no alert sent shows up every morning."""
+    print("unsent alerts")
+    flagged = {"mention_id": "M-1", "red_flag": "yes", "entity": "rk_group",
+               "platform": "ambitionbox", "captured_at": "2026-10-01"}
+    waiting = {"mention_id": "M-1", "status": "open", "raised_at": "2026-10-01",
+               "notified_at": ""}
+    check("an alert not yet sent is overdue",
+          len(red_flags.overdue([flagged], [waiting])) == 1)
+    check("one that went is not",
+          not red_flags.overdue([flagged], [dict(waiting, notified_at="2026-10-01")]))
+    check("a closed flag is not",
+          not red_flags.overdue([flagged], [dict(waiting, status="closed")]))
+
+
 def main() -> int:
     for test in (test_matching, test_scope_guardrail, test_weeks, test_urls, test_collector, test_x_collection,
-                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_reaches_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_two_quiet_failures_in_the_daily_path, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_summary_sheet_keeps_only_what_a_reader_needs, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
+                 test_sheet_covers_schema, test_carry_forward, test_workbook_round_trip, test_rate_limit_backoff, test_a_server_error_is_retried, test_red_flag_wording_has_context, test_unrated_entity_is_named, test_no_platform_specific_date_formats, test_interactive_saves_as_it_goes, test_prompt_accepts_real_typing, test_week_one_reports_the_baseline, test_weekly_effort_log, test_sweep_worksheet_covers_every_platform, test_absent_profile_is_disclosed, test_company_page_activity_is_coverage_not_sentiment, test_linkedin_post_date_from_url, test_company_post_batch_parsing, test_job_market_reaches_the_digest, test_the_six_deliverables_are_all_present, test_the_sent_message_carries_the_deliverables, test_broadsheet_is_a_skin_not_a_restructure, test_an_escalation_reaches_section_5, test_daily_check_records_and_reports_staleness, test_same_day_claim_follows_the_data, test_two_quiet_failures_in_the_daily_path, test_recipients_cannot_diverge_silently, test_channel_yield_separates_empty_from_unmeasured, test_market_worksheet_urls, test_job_market_sheet, test_summary_sheet_keeps_only_what_a_reader_needs, test_sentiment_direction_is_stated, test_an_unsent_alert_is_raised_daily, test_status_reports_the_trial_week, test_fields_reach_the_email, test_absent_values_are_named, test_unverified_channels_are_named, test_linkedin_is_fully_reachable, test_same_day_promise_is_qualified, test_quiet_red_flag_week_states_the_protocol, test_job_market_and_salary_insights, test_interviews_do_not_mask_unread_reviews, test_partial_feed_run_is_not_coverage, test_reddit_is_one_search_for_the_group, test_a_locked_file_says_so, test_a_merge_conflict_in_a_data_file_is_an_error, test_a_malformed_row_does_not_crash_three_files_away, test_source_link_falls_back_to_the_page, test_marketplace_complaints_are_out_of_scope, test_remove_mention, test_coverage_gate, test_red_flag_sla, test_config_consistency, test_sheet_import, test_sheet_import_v2, test_digest,
                  test_send_guards, test_red_flags):
         test()
     print()

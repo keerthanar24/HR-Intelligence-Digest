@@ -408,6 +408,10 @@ def red_flag_rows(mentions, escalations, entities, platforms):
                 "notified": notified.isoformat() if notified else "",
                 "timing": timing,
                 "on_time": on_time,
+                # Who it actually went to, when that is written down. An alert
+                # that reached one of the four is not an alert to the four.
+                "sent_to": (esc.get("notified") or "") if notified and not
+                           H.is_yes(esc.get("notified", "")) else "",
                 # The digest never carries a named individual; the restricted
                 # escalation log does. See docs/00-brief.md section 10.
                 "summary": m.get("one_line_summary", ""),
@@ -675,6 +679,23 @@ def period_window(week_of: dt.date, settings: dict):
         return None
     last = week_of + dt.timedelta(days=6)
     return last - dt.timedelta(days=int(days) - 1), last, int(days)
+
+
+def monitoring_start(settings: dict):
+    """The first day monitoring covers: the start of the earliest back-read,
+    either the week 1 baseline or a configured period report. Nothing before
+    it was read, so no comparison reaches back past it."""
+    starts = []
+    trial = H.parse_date(str(settings.get("programme", {}).get("trial_start", "")))
+    if trial:
+        window = H.baseline_window(H.week_start_of(trial), settings)
+        starts.append(window[0] if window else trial)
+    for week in (settings.get("digest", {}).get("period_reports") or {}):
+        day = H.parse_date(str(week))
+        window = period_window(day, settings) if day else None
+        if window:
+            starts.append(window[0])
+    return min(starts) if starts else None
 
 
 def baseline_window(week_of: dt.date, settings: dict):
@@ -1073,17 +1094,31 @@ def build(week_of: dt.date, settings: dict,
         first, last, baseline_days = baseline
         now = [m for m in mentions_in(all_mentions, first, last)
                if (m.get("status") or "") != "out_of_scope"]
-        # Nothing precedes a baseline, so there is no previous period to
-        # compare against and every "vs last week" column reads n/a.
-        prev = []
+        # The comparison for a report over a stretch of days is the stretch of
+        # the same length just before it - 26 Oct to 2 Nov against 18 to 25
+        # Oct. It is made only when monitoring already covered that earlier
+        # stretch; otherwise "vs previous" would compare against days nobody
+        # read and call every finding an increase.
+        prev_first = first - dt.timedelta(days=baseline_days)
+        prev_last = first - dt.timedelta(days=1)
+        started = monitoring_start(settings)
+        if started and prev_first >= started:
+            prev = [m for m in mentions_in(all_mentions, prev_first, prev_last)
+                    if (m.get("status") or "") != "out_of_scope"]
+            prev_span = (prev_first, prev_last)
+        else:
+            prev = []
+            prev_span = None
     else:
         baseline_days = 0
         now = [m for m in H.mentions_for_week(all_mentions, week_of)
                if (m.get("status") or "") != "out_of_scope"]
         prev = [m for m in H.mentions_for_week(all_mentions, prev_week)
                 if (m.get("status") or "") != "out_of_scope"]
+        prev_span = (prev_week, prev_week + dt.timedelta(days=6))
+    comparable = prev_span is not None
 
-    heads = headline_rows(now, prev, entities, comparable=not baseline)
+    heads = headline_rows(now, prev, entities, comparable=comparable)
     ratings = rating_rows(all_ratings, week_of, entities, platforms)
     themes = theme_rows(now, max_themes)
     flags = red_flag_rows(now, escalations, entities, platforms)
@@ -1107,7 +1142,7 @@ def build(week_of: dt.date, settings: dict,
     company_posts = sum(1 for m in now if H.is_company_voice(m))
     data_link = digest_cfg.get("data_link", "")
     holdings = sheet_contents(now, all_ratings, flags, week_of)
-    compare = "n/a" if baseline else None
+    compare = None if comparable else "n/a"
 
     def vs_previous(value, previous, digits=0):
         """The 'vs previous week' figure, or n/a when nothing precedes it."""
@@ -1536,6 +1571,9 @@ def build(week_of: dt.date, settings: dict,
         body, extra = digest_exec.render(
             week_of=week_of, week_label=week_label, prev_label=H.fmt_week(prev_week),
             baseline=bool(baseline), partial_notice=(notice if partial else ""),
+            comparable=comparable,
+            prev_span=(f"{H.day_month(prev_span[0])} to {H.day_month(prev_span[1])}"
+                       if baseline and comparable else ""),
             period=baseline if is_period else None, custom=bool(window),
             entities=entities, platforms=platforms,
             now=now, prev=prev,

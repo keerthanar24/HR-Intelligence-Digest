@@ -38,10 +38,24 @@ jobs:
             git add data/ && git commit -m "Daily collection: new mentions from feeds" && git push
           fi
 
+      # shell: bash turns on pipefail. Without it the step's status is tee's,
+      # which always succeeds - so a scan that found candidates passed green
+      # and nobody was notified.
       - name: Scan for red-flag candidates
         id: scan
+        shell: bash
         run: |
           python scripts/red_flags.py --scan --exit-code | tee scan.log
+        continue-on-error: true
+
+      # A flag that was confirmed but whose alert never went out is raised
+      # every morning until it does, instead of surfacing only as "Not yet
+      # sent" in the next digest.
+      - name: Confirmed red flags with no alert sent
+        id: overdue
+        shell: bash
+        run: |
+          python scripts/red_flags.py --overdue --exit-code | tee overdue.log
         continue-on-error: true
 
       # The scan can only flag what has been logged, and AmbitionBox and
@@ -58,6 +72,7 @@ jobs:
 
       - name: Is the review-page check actually happening?
         id: freshness
+        shell: bash
         run: python scripts/daily_check.py --stale-after 7 | tee -a check.log
         continue-on-error: true
 
@@ -78,6 +93,16 @@ jobs:
             cat scan.log
             echo '```'
             echo ""
+            echo "## Confirmed red flags"
+            echo ""
+            if [ "${{ steps.overdue.outcome }}" = "failure" ]; then
+              echo "**An alert has not been sent. Send it today.**"
+            fi
+            echo ""
+            echo '```'
+            cat overdue.log
+            echo '```'
+            echo ""
             echo "## Review pages (AmbitionBox, Glassdoor)"
             echo ""
             if [ "${{ steps.freshness.outcome }}" = "failure" ]; then
@@ -92,4 +117,5 @@ jobs:
           # Fail the job when there is something to look at, so GitHub notifies -
           # either a candidate to judge, or a check nobody is doing.
           [ "${{ steps.scan.outcome }}" != "failure" ] \
+            && [ "${{ steps.overdue.outcome }}" != "failure" ] \
             && [ "${{ steps.freshness.outcome }}" != "failure" ]

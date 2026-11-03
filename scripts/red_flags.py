@@ -89,6 +89,23 @@ def open_flags(mentions: list[dict], escalations: list[dict]) -> list[tuple[dict
     return out
 
 
+def overdue(mentions: list[dict], escalations: list[dict]):
+    """Confirmed red flags whose alert has not gone out: (mention, escalation, days).
+
+    The protocol promises a same-day alert once a flag is confirmed. The daily
+    workflow runs this, so a flag confirmed but never sent is raised every
+    morning until it is, instead of waiting for the digest to show "Not yet sent".
+    """
+    today = dt.date.today()
+    out = []
+    for m, esc in open_flags(mentions, escalations):
+        if (esc.get("notified_at") or "").strip():
+            continue
+        found = H.parse_date(esc.get("raised_at", "")) or H.parse_date(m.get("captured_at", ""))
+        out.append((m, esc, (today - found).days if found else 0))
+    return out
+
+
 def draft_alert(row: dict, settings: dict, recipients: dict) -> str:
     entities = H.entity_names()
     platforms = H.platform_names()
@@ -292,6 +309,8 @@ def main() -> int:
     parser.add_argument("--owner", default="desk")
     parser.add_argument("--send", action="store_true",
                         help="with --raise, actually email the alert now")
+    parser.add_argument("--overdue", action="store_true",
+                        help="list confirmed red flags whose alert has not been sent")
     parser.add_argument("--exit-code", action="store_true",
                         help="exit 1 if the scan finds candidates, so a scheduled run "
                              "can raise them instead of passing quietly")
@@ -329,6 +348,20 @@ def main() -> int:
             print(f"Warning: no email address set for {', '.join(missing)} in config/recipients.yaml")
         return 0
 
+    if args.overdue:
+        late = overdue(mentions, escalations)
+        if not late:
+            print("Every confirmed red flag has had its alert sent.")
+            return 0
+        print(f"{len(late)} confirmed red flag(s) with no alert sent yet:\n")
+        for m, esc, days in late:
+            print(f"  {m.get('mention_id','?')} [{m.get('entity')}/{m.get('platform')}] "
+                  f"{(m.get('red_flag_reason') or 'unspecified').replace('_', ' ')} "
+                  f"- found {days} day(s) ago")
+            print(f"      {m.get('url') or esc.get('url', '')}")
+        print("\nSend the alert, then record notified_at in data/escalations.csv.")
+        return 1 if args.exit_code else 0
+
     if args.scan:
         found = suggestions(mentions, settings)
         if not found:
@@ -355,7 +388,9 @@ def main() -> int:
     for m, esc in flags:
         raised = H.parse_date(esc.get("raised_at", "")) or H.parse_date(m.get("captured_at", ""))
         age = f"{(today - raised).days}d old" if raised else "age unknown"
-        notified = esc.get("notified") or "NOT YET NOTIFIED"
+        # "notified" holds who the alert is FOR; only notified_at says it went.
+        notified = (f"{esc.get('notified') or 'sent'} on {esc.get('notified_at')}"
+                    if esc.get("notified_at") else "NOT YET NOTIFIED")
         print(f"  {m.get('mention_id','?')} [{m.get('entity')}/{m.get('platform')}] "
               f"{(m.get('red_flag_reason') or 'unspecified').replace('_',' ')} · {age}")
         print(f"      status: {esc.get('status') or 'open'} · notified: {notified}")
